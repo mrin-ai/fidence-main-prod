@@ -1,0 +1,200 @@
+"use client"
+
+import {
+  ChevronDownIcon,
+  CopyIcon,
+  EllipsisVerticalIcon,
+  ExternalLinkIcon,
+  Link2Icon,
+  PlusIcon,
+} from "lucide-react"
+
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
+  dashboardCardClassName,
+  dashboardPanelBodyHeightClassName,
+  dashboardPanelFadeClassName,
+  dashboardPanelHeaderClassName,
+  dashboardPanelScrollClassName,
+  dashboardPanelTitleClassName,
+} from "@/lib/dashboard-styles"
+import { useScrollFade } from "@/hooks/use-scroll-fade"
+import { cn } from "@/lib/utils"
+
+type PaymentLink = {
+  id: string
+  amount: string
+  status: "pending" | "paid"
+  iconClassName: string
+}
+
+const paymentLinks: PaymentLink[] = [
+  {
+    id: "1",
+    amount: "10 USDC",
+    status: "pending",
+    iconClassName: "bg-accent text-primary",
+  },
+  {
+    id: "2",
+    amount: "25 USDC",
+    status: "paid",
+    iconClassName: "bg-secondary text-secondary-foreground",
+  },
+  {
+    id: "3",
+    amount: "50 USDC",
+    status: "pending",
+    iconClassName: "bg-accent text-primary",
+  },
+  {
+    id: "4",
+    amount: "100 USDC",
+    status: "paid",
+    iconClassName: "bg-secondary text-secondary-foreground",
+  },
+  {
+    id: "5",
+    amount: "15 USDC",
+    status: "paid",
+    iconClassName: "bg-accent text-primary",
+  },
+  {
+    id: "6",
+    amount: "75 USDC",
+    status: "pending",
+    iconClassName: "bg-secondary text-secondary-foreground",
+  },
+]
+
+function PaymentLinkStatusBadge({ status }: { status: PaymentLink["status"] }) {
+  if (status === "paid") {
+    return (
+      <Badge className="h-5 border-transparent bg-secondary px-1.5 text-[0.625rem] text-secondary-foreground">
+        Paid
+      </Badge>
+    )
+  }
+
+  return (
+    <Badge
+      variant="outline"
+      className="h-5 border-accent bg-accent/40 px-1.5 text-[0.625rem] text-accent-foreground"
+    >
+      Pending
+    </Badge>
+  )
+}
+
+export function PaymentLinks({ className }: { className?: string }) {
+  const { scrollRef, showBottomFade } = useScrollFade()
+
+  return (
+    <Card className={cn(dashboardCardClassName, "w-full self-start", className)}>
+      <CardHeader className={dashboardPanelHeaderClassName}>
+        <CardTitle className={dashboardPanelTitleClassName}>
+          Payment Links
+        </CardTitle>
+        <CardAction>
+          <Button
+            variant="link"
+            className="h-auto gap-1 px-0 text-xs font-medium text-muted-foreground"
+          >
+            <PlusIcon className="size-3" />
+            New
+          </Button>
+        </CardAction>
+      </CardHeader>
+      <CardContent className="relative pt-0">
+        <div
+          ref={scrollRef}
+          className={cn(
+            dashboardPanelBodyHeightClassName,
+            dashboardPanelScrollClassName,
+            "divide-y divide-border"
+          )}
+        >
+          {paymentLinks.map((link) => (
+            <div
+              key={link.id}
+              className="flex items-center gap-2.5 py-2.5 first:pt-0 last:pb-0"
+            >
+              <div
+                className={cn(
+                  "flex size-8 shrink-0 items-center justify-center rounded-lg",
+                  link.iconClassName
+                )}
+              >
+                <Link2Icon className="size-3.5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium tabular-nums">{link.amount}</p>
+                <PaymentLinkStatusBadge status={link.status} />
+              </div>
+              <div className="flex shrink-0 items-center gap-0.5">
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  className="text-muted-foreground"
+                  aria-label="Copy link"
+                >
+                  <CopyIcon className="size-3.5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  className="text-muted-foreground"
+                  aria-label="Open link"
+                >
+                  <ExternalLinkIcon className="size-3.5" />
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger
+                    render={
+                      <Button
+                        variant="ghost"
+                        size="icon-xs"
+                        className="text-muted-foreground"
+                        aria-label="More options"
+                      />
+                    }
+                  >
+                    <EllipsisVerticalIcon className="size-3.5" />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-36">
+                    <DropdownMenuItem>Edit</DropdownMenuItem>
+                    <DropdownMenuItem>Share</DropdownMenuItem>
+                    <DropdownMenuItem variant="destructive">Delete</DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div
+          aria-hidden
+          className={cn(
+            dashboardPanelFadeClassName,
+            showBottomFade ? "opacity-100" : "opacity-0"
+          )}
+        >
+          <ChevronDownIcon className="size-3.5 text-primary/50" />
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
