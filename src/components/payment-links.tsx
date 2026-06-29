@@ -125,13 +125,13 @@ export function PaymentLinks({ className }: { className?: string }) {
           className={cn(
             dashboardPanelBodyHeightClassName,
             dashboardPanelScrollClassName,
-            "divide-y divide-border"
+            "flex flex-col gap-4"
           )}
         >
           {paymentLinks.map((link) => (
             <div
               key={link.id}
-              className="flex items-center gap-2.5 py-2.5 first:pt-0 last:pb-0"
+              className="flex items-center gap-2.5"
             >
               <div
                 className={cn(

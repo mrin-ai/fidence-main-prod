@@ -125,11 +125,11 @@ export function NeedsApproval({ className }: { className?: string }) {
               className={cn(
                 dashboardPanelBodyHeightClassName,
                 dashboardPanelScrollClassName,
-                "divide-y divide-border"
+                "flex flex-col gap-4"
               )}
             >
               {items.map((item) => (
-                <div key={item.id} className="flex flex-col gap-2.5 py-3 first:pt-0">
+                <div key={item.id} className="flex flex-col gap-2.5">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 space-y-1">
                       <p className="text-sm font-medium leading-snug">

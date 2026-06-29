@@ -60,13 +60,13 @@ export function RecentTransactions({ className }: { className?: string }) {
           className={cn(
             dashboardPanelBodyHeightClassName,
             dashboardPanelScrollClassName,
-            "divide-y divide-border"
+            "flex flex-col gap-4"
           )}
         >
           {transactions.map((tx) => (
             <div
               key={tx.id}
-              className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0"
+              className="flex items-center gap-3"
             >
               <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600">
                 <ArrowDownLeftIcon className="size-3.5" />

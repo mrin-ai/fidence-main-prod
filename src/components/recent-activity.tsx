@@ -168,13 +168,13 @@ export function RecentActivity({ className }: { className?: string }) {
           className={cn(
             dashboardPanelBodyHeightClassName,
             dashboardPanelScrollClassName,
-            "divide-y divide-border"
+            "flex flex-col gap-4"
           )}
         >
           {activities.map((activity) => (
             <div
               key={activity.id}
-              className="flex items-start gap-3 py-3 first:pt-0 last:pb-0"
+              className="flex items-start gap-3"
             >
               <div
                 className={cn(

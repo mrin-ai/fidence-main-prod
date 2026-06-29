@@ -61,10 +61,10 @@ export function IdentitiesPageContent() {
 
         <Separator className="my-6 bg-border" />
 
-        <div className="flex flex-wrap items-start gap-6">
-          <AssignedAgents className="max-w-2xl" />
-          <Balance className="max-w-sm" />
-          <ActivityTimeline className="max-w-md" />
+        <div className="grid items-start gap-6 lg:grid-cols-12">
+          <AssignedAgents className="lg:col-span-5" />
+          <Balance className="lg:col-span-3" />
+          <ActivityTimeline className="lg:col-span-4" />
         </div>
 
         {viewTabs.map((tab) => (

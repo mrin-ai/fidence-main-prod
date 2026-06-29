@@ -45,13 +45,13 @@ export function Identities({ className }: { className?: string }) {
           className={cn(
             dashboardPanelBodyHeightClassName,
             dashboardPanelScrollClassName,
-            "divide-y divide-border"
+            "flex flex-col gap-4"
           )}
         >
           {identities.map((identity) => (
             <div
               key={identity.id}
-              className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0"
+              className="flex items-center gap-3"
             >
               <div
                 className={cn(
