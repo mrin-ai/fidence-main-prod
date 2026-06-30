@@ -1,3 +1,5 @@
+"use client"
+
 import type { ReactNode } from "react"
 import {
   ArrowRightIcon,
@@ -7,6 +9,7 @@ import {
   PlusIcon,
 } from "lucide-react"
 
+import { useCreatePaymentLink } from "@/components/create-payment-link-sheet"
 import { cn } from "@/lib/utils"
 
 type ActionCardProps = {
@@ -14,7 +17,9 @@ type ActionCardProps = {
   subtitle: string
   icon: ReactNode
   href?: string
+  onClick?: () => void
   variant?: "primary" | "secondary"
+  comingSoon?: boolean
 }
 
 function ActionCard({
@@ -22,20 +27,14 @@ function ActionCard({
   subtitle,
   icon,
   href = "#",
+  onClick,
   variant = "secondary",
+  comingSoon = false,
 }: ActionCardProps) {
   const isPrimary = variant === "primary"
 
-  return (
-    <a
-      href={href}
-      className={cn(
-        "group flex min-h-[8.75rem] flex-col justify-between rounded-xl p-4 transition-colors",
-        isPrimary
-          ? "bg-primary text-primary-foreground hover:bg-primary/90"
-          : "border border-border/50 bg-card shadow-none hover:border-primary/30 hover:bg-secondary"
-      )}
-    >
+  const content = (
+    <>
       <div className="flex items-start justify-between gap-3">
         <div
           className={cn(
@@ -47,12 +46,18 @@ function ActionCard({
         >
           {icon}
         </div>
-        <ArrowRightIcon
-          className={cn(
-            "size-4 shrink-0 transition-transform group-hover:translate-x-0.5",
-            isPrimary ? "text-primary-foreground/80" : "text-muted-foreground"
-          )}
-        />
+        {comingSoon ? (
+          <span className="rounded-full bg-secondary px-2 py-0.5 text-[0.625rem] font-medium text-secondary-foreground">
+            Soon
+          </span>
+        ) : (
+          <ArrowRightIcon
+            className={cn(
+              "size-4 shrink-0 transition-transform group-hover:translate-x-0.5",
+              isPrimary ? "text-primary-foreground/80" : "text-muted-foreground"
+            )}
+          />
+        )}
       </div>
       <div className="space-y-1">
         <p className="text-sm font-semibold leading-snug">{title}</p>
@@ -65,35 +70,84 @@ function ActionCard({
           {subtitle}
         </p>
       </div>
+    </>
+  )
+
+  if (comingSoon) {
+    return (
+      <div
+        aria-disabled
+        className={cn(
+          "flex min-h-[8.75rem] cursor-default flex-col justify-between rounded-xl border border-border/50 bg-card p-4 opacity-70 shadow-none",
+          isPrimary && "border-primary/20 bg-primary/90 text-primary-foreground"
+        )}
+      >
+        {content}
+      </div>
+    )
+  }
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className={cn(
+          "group flex min-h-[8.75rem] w-full flex-col justify-between rounded-xl p-4 text-left transition-colors",
+          isPrimary
+            ? "bg-primary text-primary-foreground hover:bg-primary/90"
+            : "border border-border/50 bg-card shadow-none hover:border-primary/30 hover:bg-secondary"
+        )}
+      >
+        {content}
+      </button>
+    )
+  }
+
+  return (
+    <a
+      href={href}
+      className={cn(
+        "group flex min-h-[8.75rem] flex-col justify-between rounded-xl p-4 transition-colors",
+        isPrimary
+          ? "bg-primary text-primary-foreground hover:bg-primary/90"
+          : "border border-border/50 bg-card shadow-none hover:border-primary/30 hover:bg-secondary"
+      )}
+    >
+      {content}
     </a>
   )
 }
 
-const actions: ActionCardProps[] = [
-  {
-    title: "Create Payment Link",
-    subtitle: "Generate a new link",
-    icon: <PlusIcon className="size-4" />,
-    variant: "primary",
-  },
-  {
-    title: "Manage Links",
-    subtitle: "View all payment links",
-    icon: <Link2Icon className="size-4" />,
-  },
-  {
-    title: "Rewards",
-    subtitle: "View earned creator rewards",
-    icon: <GiftIcon className="size-4" />,
-  },
-  {
-    title: "API Documentation",
-    subtitle: "Explore developer guides",
-    icon: <Code2Icon className="size-4" />,
-  },
-]
-
 export function QuickActions() {
+  const { openCreatePaymentLink } = useCreatePaymentLink()
+
+  const actions: ActionCardProps[] = [
+    {
+      title: "Create Payment Link",
+      subtitle: "Generate a new link",
+      icon: <PlusIcon className="size-4" />,
+      variant: "primary",
+      onClick: openCreatePaymentLink,
+    },
+    {
+      title: "Manage Links",
+      subtitle: "View all payment links",
+      icon: <Link2Icon className="size-4" />,
+    },
+    {
+      title: "Rewards",
+      subtitle: "View earned creator rewards",
+      icon: <GiftIcon className="size-4" />,
+    },
+    {
+      title: "API Documentation",
+      subtitle: "Explore developer guides",
+      icon: <Code2Icon className="size-4" />,
+      comingSoon: true,
+    },
+  ]
+
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
       {actions.map((action) => (

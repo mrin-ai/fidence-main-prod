@@ -4,7 +4,6 @@ import {
   ArrowDownLeftIcon,
   ArrowUpRightIcon,
   ChevronDownIcon,
-  CircleCheckIcon,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -78,10 +77,6 @@ export function RecentTransactions({ className }: { className?: string }) {
               <div className="shrink-0 text-right">
                 <p className="text-sm font-semibold tabular-nums text-emerald-600">
                   {tx.amount}
-                </p>
-                <p className="flex items-center justify-end gap-1 text-[0.6875rem] text-emerald-600">
-                  <CircleCheckIcon className="size-3" />
-                  Success
                 </p>
               </div>
               <Button

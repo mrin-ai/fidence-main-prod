@@ -9,7 +9,6 @@ import {
   ShoppingCartIcon,
 } from "lucide-react"
 
-import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   dashboardCardClassName,
@@ -108,22 +107,14 @@ const activities: ActivityItem[] = [
   },
 ]
 
-function ActivityStatusBadge({ status }: { status: ActivityStatus }) {
-  if (status === "settled") {
-    return (
-      <Badge className="h-5 border-transparent bg-secondary px-1.5 text-[0.625rem] text-secondary-foreground">
-        Settled
-      </Badge>
-    )
-  }
-
+function ActivityStatusDot({ status }: { status: ActivityStatus }) {
   return (
-    <Badge
-      variant="destructive"
-      className="h-5 px-1.5 text-[0.625rem] font-normal"
-    >
-      Blocked
-    </Badge>
+    <span
+      className={cn(
+        "mt-1 size-1.5 shrink-0 rounded-full",
+        status === "settled" ? "bg-green-500" : "bg-red-500"
+      )}
+    />
   )
 }
 
@@ -193,7 +184,7 @@ export function RecentActivity({ className }: { className?: string }) {
                 </p>
               </div>
               {activity.status ? (
-                <ActivityStatusBadge status={activity.status} />
+                <ActivityStatusDot status={activity.status} />
               ) : null}
             </div>
           ))}

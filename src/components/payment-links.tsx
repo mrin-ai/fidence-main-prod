@@ -9,7 +9,6 @@ import {
   PlusIcon,
 } from "lucide-react"
 
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -35,70 +34,28 @@ import {
 import { useScrollFade } from "@/hooks/use-scroll-fade"
 import { cn } from "@/lib/utils"
 
+type PaymentLinkStatus = "paid" | "pending" | "expired"
+
 type PaymentLink = {
   id: string
   amount: string
-  status: "pending" | "paid"
-  iconClassName: string
+  status: PaymentLinkStatus
+}
+
+const paymentLinkIconClassName: Record<PaymentLinkStatus, string> = {
+  paid: "bg-green-500/10 text-green-600",
+  pending: "bg-amber-500/10 text-amber-600",
+  expired: "bg-red-500/10 text-red-600",
 }
 
 const paymentLinks: PaymentLink[] = [
-  {
-    id: "1",
-    amount: "10 USDC",
-    status: "pending",
-    iconClassName: "bg-accent text-primary",
-  },
-  {
-    id: "2",
-    amount: "25 USDC",
-    status: "paid",
-    iconClassName: "bg-secondary text-secondary-foreground",
-  },
-  {
-    id: "3",
-    amount: "50 USDC",
-    status: "pending",
-    iconClassName: "bg-accent text-primary",
-  },
-  {
-    id: "4",
-    amount: "100 USDC",
-    status: "paid",
-    iconClassName: "bg-secondary text-secondary-foreground",
-  },
-  {
-    id: "5",
-    amount: "15 USDC",
-    status: "paid",
-    iconClassName: "bg-accent text-primary",
-  },
-  {
-    id: "6",
-    amount: "75 USDC",
-    status: "pending",
-    iconClassName: "bg-secondary text-secondary-foreground",
-  },
+  { id: "1", amount: "10 USDC", status: "pending" },
+  { id: "2", amount: "25 USDC", status: "paid" },
+  { id: "3", amount: "50 USDC", status: "pending" },
+  { id: "4", amount: "100 USDC", status: "paid" },
+  { id: "5", amount: "15 USDC", status: "expired" },
+  { id: "6", amount: "75 USDC", status: "pending" },
 ]
-
-function PaymentLinkStatusBadge({ status }: { status: PaymentLink["status"] }) {
-  if (status === "paid") {
-    return (
-      <Badge className="h-5 border-transparent bg-secondary px-1.5 text-[0.625rem] text-secondary-foreground">
-        Paid
-      </Badge>
-    )
-  }
-
-  return (
-    <Badge
-      variant="outline"
-      className="h-5 border-accent bg-accent/40 px-1.5 text-[0.625rem] text-accent-foreground"
-    >
-      Pending
-    </Badge>
-  )
-}
 
 export function PaymentLinks({ className }: { className?: string }) {
   const { scrollRef, showBottomFade } = useScrollFade()
@@ -129,21 +86,17 @@ export function PaymentLinks({ className }: { className?: string }) {
           )}
         >
           {paymentLinks.map((link) => (
-            <div
-              key={link.id}
-              className="flex items-center gap-2.5"
-            >
+            <div key={link.id} className="flex items-center gap-2.5">
               <div
                 className={cn(
                   "flex size-8 shrink-0 items-center justify-center rounded-lg",
-                  link.iconClassName
+                  paymentLinkIconClassName[link.status]
                 )}
               >
                 <Link2Icon className="size-3.5" />
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium tabular-nums">{link.amount}</p>
-                <PaymentLinkStatusBadge status={link.status} />
               </div>
               <div className="flex shrink-0 items-center gap-0.5">
                 <Button
