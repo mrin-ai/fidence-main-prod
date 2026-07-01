@@ -7,6 +7,10 @@ import {
   getNetworkById,
   getTokenById,
 } from "@/lib/create-payment-link-data";
+import {
+  logPaymentLinkCreatedActivity,
+  logPaymentReceivedActivity,
+} from "@/lib/db/activity";
 import { getDb } from "@/lib/db/client";
 import { COLLECTIONS } from "@/lib/db/collections";
 import type { PaymentLinkDoc, PaymentLinkStatus, UserDoc } from "@/lib/db/types";
@@ -112,6 +116,13 @@ export async function createPaymentLink(input: {
   };
 
   const result = await db.collection(COLLECTIONS.paymentLinks).insertOne(doc);
+  const token = getTokenById(input.tokenId);
+
+  await logPaymentLinkCreatedActivity({
+    workspaceId: input.workspaceId,
+    amount: input.amount,
+    tokenSymbol: token?.symbol ?? input.tokenId.toUpperCase(),
+  });
 
   return {
     id: result.insertedId.toString(),
@@ -209,14 +220,10 @@ export async function markPaymentLinkPaid(input: {
     createdAt: now,
   });
 
-  await db.collection(COLLECTIONS.activityEvents).insertOne({
+  await logPaymentReceivedActivity({
     workspaceId: syncedLink.workspaceId,
-    type: "payment_received",
-    summary: `Payment link paid · ${syncedLink.amount} ${token?.symbol ?? syncedLink.tokenId}`,
-    meta: `${normalizedUsername}/${syncedLink.publicId}`,
-    status: "settled",
-    occurredAt: now,
-    createdAt: now,
+    amount: syncedLink.amount,
+    tokenSymbol: token?.symbol ?? syncedLink.tokenId.toUpperCase(),
   });
 
   const updated = await db.collection<PaymentLinkDoc>(COLLECTIONS.paymentLinks).findOne({

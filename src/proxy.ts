@@ -12,7 +12,9 @@ export async function proxy(request: NextRequest) {
 
   const isAuthRoute = pathname === "/sign-in" || pathname === "/sign-up";
   const isProtected =
-    pathname.startsWith("/dashboard") || pathname.startsWith("/settings");
+    pathname.startsWith("/dashboard") ||
+    pathname.startsWith("/settings") ||
+    pathname.startsWith("/invoice");
 
   if (isProtected && !hasValidSession) {
     const url = request.nextUrl.clone();
@@ -52,6 +54,8 @@ export const config = {
     "/dashboard/:path*",
     "/settings",
     "/settings/:path*",
+    "/invoice",
+    "/invoice/:path*",
     "/sign-in",
     "/sign-up",
   ],

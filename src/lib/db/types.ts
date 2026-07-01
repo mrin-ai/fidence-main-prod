@@ -119,6 +119,66 @@ export type ActivityEventDoc = {
   createdAt: Date;
 };
 
+export type InvoiceStatus = "draft" | "sent" | "paid" | "cancelled";
+
+export type InvoiceFieldsDoc = {
+  companyDetails: {
+    logo?: string | null;
+    logoBase64?: string;
+    signature?: string | null;
+    signatureBase64?: string;
+    name: string;
+    address: string;
+    metadata: Array<{ label: string; value: string }>;
+  };
+  clientDetails: {
+    name: string;
+    address: string;
+    metadata: Array<{ label: string; value: string }>;
+  };
+  invoiceDetails: {
+    theme: {
+      baseColor: string;
+      mode: "dark" | "light";
+      template?: "default" | "vercel";
+      font?: "inter" | "geist";
+    };
+    currency: string;
+    prefix: string;
+    serialNumber: string;
+    date: Date;
+    dueDate?: Date | null;
+    paymentTerms: string;
+    billingDetails: Array<{
+      label: string;
+      value: number;
+      type: "fixed" | "percentage";
+    }>;
+  };
+  items: Array<{
+    name: string;
+    description: string;
+    quantity: number;
+    unitPrice: number;
+  }>;
+  metadata: {
+    notes: string;
+    terms: string;
+    paymentInformation: Array<{ label: string; value: string }>;
+  };
+};
+
+export type InvoiceDoc = {
+  _id: ObjectId;
+  workspaceId: ObjectId;
+  createdBy: ObjectId;
+  status: InvoiceStatus;
+  reference: string;
+  fields: InvoiceFieldsDoc;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
 export type SessionContext = {
   session: SessionDoc;
   user: UserDoc;

@@ -74,9 +74,8 @@ const data = {
         },
         {
           title: "Invoice",
-          url: "#",
+          url: "/invoice",
           icon: <FileTextIcon />,
-          comingSoon: true,
         },
         {
           title: "Visa Intelligence",

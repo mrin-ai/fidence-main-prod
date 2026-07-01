@@ -6,6 +6,10 @@ import {
   ChevronDownIcon,
   CircleCheckIcon,
   CreditCardIcon,
+  FileTextIcon,
+  LinkIcon,
+  LogInIcon,
+  LogOutIcon,
   ShoppingCartIcon,
 } from "lucide-react"
 
@@ -30,6 +34,41 @@ type ActivityItem = {
 }
 
 function getActivityVisual(type: string, status?: ActivityStatus) {
+  if (type === "login") {
+    return {
+      icon: <LogInIcon className="size-3.5" />,
+      iconClassName: "bg-secondary text-primary",
+    }
+  }
+
+  if (type === "logout") {
+    return {
+      icon: <LogOutIcon className="size-3.5" />,
+      iconClassName: "bg-muted text-muted-foreground",
+    }
+  }
+
+  if (type === "payment_link_created") {
+    return {
+      icon: <LinkIcon className="size-3.5" />,
+      iconClassName: "bg-accent/70 text-primary",
+    }
+  }
+
+  if (type === "payment_received") {
+    return {
+      icon: <CircleCheckIcon className="size-3.5" />,
+      iconClassName: "bg-green-500/10 text-green-600",
+    }
+  }
+
+  if (type === "invoice_created") {
+    return {
+      icon: <FileTextIcon className="size-3.5" />,
+      iconClassName: "bg-secondary text-secondary-foreground",
+    }
+  }
+
   if (status === "blocked" || type === "blocked") {
     return {
       icon: <BanIcon className="size-3.5" />,

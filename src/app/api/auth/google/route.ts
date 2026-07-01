@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { logLoginActivity } from "@/lib/db/activity";
 import {
   createSessionForUser,
   sessionCookieOptions,
@@ -22,6 +23,7 @@ export async function POST() {
 
     const { token, workspace } = await createSessionForUser(user, "google");
     await seedWorkspaceDemoData(workspace._id, user._id);
+    await logLoginActivity(workspace._id, "google");
 
     const cookieStore = await cookies();
     cookieStore.set(sessionCookieOptions(token));

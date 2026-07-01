@@ -1,6 +1,8 @@
 import { ObjectId } from "mongodb";
-import { getDb } from "@/lib/db/client";
+
+import { formatActivityMeta } from "@/lib/format-date";
 import { COLLECTIONS } from "@/lib/db/collections";
+import { getDb } from "@/lib/db/client";
 import type {
   ActivityEventDoc,
   BalanceDoc,
@@ -56,7 +58,7 @@ export async function getDashboardOverview(
         .collection<ActivityEventDoc>(COLLECTIONS.activityEvents)
         .find({ workspaceId })
         .sort({ occurredAt: -1 })
-        .limit(20)
+        .limit(50)
         .toArray(),
       db
         .collection<BalanceDoc>(COLLECTIONS.balances)
@@ -123,7 +125,7 @@ export async function getDashboardOverview(
     activities: activities.map((event) => ({
       id: event._id.toString(),
       summary: event.summary,
-      meta: event.meta,
+      meta: formatActivityMeta(event.occurredAt),
       status: event.status,
       type: event.type,
     })),

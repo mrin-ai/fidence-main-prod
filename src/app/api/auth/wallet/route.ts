@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { verifyMessage } from "viem";
+import { logLoginActivity } from "@/lib/db/activity";
 import {
   createSessionForUser,
   sessionCookieOptions,
@@ -52,6 +53,7 @@ export async function POST(request: Request) {
       address,
     );
     await seedWorkspaceDemoData(workspace._id, user._id);
+    await logLoginActivity(workspace._id, "wallet");
 
     const cookieStore = await cookies();
     cookieStore.set(sessionCookieOptions(token));

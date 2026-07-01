@@ -7,4 +7,5 @@ export const COLLECTIONS = {
   transactions: "transactions",
   balances: "balances",
   activityEvents: "activity_events",
+  invoices: "invoices",
 } as const;
