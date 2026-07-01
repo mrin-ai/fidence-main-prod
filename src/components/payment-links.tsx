@@ -8,7 +8,9 @@ import {
   Link2Icon,
   PlusIcon,
 } from "lucide-react"
+import { toast } from "sonner"
 
+import { useCreatePaymentLink } from "@/components/create-payment-link-sheet"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -31,34 +33,38 @@ import {
   dashboardPanelScrollClassName,
   dashboardPanelTitleClassName,
 } from "@/lib/dashboard-styles"
+import type { PaymentLinkStatus } from "@/lib/db/types"
 import { useScrollFade } from "@/hooks/use-scroll-fade"
 import { cn } from "@/lib/utils"
-
-type PaymentLinkStatus = "paid" | "pending" | "expired"
 
 type PaymentLink = {
   id: string
   amount: string
   status: PaymentLinkStatus
+  url: string
 }
 
 const paymentLinkIconClassName: Record<PaymentLinkStatus, string> = {
   paid: "bg-green-500/10 text-green-600",
   pending: "bg-amber-500/10 text-amber-600",
   expired: "bg-red-500/10 text-red-600",
+  cancelled: "bg-red-500/10 text-red-600",
 }
 
-const paymentLinks: PaymentLink[] = [
-  { id: "1", amount: "10 USDC", status: "pending" },
-  { id: "2", amount: "25 USDC", status: "paid" },
-  { id: "3", amount: "50 USDC", status: "pending" },
-  { id: "4", amount: "100 USDC", status: "paid" },
-  { id: "5", amount: "15 USDC", status: "expired" },
-  { id: "6", amount: "75 USDC", status: "pending" },
-]
-
-export function PaymentLinks({ className }: { className?: string }) {
+export function PaymentLinks({
+  links,
+  className,
+}: {
+  links: PaymentLink[]
+  className?: string
+}) {
   const { scrollRef, showBottomFade } = useScrollFade()
+  const { openCreatePaymentLink } = useCreatePaymentLink()
+
+  async function handleCopy(url: string) {
+    await navigator.clipboard.writeText(url)
+    toast.success("Payment link copied")
+  }
 
   return (
     <Card className={cn(dashboardCardClassName, "w-full self-start", className)}>
@@ -70,6 +76,7 @@ export function PaymentLinks({ className }: { className?: string }) {
           <Button
             variant="link"
             className="h-auto gap-1 px-0 text-xs font-medium text-muted-foreground"
+            onClick={openCreatePaymentLink}
           >
             <PlusIcon className="size-3" />
             New
@@ -85,7 +92,7 @@ export function PaymentLinks({ className }: { className?: string }) {
             "flex flex-col gap-4"
           )}
         >
-          {paymentLinks.map((link) => (
+          {links.map((link) => (
             <div key={link.id} className="flex items-center gap-2.5">
               <div
                 className={cn(
@@ -97,6 +104,9 @@ export function PaymentLinks({ className }: { className?: string }) {
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium tabular-nums">{link.amount}</p>
+                <p className="truncate font-mono text-[10px] text-muted-foreground">
+                  {link.url}
+                </p>
               </div>
               <div className="flex shrink-0 items-center gap-0.5">
                 <Button
@@ -104,6 +114,7 @@ export function PaymentLinks({ className }: { className?: string }) {
                   size="icon-xs"
                   className="text-muted-foreground"
                   aria-label="Copy link"
+                  onClick={() => handleCopy(link.url)}
                 >
                   <CopyIcon className="size-3.5" />
                 </Button>
@@ -112,6 +123,7 @@ export function PaymentLinks({ className }: { className?: string }) {
                   size="icon-xs"
                   className="text-muted-foreground"
                   aria-label="Open link"
+                  onClick={() => window.open(link.url, "_blank", "noopener,noreferrer")}
                 >
                   <ExternalLinkIcon className="size-3.5" />
                 </Button>
@@ -129,9 +141,9 @@ export function PaymentLinks({ className }: { className?: string }) {
                     <EllipsisVerticalIcon className="size-3.5" />
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-36">
-                    <DropdownMenuItem>Edit</DropdownMenuItem>
-                    <DropdownMenuItem>Share</DropdownMenuItem>
-                    <DropdownMenuItem variant="destructive">Delete</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleCopy(link.url)}>
+                      Share
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>

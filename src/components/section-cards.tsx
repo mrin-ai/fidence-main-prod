@@ -12,6 +12,7 @@ import {
   metricCardSurfaceClassName,
   metricCardValueClassName,
 } from "@/lib/dashboard-styles"
+import type { DashboardOverview } from "@/lib/db/types"
 import { cn } from "@/lib/utils"
 
 type Stat = {
@@ -24,87 +25,49 @@ type Stat = {
   chartData: { value: number }[]
 }
 
-const stats: Stat[] = [
-  {
-    label: "Total Links",
-    value: "5",
-    chartKey: "links",
-    chartColor: "var(--chart-1)",
-    chartData: [
-      { value: 2 },
-      { value: 3 },
-      { value: 3 },
-      { value: 4 },
-      { value: 4 },
-      { value: 5 },
-      { value: 5 },
-    ],
-  },
-  {
-    label: "Completed",
-    value: "5",
-    valueClassName: "text-green-600",
-    chartKey: "completed",
-    chartColor: "var(--chart-2)",
-    chartData: [
-      { value: 1 },
-      { value: 2 },
-      { value: 3 },
-      { value: 3 },
-      { value: 4 },
-      { value: 4 },
-      { value: 5 },
-    ],
-  },
-  {
-    label: "Pending",
-    value: "3",
-    valueClassName: "text-amber-600",
-    chartKey: "pending",
-    chartColor: "var(--chart-4)",
-    chartData: [
-      { value: 6 },
-      { value: 5 },
-      { value: 5 },
-      { value: 4 },
-      { value: 4 },
-      { value: 3 },
-      { value: 3 },
-    ],
-  },
-  {
-    label: "Received",
-    value: "$651.21",
-    chartKey: "received",
-    chartColor: "var(--chart-1)",
-    chartData: [
-      { value: 420 },
-      { value: 480 },
-      { value: 510 },
-      { value: 560 },
-      { value: 590 },
-      { value: 620 },
-      { value: 651 },
-    ],
-  },
-  {
-    label: "Rewards",
-    value: "$1.13",
-    icon: <GiftIcon className="size-3" />,
-    valueClassName: "text-primary",
-    chartKey: "rewards",
-    chartColor: "var(--chart-3)",
-    chartData: [
-      { value: 0.42 },
-      { value: 0.58 },
-      { value: 0.71 },
-      { value: 0.84 },
-      { value: 0.96 },
-      { value: 1.05 },
-      { value: 1.13 },
-    ],
-  },
-]
+function buildStats(metrics: DashboardOverview["metrics"]): Stat[] {
+  return [
+    {
+      label: "Total Links",
+      value: String(metrics.totalLinks),
+      chartKey: "links",
+      chartColor: "var(--chart-1)",
+      chartData: metrics.sparklines.links.map((value) => ({ value })),
+    },
+    {
+      label: "Completed",
+      value: String(metrics.completedLinks),
+      valueClassName: "text-green-600",
+      chartKey: "completed",
+      chartColor: "var(--chart-2)",
+      chartData: metrics.sparklines.completed.map((value) => ({ value })),
+    },
+    {
+      label: "Pending",
+      value: String(metrics.pendingLinks),
+      valueClassName: "text-amber-600",
+      chartKey: "pending",
+      chartColor: "var(--chart-4)",
+      chartData: metrics.sparklines.pending.map((value) => ({ value })),
+    },
+    {
+      label: "Received",
+      value: `$${metrics.receivedAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      chartKey: "received",
+      chartColor: "var(--chart-1)",
+      chartData: metrics.sparklines.received.map((value) => ({ value })),
+    },
+    {
+      label: "Rewards",
+      value: `$${metrics.rewardsAmount.toFixed(2)}`,
+      icon: <GiftIcon className="size-3" />,
+      valueClassName: "text-primary",
+      chartKey: "rewards",
+      chartColor: "var(--chart-3)",
+      chartData: metrics.sparklines.rewards.map((value) => ({ value })),
+    },
+  ]
+}
 
 function MetricSparkline({
   chartKey,
@@ -188,7 +151,13 @@ function StatCard({
   )
 }
 
-export function SectionCards() {
+export function SectionCards({
+  metrics,
+}: {
+  metrics: DashboardOverview["metrics"]
+}) {
+  const stats = buildStats(metrics)
+
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
       {stats.map((stat) => (

@@ -25,16 +25,18 @@ import {
 import { useScrollFade } from "@/hooks/use-scroll-fade"
 import { cn } from "@/lib/utils"
 
-const transactions = [
-  { id: "1", label: "Payment received", date: "Mar 13", amount: "+10 USDC" },
-  { id: "2", label: "Payment received", date: "Mar 12", amount: "+25 USDC" },
-  { id: "3", label: "Payment received", date: "Mar 11", amount: "+8 USDC" },
-  { id: "4", label: "Payment received", date: "Mar 10", amount: "+120 USDC" },
-  { id: "5", label: "Payment received", date: "Mar 9", amount: "+45 USDC" },
-  { id: "6", label: "Payment received", date: "Mar 8", amount: "+16 USDC" },
-]
-
-export function RecentTransactions({ className }: { className?: string }) {
+export function RecentTransactions({
+  transactions,
+  className,
+}: {
+  transactions: Array<{
+    id: string
+    label: string
+    date: string
+    amount: string
+  }>
+  className?: string
+}) {
   const { scrollRef, showBottomFade } = useScrollFade()
 
   return (

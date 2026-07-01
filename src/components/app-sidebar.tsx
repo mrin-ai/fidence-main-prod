@@ -33,15 +33,6 @@ import {
 } from "lucide-react"
 
 const data = {
-  workspace: {
-    name: "LCX Ag",
-    label: "Workspace",
-  },
-  user: {
-    name: "Alex Rivera",
-    role: "Owner",
-    initials: "AR",
-  },
   navGroups: [
     {
       label: "Control Plane",
@@ -118,7 +109,7 @@ const data = {
           title: "Scan QR",
           url: "#",
           icon: <ScanQrNavIcon />,
-          opensDrawer: "scan-qr",
+          opensDrawer: "scan-qr" as const,
         },
       ],
     },
@@ -142,7 +133,30 @@ const data = {
   ],
 }
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+export function AppSidebar({
+  user,
+  workspace,
+  ...props
+}: React.ComponentProps<typeof Sidebar> & {
+  user: {
+    name: string
+    role: string
+    initials: string
+  }
+  workspace: {
+    name: string
+    slug: string
+  }
+}) {
+  const sidebarData = {
+    workspace: {
+      name: workspace.name,
+      label: "Workspace",
+    },
+    user,
+    navGroups: data.navGroups,
+  }
+
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader>
@@ -164,9 +178,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 />
               </div>
               <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-semibold">{data.workspace.name}</span>
+                <span className="truncate font-semibold">{sidebarData.workspace.name}</span>
                 <span className="truncate font-mono text-xs text-muted-foreground">
-                  {data.workspace.label}
+                  {sidebarData.workspace.label}
                 </span>
               </div>
               <ChevronsUpDownIcon className="ml-auto size-4 text-muted-foreground" />
@@ -175,10 +189,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain groups={data.navGroups} />
+        <NavMain groups={sidebarData.navGroups} />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={data.user} />
+        <NavUser user={sidebarData.user} />
       </SidebarFooter>
     </Sidebar>
   )

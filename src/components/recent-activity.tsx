@@ -18,94 +18,44 @@ import {
   dashboardPanelScrollClassName,
   dashboardPanelTitleClassName,
 } from "@/lib/dashboard-styles"
+import type { ActivityStatus } from "@/lib/db/types"
 import { cn } from "@/lib/utils"
-
-type ActivityStatus = "settled" | "blocked"
 
 type ActivityItem = {
   id: string
-  icon: React.ReactNode
-  iconClassName: string
-  summary: React.ReactNode
+  summary: string
   meta: string
   status?: ActivityStatus
+  type: string
 }
 
-const activities: ActivityItem[] = [
-  {
-    id: "1",
+function getActivityVisual(type: string, status?: ActivityStatus) {
+  if (status === "blocked" || type === "blocked") {
+    return {
+      icon: <BanIcon className="size-3.5" />,
+      iconClassName: "bg-destructive/8 text-destructive",
+    }
+  }
+
+  if (type === "wallet_funded") {
+    return {
+      icon: <CreditCardIcon className="size-3.5" />,
+      iconClassName: "bg-secondary text-primary",
+    }
+  }
+
+  if (type === "approval") {
+    return {
+      icon: <CircleCheckIcon className="size-3.5" />,
+      iconClassName: "bg-secondary text-secondary-foreground",
+    }
+  }
+
+  return {
     icon: <ShoppingCartIcon className="size-3.5" />,
     iconClassName: "bg-accent/70 text-primary",
-    summary: (
-      <>
-        <span className="font-medium">Shopping Agent</span> spent{" "}
-        <span className="font-medium">$2,199</span> at Apple
-      </>
-    ),
-    meta: "2m ago · approved",
-    status: "settled",
-  },
-  {
-    id: "2",
-    icon: <BanIcon className="size-3.5" />,
-    iconClassName: "bg-destructive/8 text-destructive",
-    summary: (
-      <>
-        <span className="font-medium">Trading Bot</span> blocked on Unknown DEX
-      </>
-    ),
-    meta: "6m ago · not on safelist",
-    status: "blocked",
-  },
-  {
-    id: "3",
-    icon: <CircleCheckIcon className="size-3.5" />,
-    iconClassName: "bg-secondary text-secondary-foreground",
-    summary: (
-      <>
-        <span className="font-medium">Cloud Agent</span> approved AWS spend
-      </>
-    ),
-    meta: "12m ago · 1 of 1 approvals",
-  },
-  {
-    id: "4",
-    icon: <CreditCardIcon className="size-3.5" />,
-    iconClassName: "bg-secondary text-primary",
-    summary: (
-      <>
-        Wallet funded with <span className="font-medium">$5,000 USDC</span>
-      </>
-    ),
-    meta: "1h ago · identity verified",
-  },
-  {
-    id: "5",
-    icon: <ShoppingCartIcon className="size-3.5" />,
-    iconClassName: "bg-accent/70 text-primary",
-    summary: (
-      <>
-        <span className="font-medium">Shopping Agent</span> spent{" "}
-        <span className="font-medium">$129</span> at Notion
-      </>
-    ),
-    meta: "2h ago · auto-approved",
-    status: "settled",
-  },
-  {
-    id: "6",
-    icon: <BanIcon className="size-3.5" />,
-    iconClassName: "bg-destructive/8 text-destructive",
-    summary: (
-      <>
-        <span className="font-medium">Trading Bot</span> blocked on unverified
-        pool
-      </>
-    ),
-    meta: "3h ago · risk threshold",
-    status: "blocked",
-  },
-]
+  }
+}
 
 function ActivityStatusDot({ status }: { status: ActivityStatus }) {
   return (
@@ -118,7 +68,13 @@ function ActivityStatusDot({ status }: { status: ActivityStatus }) {
   )
 }
 
-export function RecentActivity({ className }: { className?: string }) {
+export function RecentActivity({
+  activities,
+  className,
+}: {
+  activities: ActivityItem[]
+  className?: string
+}) {
   const [showBottomFade, setShowBottomFade] = React.useState(false)
   const scrollRef = React.useRef<HTMLDivElement>(null)
 
@@ -162,32 +118,33 @@ export function RecentActivity({ className }: { className?: string }) {
             "flex flex-col gap-4"
           )}
         >
-          {activities.map((activity) => (
-            <div
-              key={activity.id}
-              className="flex items-start gap-3"
-            >
-              <div
-                className={cn(
-                  "flex size-8 shrink-0 items-center justify-center rounded-lg",
-                  activity.iconClassName
-                )}
-              >
-                {activity.icon}
+          {activities.map((activity) => {
+            const visual = getActivityVisual(activity.type, activity.status)
+
+            return (
+              <div key={activity.id} className="flex items-start gap-3">
+                <div
+                  className={cn(
+                    "flex size-8 shrink-0 items-center justify-center rounded-lg",
+                    visual.iconClassName
+                  )}
+                >
+                  {visual.icon}
+                </div>
+                <div className="min-w-0 flex-1 space-y-1">
+                  <p className="text-sm leading-snug text-foreground/90">
+                    {activity.summary}
+                  </p>
+                  <p className="font-mono text-[0.6875rem] text-muted-foreground">
+                    {activity.meta}
+                  </p>
+                </div>
+                {activity.status ? (
+                  <ActivityStatusDot status={activity.status} />
+                ) : null}
               </div>
-              <div className="min-w-0 flex-1 space-y-1">
-                <p className="text-sm leading-snug text-foreground/90">
-                  {activity.summary}
-                </p>
-                <p className="font-mono text-[0.6875rem] text-muted-foreground">
-                  {activity.meta}
-                </p>
-              </div>
-              {activity.status ? (
-                <ActivityStatusDot status={activity.status} />
-              ) : null}
-            </div>
-          ))}
+            )
+          })}
         </div>
         <div
           aria-hidden

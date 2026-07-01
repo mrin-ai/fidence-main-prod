@@ -1,7 +1,9 @@
 "use client"
 
 import * as React from "react"
+import { useRouter } from "next/navigation"
 import { ArrowLeftIcon, CheckIcon, CopyIcon, Link2Icon } from "lucide-react"
+import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -119,6 +121,7 @@ function CreatePaymentLinkModal({
   const [draft, setDraft] = React.useState<PaymentLinkDraft>(initialDraft)
   const [createdLink, setCreatedLink] = React.useState<string | null>(null)
   const [copied, setCopied] = React.useState(false)
+  const router = useRouter()
 
   const availableNetworks = React.useMemo(
     () => getNetworksForToken(draft.tokenId),
@@ -163,14 +166,48 @@ function CreatePaymentLinkModal({
     return true
   }
 
-  function handleContinue() {
+  async function handleContinue() {
     if (step < 4) {
       setStep((current) => (current + 1) as Step)
       return
     }
 
-    const slug = `${draft.amount}-${draft.tokenId}-${Date.now().toString(36)}`
-    setCreatedLink(`pay.fidence.xyz/${slug}`)
+    const response = await fetch("/api/payment-links", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        amount: draft.amount,
+        tokenId: draft.tokenId,
+        networkId: draft.networkId,
+        expiresAt: new Date(draft.expiresAt).toISOString(),
+      }),
+    })
+
+    const payload = (await response.json()) as {
+      url?: string
+      error?: string
+      code?: string
+    }
+
+    if (!response.ok) {
+      if (payload.code === "USERNAME_REQUIRED") {
+        toast.error("Set a username in Settings before creating links")
+      } else if (payload.code === "WALLET_REQUIRED") {
+        toast.error("Connect a wallet to your account to receive payments")
+      } else {
+        toast.error(payload.error ?? "Failed to create payment link")
+      }
+      return
+    }
+
+    if (!payload.url) {
+      toast.error("Failed to create payment link")
+      return
+    }
+
+    setCreatedLink(payload.url)
+    toast.success("Payment link created")
+    router.refresh()
   }
 
   function handleBack() {
@@ -310,7 +347,7 @@ function CreatePaymentLinkModal({
             <div className="space-y-4">
               <div className="flex items-center gap-2 rounded-xl border border-border/50 bg-secondary px-3 py-2.5">
                 <Link2Icon className="size-4 shrink-0 text-primary" />
-                <p className="min-w-0 flex-1 truncate font-mono text-sm">
+                <p className="min-w-0 flex-1 break-all font-mono text-sm">
                   {createdLink}
                 </p>
                 <Button
@@ -326,6 +363,10 @@ function CreatePaymentLinkModal({
               {copied ? (
                 <p className="text-xs text-secondary-foreground">Link copied</p>
               ) : null}
+              <p className="text-xs text-muted-foreground">
+                Share this link with anyone who needs to pay. Format:{" "}
+                <span className="font-mono">domain/username/id</span>
+              </p>
               <div className="rounded-xl border border-border/50 bg-secondary/30 p-4">
                 <PreviewRow
                   label="Amount"

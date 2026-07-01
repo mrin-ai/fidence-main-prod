@@ -16,32 +16,30 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
 
-const paymentLink = "pay.fidence.xyz/alex"
-const paymentUrl = `https://${paymentLink}`
-
-const balances = [
-  {
-    id: "usdc",
-    label: "USDC",
-    value: "1,240.00",
+const balanceVisuals: Record<
+  string,
+  { iconClassName: string; icon: string }
+> = {
+  usdc: {
     iconClassName: "bg-primary text-primary-foreground",
     icon: "$",
   },
-  {
-    id: "eth",
-    label: "Ethereum",
-    value: "0.42",
+  eth: {
     iconClassName: "bg-chart-2 text-primary-foreground",
     icon: "Ξ",
   },
-  {
-    id: "sol",
-    label: "Solana",
-    value: "12.4",
-    iconClassName: "bg-gradient-to-br from-purple-500 to-teal-400 text-primary-foreground",
+  sol: {
+    iconClassName:
+      "bg-gradient-to-br from-purple-500 to-teal-400 text-primary-foreground",
     icon: "S",
   },
-]
+}
+
+type ScanQrBalance = {
+  id: string
+  label: string
+  value: string
+}
 
 type ScanQrContextValue = {
   openScanQr: () => void
@@ -57,7 +55,7 @@ export function useScanQr() {
   return context
 }
 
-function PayQrCode() {
+function PayQrCode({ paymentUrl }: { paymentUrl: string }) {
   return (
     <div className="mx-auto w-full max-w-[15rem] rounded-[1.25rem] border border-border/60 bg-white p-5 shadow-none">
       <div className="overflow-hidden rounded-xl bg-white p-2">
@@ -78,11 +76,18 @@ function PayQrCode() {
 function ScanQrDrawerPanel({
   open,
   onOpenChange,
+  paymentLink,
+  balances,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
+  paymentLink: string
+  balances: ScanQrBalance[]
 }) {
   const [copied, setCopied] = React.useState(false)
+  const paymentUrl = paymentLink.startsWith("http")
+    ? paymentLink
+    : `https://${paymentLink}`
 
   async function handleCopy() {
     await navigator.clipboard.writeText(paymentLink)
@@ -118,7 +123,7 @@ function ScanQrDrawerPanel({
             <p className="-mt-4 text-xs text-secondary-foreground">Link copied</p>
           ) : null}
 
-          <PayQrCode />
+          <PayQrCode paymentUrl={paymentUrl} />
 
           <Separator className="bg-border" />
 
@@ -127,20 +132,27 @@ function ScanQrDrawerPanel({
               Balances
             </p>
             <div className="flex flex-col gap-4">
-              {balances.map((balance) => (
-                <div key={balance.id} className="flex items-center gap-3">
-                  <div
-                    className={cn(
-                      "flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
-                      balance.iconClassName
-                    )}
-                  >
-                    {balance.icon}
+              {balances.map((balance) => {
+                const visual = balanceVisuals[balance.id] ?? {
+                  iconClassName: "bg-secondary text-primary",
+                  icon: balance.label.slice(0, 1),
+                }
+
+                return (
+                  <div key={balance.id} className="flex items-center gap-3">
+                    <div
+                      className={cn(
+                        "flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
+                        visual.iconClassName
+                      )}
+                    >
+                      {visual.icon}
+                    </div>
+                    <p className="min-w-0 flex-1 text-sm font-medium">{balance.label}</p>
+                    <p className="shrink-0 font-mono text-sm tabular-nums">{balance.value}</p>
                   </div>
-                  <p className="min-w-0 flex-1 text-sm font-medium">{balance.label}</p>
-                  <p className="shrink-0 font-mono text-sm tabular-nums">{balance.value}</p>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         </div>
@@ -159,7 +171,15 @@ function ScanQrDrawerPanel({
   )
 }
 
-export function ScanQrProvider({ children }: { children: React.ReactNode }) {
+export function ScanQrProvider({
+  children,
+  paymentLink,
+  balances,
+}: {
+  children: React.ReactNode
+  paymentLink: string
+  balances: ScanQrBalance[]
+}) {
   const [open, setOpen] = React.useState(false)
 
   const value = React.useMemo(
@@ -172,7 +192,12 @@ export function ScanQrProvider({ children }: { children: React.ReactNode }) {
   return (
     <ScanQrContext.Provider value={value}>
       {children}
-      <ScanQrDrawerPanel open={open} onOpenChange={setOpen} />
+      <ScanQrDrawerPanel
+        open={open}
+        onOpenChange={setOpen}
+        paymentLink={paymentLink}
+        balances={balances}
+      />
     </ScanQrContext.Provider>
   )
 }

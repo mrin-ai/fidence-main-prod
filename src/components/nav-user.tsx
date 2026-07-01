@@ -1,5 +1,7 @@
 "use client"
 
+import { useRouter } from "next/navigation"
+import { useDisconnect } from "wagmi"
 import {
   Avatar,
   AvatarFallback,
@@ -37,6 +39,15 @@ export function NavUser({
   }
 }) {
   const { isMobile } = useSidebar()
+  const router = useRouter()
+  const { disconnect } = useDisconnect()
+
+  const handleLogOut = async () => {
+    await fetch("/api/auth/logout", { method: "POST" })
+    disconnect()
+    router.push("/sign-in")
+    router.refresh()
+  }
 
   return (
     <SidebarMenu>
@@ -100,13 +111,13 @@ export function NavUser({
                 <BellIcon />
                 Notifications
               </DropdownMenuItem>
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push("/settings")}>
                 <SettingsIcon />
                 Settings
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={handleLogOut}>
               <LogOutIcon />
               Log out
             </DropdownMenuItem>

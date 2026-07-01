@@ -7,6 +7,7 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-serif: var(--font-instrument-serif);
   --font-heading: var(--font-sans);
   --color-brand-primary: var(--brand-primary);
   --color-brand-secondary: var(--brand-secondary);
@@ -100,6 +101,43 @@
   --sidebar-accent-foreground: oklch(0.469 0.207 264.1);
   --sidebar-border: oklch(0.911 0.028 263.4);
   --sidebar-ring: oklch(0.579 0.23 263.3 / 35%);
+}
+
+/* LCX auth — light theme with electric blue accents (see docs/LCX_AUTH_STYLE.md) */
+.lcx-auth {
+  color-scheme: light;
+
+  --lcx-blue: #0066ff;
+  --lcx-blue-muted: #0047b3;
+  --brand-primary: var(--lcx-blue);
+
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.207 0.038 265.1);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.207 0.038 265.1);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.207 0.038 265.1);
+
+  --primary: oklch(0.579 0.23 263.3);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.964 0.017 267.8);
+  --secondary-foreground: oklch(0.469 0.207 264.1);
+  --accent: oklch(0.917 0.04 263.7);
+  --accent-foreground: oklch(0.469 0.207 264.1);
+  --muted: oklch(0.975 0.01 264);
+  --muted-foreground: oklch(0.528 0.056 264.5);
+
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.911 0.028 263.4);
+  --input: oklch(0.911 0.028 263.4);
+  --ring: oklch(0.579 0.23 263.3 / 35%);
+}
+
+.lcx-auth .pixel-grid-bg {
+  background-image:
+    linear-gradient(to right, oklch(0.911 0.028 263.4 / 30%) 1px, transparent 1px),
+    linear-gradient(to bottom, oklch(0.911 0.028 263.4 / 30%) 1px, transparent 1px);
+  background-size: 24px 24px;
 }
 
 @layer base {
