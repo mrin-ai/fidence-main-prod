@@ -19,4 +19,5 @@ export type PublicPaymentLink = {
   recipientAddress?: string;
   merchantName: string;
   canPay: boolean;
+  invoiceReference?: string;
 };

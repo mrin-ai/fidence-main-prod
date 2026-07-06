@@ -4,6 +4,15 @@ import {
   type InvoiceFormData,
 } from "@/lib/invoice/schema";
 
+const defaultPreviewItems: InvoiceFormData["items"] = [
+  {
+    name: "Professional services",
+    description: "Consulting and implementation",
+    quantity: 1,
+    unitPrice: 100,
+  },
+];
+
 export function buildInvoiceDefaults(input: {
   user: UserDoc;
   serialNumber: string;
@@ -38,6 +47,14 @@ export function buildInvoiceDefaults(input: {
       ...input.existing?.invoiceDetails,
       serialNumber: input.serialNumber,
       date: input.existing?.invoiceDetails.date ?? new Date(),
+    },
+    items:
+      input.existing?.items && input.existing.items.length > 0
+        ? input.existing.items
+        : defaultPreviewItems,
+    paymentLink: {
+      ...invoiceFormDefaultValues.paymentLink,
+      ...input.existing?.paymentLink,
     },
     metadata: {
       ...invoiceFormDefaultValues.metadata,

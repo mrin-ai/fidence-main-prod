@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import {
   ChevronDownIcon,
   CopyIcon,
@@ -72,7 +73,13 @@ export function PaymentLinks({
         <CardTitle className={dashboardPanelTitleClassName}>
           Payment Links
         </CardTitle>
-        <CardAction>
+        <CardAction className="flex items-center gap-3">
+          <Link
+            href="/payment-links"
+            className="text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            View all
+          </Link>
           <Button
             variant="link"
             className="h-auto gap-1 px-0 text-xs font-medium text-muted-foreground"

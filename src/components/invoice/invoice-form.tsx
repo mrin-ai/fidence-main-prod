@@ -33,12 +33,16 @@ import {
   InvoiceStringFieldRows,
 } from "@/components/invoice/invoice-field-rows";
 import { InvoiceItemsSection } from "@/components/invoice/invoice-items-section";
+import { InvoicePaymentActions } from "@/components/invoice/invoice-payment-actions";
+import { InvoicePaymentLinkSection } from "@/components/invoice/invoice-payment-link-section";
 import { currenciesWithSymbols } from "@/lib/invoice/currency";
 import {
   invoiceFormDefaultValues,
   invoiceFormSchema,
   type InvoiceFormData,
+  invoiceReference,
 } from "@/lib/invoice/schema";
+import type { InvoicePaymentLinkInfo } from "@/lib/invoice/invoice-payment-link";
 import { cn } from "@/lib/utils";
 
 function FormRow({
@@ -63,8 +67,10 @@ export function useInvoiceForm(defaultValues?: InvoiceFormData) {
 
 export function InvoiceFormPanel({
   form,
+  savedPaymentLink,
 }: {
   form: UseFormReturn<InvoiceFormData>;
+  savedPaymentLink?: InvoicePaymentLinkInfo | null;
 }) {
   const logoPreview =
     form.watch("companyDetails.logoBase64") ||
@@ -331,6 +337,27 @@ export function InvoiceFormPanel({
               name="metadata.paymentInformation"
               label="Payment information"
             />
+          </AccordionContent>
+        </AccordionItem>
+
+        <AccordionItem value="payment-link">
+          <AccordionTrigger className="px-4">
+            Payment link <span className="ml-1 text-destructive">*</span>
+          </AccordionTrigger>
+          <AccordionContent className="px-4 pb-4">
+            <InvoicePaymentLinkSection
+              form={form}
+              savedPaymentLink={savedPaymentLink}
+            />
+            {savedPaymentLink ? (
+              <div className="mt-4">
+                <InvoicePaymentActions
+                  paymentLink={savedPaymentLink}
+                  invoiceReference={invoiceReference(form.getValues())}
+                  compact
+                />
+              </div>
+            ) : null}
           </AccordionContent>
         </AccordionItem>
       </Accordion>

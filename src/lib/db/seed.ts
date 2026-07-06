@@ -92,116 +92,17 @@ export async function ensureDbIndexes() {
 
 export async function seedWorkspaceDemoData(workspaceId: ObjectId, userId: ObjectId) {
   const db = await getDb();
-  const existingLinks = await db
-    .collection(COLLECTIONS.paymentLinks)
+  const existingActivities = await db
+    .collection(COLLECTIONS.activityEvents)
     .countDocuments({ workspaceId });
 
-  if (existingLinks > 0) return { seeded: false };
+  if (existingActivities > 0) return { seeded: false };
 
   const now = new Date();
-  const user = await db.collection<UserDoc>(COLLECTIONS.users).findOne({ _id: userId });
-  const username = user?.username ?? `merchant-${userId.toString().slice(-6)}`;
-  const recipientAddress = user?.walletAddresses[0]?.toLowerCase();
-
-  function buildSeedLink(
-    link: Omit<
-      PaymentLinkDoc,
-      "_id" | "username" | "publicId" | "slug" | "url" | "recipientAddress"
-    >,
-  ): Omit<PaymentLinkDoc, "_id"> {
-    const publicId = generatePublicId();
-    return {
-      ...link,
-      username,
-      publicId,
-      slug: publicId,
-      url: buildPaymentLinkUrl(username, publicId),
-      recipientAddress,
-    };
-  }
-
-  const paymentLinks: Omit<PaymentLinkDoc, "_id">[] = [
-    buildSeedLink({
-      workspaceId,
-      createdBy: userId,
-      amount: 10,
-      tokenId: "usdc",
-      networkId: "base",
-      status: "pending",
-      expiresAt: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
-      createdAt: now,
-      updatedAt: now,
-    }),
-    buildSeedLink({
-      workspaceId,
-      createdBy: userId,
-      amount: 25,
-      tokenId: "usdc",
-      networkId: "ethereum",
-      status: "paid",
-      expiresAt: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
-      paidAt: now,
-      paidBy: recipientAddress,
-      paidTxHash: "0xseed000000000000000000000000000000000000000000000000000000000001",
-      createdAt: new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000),
-      updatedAt: now,
-    }),
-    buildSeedLink({
-      workspaceId,
-      createdBy: userId,
-      amount: 50,
-      tokenId: "usdc",
-      networkId: "polygon",
-      status: "pending",
-      expiresAt: new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000),
-      createdAt: new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000),
-      updatedAt: now,
-    }),
-    buildSeedLink({
-      workspaceId,
-      createdBy: userId,
-      amount: 100,
-      tokenId: "usdc",
-      networkId: "arbitrum",
-      status: "paid",
-      expiresAt: new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000),
-      paidAt: new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000),
-      paidBy: recipientAddress,
-      paidTxHash: "0xseed000000000000000000000000000000000000000000000000000000000002",
-      createdAt: new Date(now.getTime() - 4 * 24 * 60 * 60 * 1000),
-      updatedAt: now,
-    }),
-    buildSeedLink({
-      workspaceId,
-      createdBy: userId,
-      amount: 15,
-      tokenId: "usdc",
-      networkId: "base",
-      status: "expired",
-      expiresAt: new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000),
-      createdAt: new Date(now.getTime() - 10 * 24 * 60 * 60 * 1000),
-      updatedAt: now,
-    }),
-    buildSeedLink({
-      workspaceId,
-      createdBy: userId,
-      amount: 75,
-      tokenId: "usdc",
-      networkId: "base",
-      status: "pending",
-      expiresAt: new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000),
-      createdAt: new Date(now.getTime() - 12 * 60 * 60 * 1000),
-      updatedAt: now,
-    }),
-  ];
-
-  const linkResult = await db.collection(COLLECTIONS.paymentLinks).insertMany(paymentLinks);
-  const linkIds = Object.values(linkResult.insertedIds);
 
   const transactions: Omit<TransactionDoc, "_id">[] = [
     {
       workspaceId,
-      paymentLinkId: linkIds[0],
       type: "payment_received",
       label: "Payment received",
       amount: 10,
@@ -213,7 +114,6 @@ export async function seedWorkspaceDemoData(workspaceId: ObjectId, userId: Objec
     },
     {
       workspaceId,
-      paymentLinkId: linkIds[1],
       type: "payment_received",
       label: "Payment received",
       amount: 25,

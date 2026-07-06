@@ -20,6 +20,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import type { InvoicePaymentLinkInfo } from "@/lib/invoice/invoice-payment-link";
 import {
   invoiceFormSchema,
   type InvoiceFormData,
@@ -36,7 +37,10 @@ export function InvoiceToolbar({
   viewTab: InvoiceViewTab;
   onViewTabChange: (tab: InvoiceViewTab) => void;
   invoiceId?: string;
-  onSaved?: (id: string) => void;
+  onSaved?: (payload: {
+    id: string;
+    paymentLink?: InvoicePaymentLinkInfo;
+  }) => void;
 }) {
   const router = useRouter();
   const [isSaving, setIsSaving] = React.useState(false);
@@ -63,6 +67,7 @@ export function InvoiceToolbar({
         error?: string;
         id?: string;
         reference?: string;
+        paymentLink?: InvoicePaymentLinkInfo;
       };
 
       if (!response.ok) {
@@ -71,8 +76,15 @@ export function InvoiceToolbar({
 
       toast.success(`Saved ${payload.reference ?? "invoice"}`);
 
+      const savedId = payload.id ?? invoiceId;
+      if (savedId) {
+        onSaved?.({
+          id: savedId,
+          paymentLink: payload.paymentLink,
+        });
+      }
+
       if (!invoiceId && payload.id) {
-        onSaved?.(payload.id);
         router.replace(`/invoice/${payload.id}`);
         router.refresh();
       }

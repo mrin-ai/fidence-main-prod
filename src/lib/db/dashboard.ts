@@ -44,7 +44,7 @@ export async function getDashboardOverview(
       db.collection(COLLECTIONS.workspaces).findOne({ _id: workspaceId }),
       db
         .collection<PaymentLinkDoc>(COLLECTIONS.paymentLinks)
-        .find({ workspaceId })
+        .find({ workspaceId, invoiceId: { $exists: false } })
         .sort({ createdAt: -1 })
         .limit(20)
         .toArray(),

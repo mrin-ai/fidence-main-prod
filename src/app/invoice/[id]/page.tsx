@@ -21,7 +21,11 @@ export default async function EditInvoicePage({ params }: PageProps) {
 
   return (
     <div className="flex h-[calc(100svh-var(--header-height))] min-h-0 flex-col">
-      <InvoiceEditor defaultValues={invoice.fields} invoiceId={invoice.id} />
+      <InvoiceEditor
+        defaultValues={invoice.fields}
+        invoiceId={invoice.id}
+        initialPaymentLink={invoice.paymentLink}
+      />
     </div>
   );
 }

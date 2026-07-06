@@ -78,6 +78,11 @@ const data = {
           icon: <FileTextIcon />,
         },
         {
+          title: "Manage Invoices",
+          url: "/manage-invoices",
+          icon: <ReceiptIcon />,
+        },
+        {
           title: "Visa Intelligence",
           url: "#",
           icon: <SparklesIcon />,
@@ -101,7 +106,7 @@ const data = {
         },
         {
           title: "Payment Links",
-          url: "#",
+          url: "/payment-links",
           icon: <Link2Icon />,
         },
         {

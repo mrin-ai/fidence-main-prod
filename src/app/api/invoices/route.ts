@@ -1,8 +1,30 @@
 import { NextResponse } from "next/server";
 
 import { getSessionFromCookies } from "@/lib/db/auth";
-import { createInvoice, listInvoices } from "@/lib/db/invoices";
+import { listInvoices, saveInvoiceWithPaymentLink } from "@/lib/db/invoices";
 import { invoiceFormSchema } from "@/lib/invoice/schema";
+
+function invoiceSaveRequirements(session: NonNullable<Awaited<ReturnType<typeof getSessionFromCookies>>>) {
+  if (!session.user.username) {
+    return {
+      error: "Set a username in Settings before saving invoices with payment links",
+      code: "USERNAME_REQUIRED",
+    };
+  }
+
+  const recipientAddress = session.user.walletAddresses[0];
+  if (!recipientAddress) {
+    return {
+      error: "Connect a wallet to your account to receive invoice payments",
+      code: "WALLET_REQUIRED",
+    };
+  }
+
+  return {
+    username: session.user.username,
+    recipientAddress,
+  };
+}
 
 export async function GET() {
   const session = await getSessionFromCookies();
@@ -20,6 +42,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const requirements = invoiceSaveRequirements(session);
+  if ("error" in requirements) {
+    return NextResponse.json(requirements, { status: 400 });
+  }
+
   const body = await request.json();
   const parsed = invoiceFormSchema.safeParse(body);
 
@@ -30,11 +57,23 @@ export async function POST(request: Request) {
     );
   }
 
-  const invoice = await createInvoice({
-    workspaceId: session.workspace._id,
-    userId: session.user._id,
-    data: parsed.data,
-  });
+  try {
+    const invoice = await saveInvoiceWithPaymentLink({
+      workspaceId: session.workspace._id,
+      userId: session.user._id,
+      username: requirements.username,
+      recipientAddress: requirements.recipientAddress,
+      data: parsed.data,
+    });
 
-  return NextResponse.json(invoice);
+    return NextResponse.json(invoice);
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to save invoice",
+      },
+      { status: 400 },
+    );
+  }
 }

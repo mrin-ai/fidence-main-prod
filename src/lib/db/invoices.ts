@@ -3,9 +3,15 @@ import { ObjectId } from "mongodb";
 import { logInvoiceCreatedActivity } from "@/lib/db/activity";
 import { getDb } from "@/lib/db/client";
 import { COLLECTIONS } from "@/lib/db/collections";
+import {
+  getInvoicePaymentLinkById,
+  upsertInvoicePaymentLink,
+} from "@/lib/db/payment-links";
 import type { InvoiceDoc, InvoiceFieldsDoc, InvoiceStatus } from "@/lib/db/types";
 import type { InvoiceFormData } from "@/lib/invoice/schema";
 import { invoiceReference } from "@/lib/invoice/schema";
+import { calculateInvoiceTotal } from "@/lib/invoice/calculate-totals";
+import { resolveInvoicePaymentExpiry } from "@/lib/invoice/invoice-payment-link";
 
 function toFieldsDoc(data: InvoiceFormData): InvoiceFieldsDoc {
   return {
@@ -17,6 +23,7 @@ function toFieldsDoc(data: InvoiceFormData): InvoiceFieldsDoc {
     },
     items: data.items,
     metadata: data.metadata,
+    paymentLink: data.paymentLink,
   };
 }
 
@@ -34,6 +41,10 @@ function fromFieldsDoc(doc: InvoiceFieldsDoc): InvoiceFormData {
     },
     items: doc.items,
     metadata: doc.metadata,
+    paymentLink: doc.paymentLink ?? {
+      tokenId: "usdc",
+      networkId: "",
+    },
   };
 }
 
@@ -60,13 +71,56 @@ export async function listInvoices(workspaceId: ObjectId) {
     clientName: invoice.fields.clientDetails.name,
     status: invoice.status,
     currency: invoice.fields.invoiceDetails.currency,
-    total: invoice.fields.items.reduce(
-      (sum, item) => sum + item.quantity * item.unitPrice,
-      0,
-    ),
+    total: calculateInvoiceTotal(fromFieldsDoc(invoice.fields)),
     date: invoice.fields.invoiceDetails.date,
     updatedAt: invoice.updatedAt,
   }));
+}
+
+export type ManageInvoiceListItem = {
+  id: string;
+  shortId: string;
+  serialNumber: string;
+  reference: string;
+  storage: string;
+  total: number;
+  currency: string;
+  itemCount: number;
+  status: InvoiceStatus;
+  invoiceDate: string;
+  createdAt: string;
+  paidAt?: string;
+};
+
+export async function listManageInvoices(
+  workspaceId: ObjectId,
+): Promise<ManageInvoiceListItem[]> {
+  const db = await getDb();
+  const invoices = await db
+    .collection<InvoiceDoc>(COLLECTIONS.invoices)
+    .find({ workspaceId })
+    .sort({ createdAt: -1 })
+    .toArray();
+
+  return invoices.map((invoice) => {
+    const fields = fromFieldsDoc(invoice.fields);
+    const template = invoice.fields.invoiceDetails.theme.template ?? "default";
+
+    return {
+      id: invoice._id.toString(),
+      shortId: invoice._id.toString().slice(-8),
+      serialNumber: invoice.fields.invoiceDetails.serialNumber,
+      reference: invoice.reference || invoiceReference(fields),
+      storage: template === "vercel" ? "Minimal" : "Default",
+      total: calculateInvoiceTotal(fields),
+      currency: invoice.fields.invoiceDetails.currency,
+      itemCount: invoice.fields.items.length,
+      status: invoice.status,
+      invoiceDate: invoice.fields.invoiceDetails.date.toISOString(),
+      createdAt: invoice.createdAt.toISOString(),
+      paidAt: invoice.paidAt?.toISOString(),
+    };
+  });
 }
 
 export async function getInvoiceById(workspaceId: ObjectId, invoiceId: string) {
@@ -78,11 +132,16 @@ export async function getInvoiceById(workspaceId: ObjectId, invoiceId: string) {
 
   if (!invoice) return null;
 
+  const paymentLink = invoice.paymentLinkId
+    ? await getInvoicePaymentLinkById(workspaceId, invoice.paymentLinkId)
+    : null;
+
   return {
     id: invoice._id.toString(),
     status: invoice.status,
     reference: invoice.reference,
     fields: fromFieldsDoc(invoice.fields),
+    paymentLink,
     createdAt: invoice.createdAt,
     updatedAt: invoice.updatedAt,
   };
@@ -139,11 +198,117 @@ export async function updateInvoice(input: {
         fields: toFieldsDoc(input.data),
         updatedAt: now,
         ...(input.status ? { status: input.status } : {}),
+        ...(input.status === "paid" ? { paidAt: now } : {}),
       },
     },
   );
 
   return { updated: result.matchedCount > 0, reference };
+}
+
+export async function saveInvoiceWithPaymentLink(input: {
+  workspaceId: ObjectId;
+  userId: ObjectId;
+  username: string;
+  recipientAddress: string;
+  data: InvoiceFormData;
+  invoiceId?: string;
+}) {
+  const amount = calculateInvoiceTotal(input.data);
+  if (amount <= 0) {
+    throw new Error("Invoice total must be greater than zero");
+  }
+
+  const expiresAt = resolveInvoicePaymentExpiry(input.data);
+  const { tokenId, networkId } = input.data.paymentLink;
+  const db = await getDb();
+
+  if (input.invoiceId) {
+    const existing = await db.collection<InvoiceDoc>(COLLECTIONS.invoices).findOne({
+      _id: new ObjectId(input.invoiceId),
+      workspaceId: input.workspaceId,
+    });
+
+    if (!existing) {
+      throw new Error("Invoice not found");
+    }
+
+    const nextStatus: InvoiceStatus =
+      existing.status === "paid" || existing.status === "cancelled"
+        ? existing.status
+        : "sent";
+
+    const updateResult = await updateInvoice({
+      workspaceId: input.workspaceId,
+      invoiceId: input.invoiceId,
+      data: input.data,
+      status: nextStatus,
+    });
+
+    if (!updateResult.updated) {
+      throw new Error("Invoice not found");
+    }
+
+    const paymentLink = await upsertInvoicePaymentLink({
+      workspaceId: input.workspaceId,
+      userId: input.userId,
+      username: input.username,
+      recipientAddress: input.recipientAddress,
+      invoiceId: existing._id,
+      paymentLinkId: existing.paymentLinkId,
+      amount,
+      tokenId,
+      networkId,
+      expiresAt,
+    });
+
+    if (!existing.paymentLinkId) {
+      await db.collection<InvoiceDoc>(COLLECTIONS.invoices).updateOne(
+        { _id: existing._id },
+        { $set: { paymentLinkId: new ObjectId(paymentLink.id) } },
+      );
+    }
+
+    return {
+      id: input.invoiceId,
+      reference: updateResult.reference,
+      status: nextStatus,
+      paymentLink,
+    };
+  }
+
+  const created = await createInvoice({
+    workspaceId: input.workspaceId,
+    userId: input.userId,
+    data: input.data,
+    status: "sent",
+  });
+
+  const invoiceObjectId = new ObjectId(created.id);
+
+  const paymentLink = await upsertInvoicePaymentLink({
+    workspaceId: input.workspaceId,
+    userId: input.userId,
+    username: input.username,
+    recipientAddress: input.recipientAddress,
+    invoiceId: invoiceObjectId,
+    amount,
+    tokenId,
+    networkId,
+    expiresAt,
+  });
+
+  await db.collection<InvoiceDoc>(COLLECTIONS.invoices).updateOne(
+    { _id: invoiceObjectId },
+    { $set: { paymentLinkId: new ObjectId(paymentLink.id) } },
+  );
+
+  return {
+    id: created.id,
+    reference: created.reference,
+    status: "sent" as const,
+    paymentLink,
+  };
 }
 
 export async function deleteInvoice(workspaceId: ObjectId, invoiceId: string) {

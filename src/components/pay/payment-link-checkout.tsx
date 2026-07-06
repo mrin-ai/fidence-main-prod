@@ -190,13 +190,15 @@ export function PaymentLinkCheckout({
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-xs font-medium text-muted-foreground">
-                  Pay to
+                  {link.invoiceReference ? "Invoice payment" : "Pay to"}
                 </p>
                 <CardTitle className="mt-1 text-lg">
-                  {link.merchantName}
+                  {link.invoiceReference ?? link.merchantName}
                 </CardTitle>
                 <p className="mt-0.5 font-mono text-xs text-primary">
-                  @{link.username}
+                  {link.invoiceReference
+                    ? `Invoice · @${link.username}`
+                    : `@${link.username}`}
                 </p>
               </div>
               <Badge

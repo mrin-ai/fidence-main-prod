@@ -23,8 +23,6 @@ import {
 } from "@/components/ui/sidebar"
 import {
   BellIcon,
-  CircleUserRoundIcon,
-  CreditCardIcon,
   LogOutIcon,
   SettingsIcon,
 } from "lucide-react"
@@ -99,14 +97,6 @@ export function NavUser({
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem>
-                <CircleUserRoundIcon />
-                Account
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <CreditCardIcon />
-                Billing
-              </DropdownMenuItem>
               <DropdownMenuItem>
                 <BellIcon />
                 Notifications

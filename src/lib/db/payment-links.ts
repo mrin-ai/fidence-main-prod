@@ -13,7 +13,7 @@ import {
 } from "@/lib/db/activity";
 import { getDb } from "@/lib/db/client";
 import { COLLECTIONS } from "@/lib/db/collections";
-import type { PaymentLinkDoc, PaymentLinkStatus, UserDoc } from "@/lib/db/types";
+import type { PaymentLinkDoc, PaymentLinkStatus, UserDoc, InvoiceDoc } from "@/lib/db/types";
 import type { PublicPaymentLink } from "@/lib/payment-link-types";
 import { formatPaymentDateTime } from "@/lib/format-date";
 
@@ -48,6 +48,7 @@ async function syncExpiredStatus(link: PaymentLinkDoc) {
 function toPublicPaymentLink(
   link: PaymentLinkDoc,
   merchant: Pick<UserDoc, "name">,
+  invoiceReference?: string,
 ): PublicPaymentLink {
   const status = resolveStatus(link);
   const token = getTokenById(link.tokenId);
@@ -77,6 +78,7 @@ function toPublicPaymentLink(
       status === "pending" &&
       Boolean(link.recipientAddress) &&
       link.networkId !== "solana",
+    invoiceReference,
   };
 }
 
@@ -89,6 +91,8 @@ export async function createPaymentLink(input: {
   tokenId: string;
   networkId: string;
   expiresAt: Date;
+  invoiceId?: ObjectId;
+  logActivity?: boolean;
 }) {
   const db = await getDb();
   const now = new Date();
@@ -101,6 +105,7 @@ export async function createPaymentLink(input: {
   const doc: Omit<PaymentLinkDoc, "_id"> = {
     workspaceId: input.workspaceId,
     createdBy: input.userId,
+    ...(input.invoiceId ? { invoiceId: input.invoiceId } : {}),
     username: input.username,
     publicId,
     slug: publicId,
@@ -118,17 +123,135 @@ export async function createPaymentLink(input: {
   const result = await db.collection(COLLECTIONS.paymentLinks).insertOne(doc);
   const token = getTokenById(input.tokenId);
 
-  await logPaymentLinkCreatedActivity({
-    workspaceId: input.workspaceId,
-    amount: input.amount,
-    tokenSymbol: token?.symbol ?? input.tokenId.toUpperCase(),
-  });
+  if (input.logActivity !== false && !input.invoiceId) {
+    await logPaymentLinkCreatedActivity({
+      workspaceId: input.workspaceId,
+      amount: input.amount,
+      tokenSymbol: token?.symbol ?? input.tokenId.toUpperCase(),
+    });
+  }
 
   return {
     id: result.insertedId.toString(),
     publicId,
     url,
     status,
+  };
+}
+
+export async function upsertInvoicePaymentLink(input: {
+  workspaceId: ObjectId;
+  userId: ObjectId;
+  username: string;
+  recipientAddress: string;
+  invoiceId: ObjectId;
+  paymentLinkId?: ObjectId;
+  amount: number;
+  tokenId: string;
+  networkId: string;
+  expiresAt: Date;
+}) {
+  const db = await getDb();
+  const now = new Date();
+
+  if (input.paymentLinkId) {
+    const existing = await db.collection<PaymentLinkDoc>(COLLECTIONS.paymentLinks).findOne({
+      _id: input.paymentLinkId,
+      workspaceId: input.workspaceId,
+      invoiceId: input.invoiceId,
+    });
+
+    if (existing) {
+      if (existing.status === "paid") {
+        return {
+          id: existing._id.toString(),
+          publicId: existing.publicId,
+          url: existing.url,
+          status: existing.status,
+          amount: existing.amount,
+          tokenId: existing.tokenId,
+          networkId: existing.networkId,
+        };
+      }
+
+      await db.collection<PaymentLinkDoc>(COLLECTIONS.paymentLinks).updateOne(
+        { _id: existing._id },
+        {
+          $set: {
+            amount: input.amount,
+            tokenId: input.tokenId,
+            networkId: input.networkId,
+            recipientAddress: input.recipientAddress.toLowerCase(),
+            expiresAt: input.expiresAt,
+            updatedAt: now,
+            status:
+              input.expiresAt.getTime() < now.getTime() ? "expired" : "pending",
+          },
+        },
+      );
+
+      const updated = await db.collection<PaymentLinkDoc>(COLLECTIONS.paymentLinks).findOne({
+        _id: existing._id,
+      });
+
+      if (!updated) {
+        throw new Error("Failed to load updated invoice payment link");
+      }
+
+      return {
+        id: updated._id.toString(),
+        publicId: updated.publicId,
+        url: updated.url,
+        status: resolveStatus(updated),
+        amount: updated.amount,
+        tokenId: updated.tokenId,
+        networkId: updated.networkId,
+      };
+    }
+  }
+
+  return createPaymentLink({
+    workspaceId: input.workspaceId,
+    userId: input.userId,
+    username: input.username,
+    recipientAddress: input.recipientAddress,
+    amount: input.amount,
+    tokenId: input.tokenId,
+    networkId: input.networkId,
+    expiresAt: input.expiresAt,
+    invoiceId: input.invoiceId,
+    logActivity: false,
+  }).then((link) => ({
+    ...link,
+    amount: input.amount,
+    tokenId: input.tokenId,
+    networkId: input.networkId,
+  }));
+}
+
+export async function getInvoicePaymentLinkById(
+  workspaceId: ObjectId,
+  paymentLinkId: ObjectId,
+) {
+  const db = await getDb();
+  const link = await db.collection<PaymentLinkDoc>(COLLECTIONS.paymentLinks).findOne({
+    _id: paymentLinkId,
+    workspaceId,
+    invoiceId: { $exists: true },
+  });
+
+  if (!link) return null;
+
+  const syncedLink = await syncExpiredStatus(link);
+
+  return {
+    id: syncedLink._id.toString(),
+    publicId: syncedLink.publicId,
+    url: syncedLink.url,
+    status: resolveStatus(syncedLink),
+    amount: syncedLink.amount,
+    tokenId: syncedLink.tokenId,
+    networkId: syncedLink.networkId,
   };
 }
 
@@ -153,7 +276,15 @@ export async function getPaymentLinkByUsernameAndPublicId(
 
   if (!merchant) return null;
 
-  return toPublicPaymentLink(syncedLink, merchant);
+  let invoiceReference: string | undefined;
+  if (syncedLink.invoiceId) {
+    const invoice = await db.collection<InvoiceDoc>(COLLECTIONS.invoices).findOne({
+      _id: syncedLink.invoiceId,
+    });
+    invoiceReference = invoice?.reference;
+  }
+
+  return toPublicPaymentLink(syncedLink, merchant, invoiceReference);
 }
 
 export async function markPaymentLinkPaid(input: {
@@ -161,6 +292,7 @@ export async function markPaymentLinkPaid(input: {
   publicId: string;
   payerAddress: string;
   txHash: string;
+  logActivity?: boolean;
 }) {
   const db = await getDb();
   const now = new Date();
@@ -210,7 +342,9 @@ export async function markPaymentLinkPaid(input: {
     workspaceId: syncedLink.workspaceId,
     paymentLinkId: syncedLink._id,
     type: "payment_received",
-    label: `Payment from ${payerAddress.slice(0, 6)}…${payerAddress.slice(-4)}`,
+    label: syncedLink.invoiceId
+      ? `Invoice payment`
+      : `Payment from ${payerAddress.slice(0, 6)}…${payerAddress.slice(-4)}`,
     amount: syncedLink.amount,
     symbol: token?.symbol.toLowerCase() ?? syncedLink.tokenId,
     networkId: syncedLink.networkId,
@@ -220,11 +354,26 @@ export async function markPaymentLinkPaid(input: {
     createdAt: now,
   });
 
-  await logPaymentReceivedActivity({
-    workspaceId: syncedLink.workspaceId,
-    amount: syncedLink.amount,
-    tokenSymbol: token?.symbol ?? syncedLink.tokenId.toUpperCase(),
-  });
+  if (syncedLink.invoiceId) {
+    await db.collection<InvoiceDoc>(COLLECTIONS.invoices).updateOne(
+      { _id: syncedLink.invoiceId, status: { $ne: "cancelled" } },
+      {
+        $set: {
+          status: "paid",
+          paidAt: now,
+          updatedAt: now,
+        },
+      },
+    );
+  }
+
+  if (input.logActivity !== false) {
+    await logPaymentReceivedActivity({
+      workspaceId: syncedLink.workspaceId,
+      amount: syncedLink.amount,
+      tokenSymbol: token?.symbol ?? syncedLink.tokenId.toUpperCase(),
+    });
+  }
 
   const updated = await db.collection<PaymentLinkDoc>(COLLECTIONS.paymentLinks).findOne({
     _id: syncedLink._id,
@@ -242,9 +391,17 @@ export async function markPaymentLinkPaid(input: {
     return { ok: false as const, error: "Merchant not found" };
   }
 
+  let invoiceReference: string | undefined;
+  if (updated.invoiceId) {
+    const invoice = await db.collection<InvoiceDoc>(COLLECTIONS.invoices).findOne({
+      _id: updated.invoiceId,
+    });
+    invoiceReference = invoice?.reference;
+  }
+
   return {
     ok: true as const,
-    link: toPublicPaymentLink(updated, merchant),
+    link: toPublicPaymentLink(updated, merchant, invoiceReference),
   };
 }
 
@@ -252,11 +409,62 @@ export async function listPaymentLinks(workspaceId: ObjectId) {
   const db = await getDb();
   const links = await db
     .collection<PaymentLinkDoc>(COLLECTIONS.paymentLinks)
-    .find({ workspaceId })
+    .find({
+      workspaceId,
+      invoiceId: { $exists: false },
+    })
     .sort({ createdAt: -1 })
     .toArray();
 
   return Promise.all(links.map((link) => syncExpiredStatus(link)));
+}
+
+export type PaymentLinkListItem = {
+  id: string;
+  publicId: string;
+  url: string;
+  amount: number;
+  amountLabel: string;
+  tokenId: string;
+  tokenSymbol: string;
+  networkId: string;
+  networkLabel: string;
+  status: PaymentLinkStatus;
+  createdAt: string;
+  expiresAt: string;
+  paidAt?: string;
+};
+
+export function serializePaymentLinkListItem(
+  link: PaymentLinkDoc,
+): PaymentLinkListItem {
+  const status = resolveStatus(link);
+  const token = getTokenById(link.tokenId);
+  const network = getNetworkById(link.networkId);
+  const symbol = token?.symbol ?? link.tokenId.toUpperCase();
+
+  return {
+    id: link._id.toString(),
+    publicId: link.publicId,
+    url: link.url,
+    amount: link.amount,
+    amountLabel: `${link.amount.toLocaleString("en-US", {
+      maximumFractionDigits: 2,
+    })} ${symbol}`,
+    tokenId: link.tokenId,
+    tokenSymbol: symbol,
+    networkId: link.networkId,
+    networkLabel: network?.label ?? link.networkId,
+    status,
+    createdAt: link.createdAt.toISOString(),
+    expiresAt: link.expiresAt.toISOString(),
+    paidAt: link.paidAt?.toISOString(),
+  };
+}
+
+export async function listPaymentLinksForWorkspace(workspaceId: ObjectId) {
+  const links = await listPaymentLinks(workspaceId);
+  return links.map(serializePaymentLinkListItem);
 }
 
 export async function deletePaymentLink(

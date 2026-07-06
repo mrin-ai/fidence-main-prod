@@ -4,11 +4,33 @@ import { getSessionFromCookies } from "@/lib/db/auth";
 import {
   deleteInvoice,
   getInvoiceById,
-  updateInvoice,
+  saveInvoiceWithPaymentLink,
 } from "@/lib/db/invoices";
 import { invoiceFormSchema } from "@/lib/invoice/schema";
 
 type RouteContext = { params: Promise<{ id: string }> };
+
+function invoiceSaveRequirements(session: NonNullable<Awaited<ReturnType<typeof getSessionFromCookies>>>) {
+  if (!session.user.username) {
+    return {
+      error: "Set a username in Settings before saving invoices with payment links",
+      code: "USERNAME_REQUIRED",
+    };
+  }
+
+  const recipientAddress = session.user.walletAddresses[0];
+  if (!recipientAddress) {
+    return {
+      error: "Connect a wallet to your account to receive invoice payments",
+      code: "WALLET_REQUIRED",
+    };
+  }
+
+  return {
+    username: session.user.username,
+    recipientAddress,
+  };
+}
 
 export async function GET(_request: Request, context: RouteContext) {
   const session = await getSessionFromCookies();
@@ -32,6 +54,11 @@ export async function PATCH(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const requirements = invoiceSaveRequirements(session);
+  if ("error" in requirements) {
+    return NextResponse.json(requirements, { status: 400 });
+  }
+
   const { id } = await context.params;
   const body = await request.json();
   const parsed = invoiceFormSchema.safeParse(body);
@@ -43,17 +70,24 @@ export async function PATCH(request: Request, context: RouteContext) {
     );
   }
 
-  const result = await updateInvoice({
-    workspaceId: session.workspace._id,
-    invoiceId: id,
-    data: parsed.data,
-  });
+  try {
+    const invoice = await saveInvoiceWithPaymentLink({
+      workspaceId: session.workspace._id,
+      userId: session.user._id,
+      username: requirements.username,
+      recipientAddress: requirements.recipientAddress,
+      data: parsed.data,
+      invoiceId: id,
+    });
 
-  if (!result.updated) {
-    return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+    return NextResponse.json(invoice);
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Failed to save invoice";
+    const status = message === "Invoice not found" ? 404 : 400;
+
+    return NextResponse.json({ error: message }, { status });
   }
-
-  return NextResponse.json({ reference: result.reference });
 }
 
 export async function DELETE(_request: Request, context: RouteContext) {

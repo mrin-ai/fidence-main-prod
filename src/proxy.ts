@@ -14,7 +14,9 @@ export async function proxy(request: NextRequest) {
   const isProtected =
     pathname.startsWith("/dashboard") ||
     pathname.startsWith("/settings") ||
-    pathname.startsWith("/invoice");
+    pathname.startsWith("/invoice") ||
+    pathname.startsWith("/manage-invoices") ||
+    pathname.startsWith("/payment-links");
 
   if (isProtected && !hasValidSession) {
     const url = request.nextUrl.clone();
@@ -56,6 +58,10 @@ export const config = {
     "/settings/:path*",
     "/invoice",
     "/invoice/:path*",
+    "/manage-invoices",
+    "/manage-invoices/:path*",
+    "/payment-links",
+    "/payment-links/:path*",
     "/sign-in",
     "/sign-up",
   ],

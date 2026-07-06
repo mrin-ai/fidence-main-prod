@@ -65,6 +65,7 @@ export type PaymentLinkDoc = {
   _id: ObjectId;
   workspaceId: ObjectId;
   createdBy: ObjectId;
+  invoiceId?: ObjectId;
   username: string;
   publicId: string;
   slug: string;
@@ -166,6 +167,10 @@ export type InvoiceFieldsDoc = {
     terms: string;
     paymentInformation: Array<{ label: string; value: string }>;
   };
+  paymentLink: {
+    tokenId: string;
+    networkId: string;
+  };
 };
 
 export type InvoiceDoc = {
@@ -175,6 +180,8 @@ export type InvoiceDoc = {
   status: InvoiceStatus;
   reference: string;
   fields: InvoiceFieldsDoc;
+  paymentLinkId?: ObjectId;
+  paidAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 };

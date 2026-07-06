@@ -7,128 +7,208 @@ import {
   View,
 } from "@react-pdf/renderer";
 
+import { amountToWords } from "@/lib/invoice/amount-to-words";
 import { calculateInvoiceTotal, calculateSubtotal } from "@/lib/invoice/calculate-totals";
 import { formatCurrency } from "@/lib/invoice/currency";
 import type { InvoiceFormData } from "@/lib/invoice/schema";
 import { invoiceReference } from "@/lib/invoice/schema";
 
-const styles = StyleSheet.create({
-  page: {
-    padding: 40,
-    fontSize: 10,
-    fontFamily: "Helvetica",
-    color: "#1a1a2e",
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 28,
-  },
-  brandBlock: {
-    maxWidth: "55%",
-  },
-  logo: {
-    width: 64,
-    height: 64,
-    objectFit: "contain",
-    marginBottom: 8,
-  },
-  companyName: {
-    fontSize: 14,
-    fontWeight: "bold",
-    marginBottom: 4,
-  },
-  muted: {
-    color: "#64748b",
-    lineHeight: 1.4,
-  },
-  invoiceTitle: {
-    fontSize: 22,
-    fontWeight: "bold",
-    color: "#2b6bff",
-    marginBottom: 6,
-    textAlign: "right",
-  },
-  metaRow: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    gap: 16,
-    marginBottom: 2,
-  },
-  section: {
-    marginBottom: 18,
-  },
-  sectionTitle: {
-    fontSize: 9,
-    textTransform: "uppercase",
-    letterSpacing: 1,
-    color: "#64748b",
-    marginBottom: 6,
-  },
-  table: {
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-    borderRadius: 4,
-    overflow: "hidden",
-  },
-  tableHeader: {
-    flexDirection: "row",
-    backgroundColor: "#eef3ff",
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    fontWeight: "bold",
-  },
-  tableRow: {
-    flexDirection: "row",
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderTopWidth: 1,
-    borderTopColor: "#e2e8f0",
-  },
-  colItem: { width: "40%" },
-  colQty: { width: "15%", textAlign: "right" },
-  colPrice: { width: "20%", textAlign: "right" },
-  colTotal: { width: "25%", textAlign: "right" },
-  totals: {
-    marginTop: 12,
-    alignSelf: "flex-end",
-    width: "45%",
-  },
-  totalRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingVertical: 3,
-  },
-  grandTotal: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingTop: 6,
-    marginTop: 4,
-    borderTopWidth: 1,
-    borderTopColor: "#cbd5e1",
-    fontSize: 12,
-    fontWeight: "bold",
-  },
-  footer: {
-    marginTop: 24,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: "#e2e8f0",
-  },
-  signature: {
-    width: 120,
-    height: 48,
-    objectFit: "contain",
-    marginTop: 8,
-  },
-});
+import {
+  invoicePdfFontFamily,
+  invoicePdfMonoFontFamily,
+} from "./register-fonts";
 
-function formatDateLabel(value?: Date | null) {
+function formatInvoiceDate(value?: Date | null) {
   if (!value) return "—";
-  return value.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
+  const day = String(value.getDate()).padStart(2, "0");
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const year = value.getFullYear();
+  return `${day}/${month}/${year}`;
+}
+
+function createStyles(
+  fontFamily: string,
+  monoFamily: string,
+  accentColor: string,
+) {
+  return StyleSheet.create({
+    page: {
+      padding: 36,
+      fontSize: 10,
+      fontFamily,
+      color: "#111827",
+      backgroundColor: "#FFFFFF",
+      flexDirection: "column",
+    },
+    content: {
+      flexGrow: 1,
+    },
+    title: {
+      fontFamily: monoFamily,
+      fontSize: 28,
+      fontWeight: 700,
+      color: accentColor,
+      marginBottom: 18,
+    },
+    metaBlock: {
+      width: 210,
+      marginBottom: 28,
+    },
+    metaRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      marginBottom: 6,
+    },
+    metaLabel: {
+      color: "#6B7280",
+      fontSize: 10,
+    },
+    metaValue: {
+      fontFamily: monoFamily,
+      fontSize: 10,
+      color: "#111827",
+    },
+    billingRow: {
+      flexDirection: "row",
+      marginBottom: 24,
+    },
+    billingCard: {
+      flex: 1,
+      backgroundColor: "#F3F4F6",
+      borderRadius: 10,
+      padding: 14,
+    },
+    billingCardLeft: {
+      marginRight: 10,
+    },
+    billingCardTitle: {
+      color: accentColor,
+      fontSize: 11,
+      fontWeight: 700,
+      marginBottom: 8,
+    },
+    billingName: {
+      fontSize: 10,
+      fontWeight: 700,
+      marginBottom: 4,
+      color: "#111827",
+    },
+    billingAddress: {
+      fontSize: 9,
+      color: "#6B7280",
+      lineHeight: 1.45,
+    },
+    table: {
+      borderRadius: 10,
+      overflow: "hidden",
+    },
+    tableHeader: {
+      flexDirection: "row",
+      backgroundColor: accentColor,
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+    },
+    tableHeaderText: {
+      color: "#FFFFFF",
+      fontSize: 10,
+      fontWeight: 700,
+    },
+    tableRow: {
+      flexDirection: "row",
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: "#E5E7EB",
+    },
+    tableRowLast: {
+      borderBottomWidth: 0,
+    },
+    colItem: { width: "44%" },
+    colQty: { width: "14%", textAlign: "right" },
+    colPrice: { width: "20%", textAlign: "right" },
+    colTotal: { width: "22%", textAlign: "right" },
+    itemName: {
+      fontSize: 10,
+      fontWeight: 700,
+      marginBottom: 2,
+    },
+    itemDescription: {
+      fontSize: 9,
+      color: "#6B7280",
+    },
+    totalsBlock: {
+      width: 220,
+    },
+    bottomSection: {
+      marginTop: "auto",
+      alignItems: "flex-end",
+      paddingTop: 24,
+      borderTopWidth: 1,
+      borderTopColor: "#E5E7EB",
+    },
+    totalRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      marginBottom: 8,
+    },
+    totalLabel: {
+      color: "#6B7280",
+      fontSize: 10,
+    },
+    totalValue: {
+      fontFamily: monoFamily,
+      fontSize: 10,
+    },
+    grandTotalRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      borderTopWidth: 1,
+      borderTopColor: "#D1D5DB",
+      paddingTop: 10,
+      marginTop: 2,
+      marginBottom: 10,
+    },
+    grandTotalLabel: {
+      fontSize: 11,
+      fontWeight: 700,
+    },
+    grandTotalValue: {
+      fontFamily: monoFamily,
+      fontSize: 22,
+      fontWeight: 700,
+      color: "#111827",
+    },
+    totalInWordsLabel: {
+      fontSize: 8,
+      color: "#9CA3AF",
+      marginBottom: 2,
+    },
+    totalInWordsValue: {
+      fontSize: 9,
+      color: "#6B7280",
+    },
+    footer: {
+      marginTop: 24,
+    },
+    footerTitle: {
+      fontSize: 9,
+      fontWeight: 700,
+      color: accentColor,
+      marginBottom: 4,
+    },
+    footerText: {
+      fontSize: 9,
+      color: "#6B7280",
+      lineHeight: 1.45,
+      marginBottom: 10,
+    },
+    signature: {
+      width: 120,
+      height: 48,
+      objectFit: "contain",
+      marginTop: 8,
+    },
   });
 }
 
@@ -137,138 +217,181 @@ export function DefaultInvoicePdf({ data }: { data: InvoiceFormData }) {
   const subtotal = calculateSubtotal(data.items);
   const total = calculateInvoiceTotal(data);
   const reference = invoiceReference(data);
-  const logo = data.companyDetails.logoBase64 || data.companyDetails.logo;
+  const accentColor = data.invoiceDetails.theme.baseColor;
+  const fontFamily = invoicePdfFontFamily(data.invoiceDetails.theme.font);
+  const monoFamily = invoicePdfMonoFontFamily(data.invoiceDetails.theme.font);
+  const styles = createStyles(fontFamily, monoFamily, accentColor);
   const signature =
     data.companyDetails.signatureBase64 || data.companyDetails.signature;
 
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        <View style={styles.header}>
-          <View style={styles.brandBlock}>
-            {logo ? <Image src={logo} style={styles.logo} /> : null}
-            <Text style={styles.companyName}>{data.companyDetails.name}</Text>
-            <Text style={styles.muted}>{data.companyDetails.address}</Text>
-            {data.companyDetails.metadata.map((row) => (
-              <Text key={`${row.label}-${row.value}`} style={styles.muted}>
-                {row.label}: {row.value}
+        <View style={styles.content}>
+          <Text style={styles.title}>Invoice {reference}</Text>
+
+          <View style={styles.metaBlock}>
+            <View style={styles.metaRow}>
+              <Text style={styles.metaLabel}>Serial Number</Text>
+              <Text style={styles.metaValue}>
+                {data.invoiceDetails.serialNumber}
               </Text>
+            </View>
+            <View style={styles.metaRow}>
+              <Text style={styles.metaLabel}>Date</Text>
+              <Text style={styles.metaValue}>
+                {formatInvoiceDate(data.invoiceDetails.date)}
+              </Text>
+            </View>
+            <View style={styles.metaRow}>
+              <Text style={styles.metaLabel}>Currency</Text>
+              <Text style={styles.metaValue}>{currency}</Text>
+            </View>
+          </View>
+
+          <View style={styles.billingRow}>
+            <View style={[styles.billingCard, styles.billingCardLeft]}>
+              <Text style={styles.billingCardTitle}>Billed By</Text>
+              <Text style={styles.billingName}>{data.companyDetails.name}</Text>
+              {data.companyDetails.address ? (
+                <Text style={styles.billingAddress}>
+                  {data.companyDetails.address}
+                </Text>
+              ) : null}
+              {data.companyDetails.metadata.map((row) => (
+                <Text
+                  key={`company-${row.label}-${row.value}`}
+                  style={styles.billingAddress}
+                >
+                  {row.label}: {row.value}
+                </Text>
+              ))}
+            </View>
+
+            <View style={styles.billingCard}>
+              <Text style={styles.billingCardTitle}>Billed To</Text>
+              <Text style={styles.billingName}>{data.clientDetails.name}</Text>
+              {data.clientDetails.address ? (
+                <Text style={styles.billingAddress}>
+                  {data.clientDetails.address}
+                </Text>
+              ) : null}
+              {data.clientDetails.metadata.map((row) => (
+                <Text
+                  key={`client-${row.label}-${row.value}`}
+                  style={styles.billingAddress}
+                >
+                  {row.label}: {row.value}
+                </Text>
+              ))}
+            </View>
+          </View>
+
+          <View style={styles.table}>
+            <View style={styles.tableHeader}>
+              <Text style={[styles.tableHeaderText, styles.colItem]}>Item</Text>
+              <Text style={[styles.tableHeaderText, styles.colQty]}>Qty</Text>
+              <Text style={[styles.tableHeaderText, styles.colPrice]}>Price</Text>
+              <Text style={[styles.tableHeaderText, styles.colTotal]}>Total</Text>
+            </View>
+            {data.items.map((item, index) => (
+              <View
+                key={`${item.name}-${index}`}
+                style={[
+                  styles.tableRow,
+                  index === data.items.length - 1 ? styles.tableRowLast : {},
+                ]}
+              >
+                <View style={styles.colItem}>
+                  <Text style={styles.itemName}>{item.name}</Text>
+                  {item.description ? (
+                    <Text style={styles.itemDescription}>{item.description}</Text>
+                  ) : null}
+                </View>
+                <Text style={[styles.colQty, styles.totalValue]}>
+                  {item.quantity}
+                </Text>
+                <Text style={[styles.colPrice, styles.totalValue]}>
+                  {formatCurrency(item.unitPrice, currency)}
+                </Text>
+                <Text style={[styles.colTotal, styles.totalValue]}>
+                  {formatCurrency(item.quantity * item.unitPrice, currency)}
+                </Text>
+              </View>
             ))}
           </View>
-          <View>
-            <Text style={styles.invoiceTitle}>INVOICE</Text>
-            <View style={styles.metaRow}>
-              <Text style={styles.muted}>Reference</Text>
-              <Text>{reference}</Text>
+
+          {(data.metadata.notes ||
+            data.metadata.terms ||
+            data.metadata.paymentInformation.length > 0 ||
+            signature) && (
+            <View style={styles.footer}>
+              {data.metadata.notes ? (
+                <View>
+                  <Text style={styles.footerTitle}>Notes</Text>
+                  <Text style={styles.footerText}>{data.metadata.notes}</Text>
+                </View>
+              ) : null}
+              {data.metadata.terms ? (
+                <View>
+                  <Text style={styles.footerTitle}>Terms</Text>
+                  <Text style={styles.footerText}>{data.metadata.terms}</Text>
+                </View>
+              ) : null}
+              {data.metadata.paymentInformation.length > 0 ? (
+                <View>
+                  <Text style={styles.footerTitle}>Payment information</Text>
+                  {data.metadata.paymentInformation.map((row) => (
+                    <Text
+                      key={`payment-${row.label}-${row.value}`}
+                      style={styles.footerText}
+                    >
+                      {row.label}: {row.value}
+                    </Text>
+                  ))}
+                </View>
+              ) : null}
+              {signature ? (
+                <Image src={signature} style={styles.signature} />
+              ) : null}
             </View>
-            <View style={styles.metaRow}>
-              <Text style={styles.muted}>Date</Text>
-              <Text>{formatDateLabel(data.invoiceDetails.date)}</Text>
-            </View>
-            <View style={styles.metaRow}>
-              <Text style={styles.muted}>Due</Text>
-              <Text>{formatDateLabel(data.invoiceDetails.dueDate)}</Text>
-            </View>
-          </View>
+          )}
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Bill to</Text>
-          <Text style={{ fontWeight: "bold", marginBottom: 2 }}>
-            {data.clientDetails.name}
-          </Text>
-          <Text style={styles.muted}>{data.clientDetails.address}</Text>
-          {data.clientDetails.metadata.map((row) => (
-            <Text key={`${row.label}-${row.value}`} style={styles.muted}>
-              {row.label}: {row.value}
-            </Text>
-          ))}
-        </View>
-
-        <View style={styles.table}>
-          <View style={styles.tableHeader}>
-            <Text style={styles.colItem}>Item</Text>
-            <Text style={styles.colQty}>Qty</Text>
-            <Text style={styles.colPrice}>Price</Text>
-            <Text style={styles.colTotal}>Total</Text>
-          </View>
-          {data.items.map((item, index) => (
-            <View key={`${item.name}-${index}`} style={styles.tableRow}>
-              <View style={styles.colItem}>
-                <Text style={{ fontWeight: "bold" }}>{item.name}</Text>
-                {item.description ? (
-                  <Text style={styles.muted}>{item.description}</Text>
-                ) : null}
-              </View>
-              <Text style={styles.colQty}>{item.quantity}</Text>
-              <Text style={styles.colPrice}>
-                {formatCurrency(item.unitPrice, currency)}
-              </Text>
-              <Text style={styles.colTotal}>
-                {formatCurrency(item.quantity * item.unitPrice, currency)}
+        <View style={styles.bottomSection}>
+          <View style={styles.totalsBlock}>
+            <View style={styles.totalRow}>
+              <Text style={styles.totalLabel}>Subtotal</Text>
+              <Text style={styles.totalValue}>
+                {formatCurrency(subtotal, currency)}
               </Text>
             </View>
-          ))}
-        </View>
-
-        <View style={styles.totals}>
-          <View style={styles.totalRow}>
-            <Text style={styles.muted}>Subtotal</Text>
-            <Text>{formatCurrency(subtotal, currency)}</Text>
-          </View>
-          {data.invoiceDetails.billingDetails.map((row) => (
-            <View key={row.label} style={styles.totalRow}>
-              <Text style={styles.muted}>
-                {row.label}
-                {row.type === "percentage" ? ` (${row.value}%)` : ""}
-              </Text>
-              <Text>
-                {formatCurrency(
-                  row.type === "percentage"
-                    ? subtotal * (row.value / 100)
-                    : row.value,
-                  currency,
-                )}
+            {data.invoiceDetails.billingDetails.map((row) => (
+              <View key={row.label} style={styles.totalRow}>
+                <Text style={styles.totalLabel}>
+                  {row.label}
+                  {row.type === "percentage" ? ` (${row.value}%)` : ""}
+                </Text>
+                <Text style={styles.totalValue}>
+                  {formatCurrency(
+                    row.type === "percentage"
+                      ? subtotal * (row.value / 100)
+                      : row.value,
+                    currency,
+                  )}
+                </Text>
+              </View>
+            ))}
+            <View style={styles.grandTotalRow}>
+              <Text style={styles.grandTotalLabel}>Total</Text>
+              <Text style={styles.grandTotalValue}>
+                {formatCurrency(total, currency)}
               </Text>
             </View>
-          ))}
-          <View style={styles.grandTotal}>
-            <Text>Total</Text>
-            <Text>{formatCurrency(total, currency)}</Text>
+            <Text style={styles.totalInWordsLabel}>Invoice Total (in words)</Text>
+            <Text style={styles.totalInWordsValue}>{amountToWords(total)}</Text>
           </View>
         </View>
-
-        {(data.metadata.notes ||
-          data.metadata.terms ||
-          data.metadata.paymentInformation.length > 0) && (
-          <View style={styles.footer}>
-            {data.metadata.notes ? (
-              <View style={{ marginBottom: 8 }}>
-                <Text style={styles.sectionTitle}>Notes</Text>
-                <Text style={styles.muted}>{data.metadata.notes}</Text>
-              </View>
-            ) : null}
-            {data.metadata.terms ? (
-              <View style={{ marginBottom: 8 }}>
-                <Text style={styles.sectionTitle}>Terms</Text>
-                <Text style={styles.muted}>{data.metadata.terms}</Text>
-              </View>
-            ) : null}
-            {data.metadata.paymentInformation.length > 0 ? (
-              <View>
-                <Text style={styles.sectionTitle}>Payment information</Text>
-                {data.metadata.paymentInformation.map((row) => (
-                  <Text key={`${row.label}-${row.value}`} style={styles.muted}>
-                    {row.label}: {row.value}
-                  </Text>
-                ))}
-              </View>
-            ) : null}
-            {signature ? (
-              <Image src={signature} style={styles.signature} />
-            ) : null}
-          </View>
-        )}
       </Page>
     </Document>
   );

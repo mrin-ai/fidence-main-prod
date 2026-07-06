@@ -15,18 +15,21 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Field,
-  FieldContent,
-  FieldLabel,
-} from "@/components/ui/field";
 import { formatCurrency } from "@/lib/invoice/currency";
 import {
   invoiceItemSchema,
   type InvoiceFormData,
   type InvoiceItem,
 } from "@/lib/invoice/schema";
+
+const emptyItem: InvoiceItem = {
+  name: "",
+  description: "",
+  quantity: 1,
+  unitPrice: 1,
+};
 
 export function InvoiceItemsSection({
   form,
@@ -37,16 +40,15 @@ export function InvoiceItemsSection({
   const currency = form.watch("invoiceDetails.currency");
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [editingIndex, setEditingIndex] = React.useState<number | null>(null);
-  const [draft, setDraft] = React.useState<InvoiceItem>({
-    name: "",
-    description: "",
-    quantity: 1,
-    unitPrice: 1,
-  });
+  const [draft, setDraft] = React.useState<InvoiceItem>(emptyItem);
+  const nameInputRef = React.useRef<HTMLInputElement>(null);
+
+  const lineTotal = draft.quantity * draft.unitPrice;
+  const isEditing = editingIndex !== null;
 
   function openCreate() {
     setEditingIndex(null);
-    setDraft({ name: "", description: "", quantity: 1, unitPrice: 1 });
+    setDraft(emptyItem);
     setDialogOpen(true);
   }
 
@@ -55,6 +57,20 @@ export function InvoiceItemsSection({
     setDraft(items[index]);
     setDialogOpen(true);
   }
+
+  function handleDialogChange(open: boolean) {
+    setDialogOpen(open);
+    if (!open) {
+      setEditingIndex(null);
+      setDraft(emptyItem);
+    }
+  }
+
+  React.useEffect(() => {
+    if (!dialogOpen) return;
+    const timer = window.setTimeout(() => nameInputRef.current?.focus(), 0);
+    return () => window.clearTimeout(timer);
+  }, [dialogOpen, editingIndex]);
 
   function saveItem() {
     const parsed = invoiceItemSchema.safeParse(draft);
@@ -71,7 +87,7 @@ export function InvoiceItemsSection({
       form.setValue("items", next, { shouldDirty: true });
     }
 
-    setDialogOpen(false);
+    handleDialogChange(false);
   }
 
   function removeItem(index: number) {
@@ -130,30 +146,46 @@ export function InvoiceItemsSection({
         Add item
       </Button>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>{editingIndex === null ? "Add item" : "Edit item"}</DialogTitle>
+      <Dialog open={dialogOpen} onOpenChange={handleDialogChange}>
+        <DialogContent className="max-w-md gap-0 p-0">
+          <DialogHeader className="border-b border-border/50 pb-4">
+            <DialogTitle>{isEditing ? "Edit item" : "Add item"}</DialogTitle>
             <DialogDescription>
               Line items appear on the invoice and in the PDF preview.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-2">
-            <Field>
-              <FieldLabel>Name</FieldLabel>
-              <FieldContent>
+
+          <form
+            className="flex min-h-0 flex-col"
+            onSubmit={(event) => {
+              event.preventDefault();
+              saveItem();
+            }}
+          >
+            <div className="flex max-h-[min(28rem,calc(100vh-16rem))] flex-col gap-4 overflow-y-auto px-6 py-5">
+              <div className="space-y-2">
+                <Label htmlFor="invoice-item-name">Name</Label>
                 <Input
+                  ref={nameInputRef}
+                  id="invoice-item-name"
+                  placeholder="Consulting services"
                   value={draft.name}
                   onChange={(event) =>
                     setDraft((current) => ({ ...current, name: event.target.value }))
                   }
                 />
-              </FieldContent>
-            </Field>
-            <Field>
-              <FieldLabel>Description</FieldLabel>
-              <FieldContent>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="invoice-item-description">
+                  Description{" "}
+                  <span className="font-normal text-muted-foreground">(optional)</span>
+                </Label>
                 <Textarea
+                  id="invoice-item-description"
+                  placeholder="Add details that should appear below the item name"
+                  rows={3}
+                  className="min-h-20 resize-none"
                   value={draft.description}
                   onChange={(event) =>
                     setDraft((current) => ({
@@ -162,16 +194,17 @@ export function InvoiceItemsSection({
                     }))
                   }
                 />
-              </FieldContent>
-            </Field>
-            <div className="grid grid-cols-2 gap-3">
-              <Field>
-                <FieldLabel>Quantity</FieldLabel>
-                <FieldContent>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="invoice-item-quantity">Quantity</Label>
                   <Input
+                    id="invoice-item-quantity"
                     type="number"
                     min="0"
                     step="1"
+                    inputMode="numeric"
                     value={draft.quantity}
                     onChange={(event) =>
                       setDraft((current) => ({
@@ -180,15 +213,16 @@ export function InvoiceItemsSection({
                       }))
                     }
                   />
-                </FieldContent>
-              </Field>
-              <Field>
-                <FieldLabel>Unit price</FieldLabel>
-                <FieldContent>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="invoice-item-unit-price">Unit price</Label>
                   <Input
+                    id="invoice-item-unit-price"
                     type="number"
                     min="0"
                     step="any"
+                    inputMode="decimal"
+                    placeholder="0.00"
                     value={draft.unitPrice}
                     onChange={(event) =>
                       setDraft((current) => ({
@@ -197,18 +231,37 @@ export function InvoiceItemsSection({
                       }))
                     }
                   />
-                </FieldContent>
-              </Field>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-border/50 bg-secondary/30 px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    Line total
+                  </span>
+                  <span className="font-mono text-sm font-semibold tabular-nums">
+                    {formatCurrency(lineTotal, currency)}
+                  </span>
+                </div>
+              </div>
             </div>
-          </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="button" onClick={saveItem}>
-              {editingIndex === null ? "Add item" : "Save changes"}
-            </Button>
-          </DialogFooter>
+
+            <DialogFooter className="border-t border-border/50 bg-muted/20">
+              <div className="flex w-full flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="sm:min-w-24"
+                  onClick={() => handleDialogChange(false)}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" className="sm:min-w-32">
+                  {isEditing ? "Save changes" : "Add item"}
+                </Button>
+              </div>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

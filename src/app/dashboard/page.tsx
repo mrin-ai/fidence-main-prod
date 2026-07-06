@@ -10,6 +10,8 @@ import { getSessionFromCookies } from "@/lib/db/auth";
 import { getDashboardOverview } from "@/lib/db/dashboard";
 import { ensureDbIndexes } from "@/lib/db/seed";
 
+export const dynamic = "force-dynamic";
+
 export default async function Page() {
   await ensureDbIndexes();
 

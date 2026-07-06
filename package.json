@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "seed:payment-links": "npx tsx scripts/seed-payment-links.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
