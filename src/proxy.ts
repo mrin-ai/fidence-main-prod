@@ -1,14 +1,13 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { AUTH_COOKIE } from "@/lib/auth-session";
-import { clearSessionCookieOptions, getSessionByToken } from "@/lib/db/auth";
+import { hasCachedSession } from "@/lib/cache/session-cache";
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const token = request.cookies.get(AUTH_COOKIE)?.value;
 
-  const session = token ? await getSessionByToken(token) : null;
-  const hasValidSession = Boolean(session);
+  const hasValidSession = token ? await hasCachedSession(token) : false;
 
   const isAuthRoute = pathname === "/sign-in" || pathname === "/sign-up";
   const isProtected =
@@ -21,14 +20,15 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith("/payment-links");
 
   if (isProtected && !hasValidSession) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/sign-in";
-    url.searchParams.set("redirect", pathname);
-    const response = NextResponse.redirect(url);
-    if (token) {
-      applyClearSessionCookie(response);
+    if (!token) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/sign-in";
+      url.searchParams.set("redirect", pathname);
+      return NextResponse.redirect(url);
     }
-    return response;
+
+    // Cache miss with cookie present — defer to page/API auth (no Mongo in proxy).
+    return NextResponse.next();
   }
 
   if (isAuthRoute && hasValidSession) {
@@ -39,17 +39,6 @@ export async function proxy(request: NextRequest) {
   }
 
   return NextResponse.next();
-}
-
-function applyClearSessionCookie(response: NextResponse) {
-  const options = clearSessionCookieOptions();
-  response.cookies.set(options.name, options.value, {
-    httpOnly: options.httpOnly,
-    sameSite: options.sameSite,
-    secure: options.secure,
-    path: options.path,
-    maxAge: options.maxAge,
-  });
 }
 
 export const config = {

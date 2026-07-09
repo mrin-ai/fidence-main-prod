@@ -18,6 +18,12 @@ import type { InvoiceFormData } from "@/lib/invoice/schema";
 import { invoiceReference } from "@/lib/invoice/schema";
 import { calculateInvoiceTotal } from "@/lib/invoice/calculate-totals";
 import { resolveInvoicePaymentExpiry } from "@/lib/invoice/invoice-payment-link";
+import {
+  MANAGE_INVOICES_PAGE_SIZE,
+  type ManageInvoiceFilterStatus,
+  type ManageInvoiceSort,
+  type ManageInvoiceSortField,
+} from "@/lib/invoice/manage-invoices";
 
 function toFieldsDoc(data: InvoiceFormData): InvoiceFieldsDoc {
   return {
@@ -101,32 +107,95 @@ export type ManageInvoiceListItem = {
 export async function listManageInvoices(
   workspaceId: ObjectId,
 ): Promise<ManageInvoiceListItem[]> {
-  const db = await getDb();
-  const invoices = await db
-    .collection<InvoiceDoc>(COLLECTIONS.invoices)
-    .find({ workspaceId })
-    .sort({ createdAt: -1 })
-    .toArray();
-
-  return invoices.map((invoice) => {
-    const fields = fromFieldsDoc(invoice.fields);
-    const template = invoice.fields.invoiceDetails.theme.template ?? "default";
-
-    return {
-      id: invoice._id.toString(),
-      shortId: invoice._id.toString().slice(-8),
-      serialNumber: invoice.fields.invoiceDetails.serialNumber,
-      reference: invoice.reference || invoiceReference(fields),
-      storage: template === "vercel" ? "Minimal" : "Default",
-      total: calculateInvoiceTotal(fields),
-      currency: invoice.fields.invoiceDetails.currency,
-      itemCount: invoice.fields.items.length,
-      status: invoice.status,
-      invoiceDate: invoice.fields.invoiceDetails.date.toISOString(),
-      createdAt: invoice.createdAt.toISOString(),
-      paidAt: invoice.paidAt?.toISOString(),
-    };
+  const result = await listManageInvoicesPaginated(workspaceId, {
+    page: 1,
+    limit: 10_000,
   });
+  return result.items;
+}
+
+function mapManageInvoice(invoice: InvoiceDoc): ManageInvoiceListItem {
+  const fields = fromFieldsDoc(invoice.fields);
+  const template = invoice.fields.invoiceDetails.theme.template ?? "default";
+
+  return {
+    id: invoice._id.toString(),
+    shortId: invoice._id.toString().slice(-8),
+    serialNumber: invoice.fields.invoiceDetails.serialNumber,
+    reference: invoice.reference || invoiceReference(fields),
+    storage: template === "vercel" ? "Minimal" : "Default",
+    total: calculateInvoiceTotal(fields),
+    currency: invoice.fields.invoiceDetails.currency,
+    itemCount: invoice.fields.items.length,
+    status: invoice.status,
+    invoiceDate: invoice.fields.invoiceDetails.date.toISOString(),
+    createdAt: invoice.createdAt.toISOString(),
+    paidAt: invoice.paidAt?.toISOString(),
+  };
+}
+
+export async function listManageInvoicesPaginated(
+  workspaceId: ObjectId,
+  options: {
+    page?: number;
+    limit?: number;
+    status?: ManageInvoiceFilterStatus;
+    sortField?: ManageInvoiceSortField;
+    sort?: ManageInvoiceSort;
+  } = {},
+) {
+  const db = await getDb();
+  const page = Math.max(1, options.page ?? 1);
+  const limit = Math.min(50, Math.max(1, options.limit ?? MANAGE_INVOICES_PAGE_SIZE));
+  const skip = (page - 1) * limit;
+
+  const filter: Record<string, unknown> = { workspaceId };
+  if (options.status && options.status !== "all") {
+    filter.status = options.status;
+  }
+
+  const sortDirection = options.sort === "asc" ? 1 : -1;
+  const sortField = options.sortField ?? "createdAt";
+
+  let sort: Record<string, 1 | -1> = { createdAt: -1 };
+  if (sortField === "createdAt") {
+    sort = { createdAt: sortDirection };
+  } else if (sortField === "paidAt") {
+    sort = { paidAt: sortDirection, createdAt: -1 };
+  } else if (sortField === "invoiceDate") {
+    sort = { "fields.invoiceDetails.date": sortDirection };
+  }
+
+  const [invoices, total] = await Promise.all([
+    db
+      .collection<InvoiceDoc>(COLLECTIONS.invoices)
+      .find(filter)
+      .sort(sort)
+      .skip(skip)
+      .limit(limit)
+      .toArray(),
+    db.collection(COLLECTIONS.invoices).countDocuments(filter),
+  ]);
+
+  let items = invoices.map(mapManageInvoice);
+
+  if (sortField === "total" || sortField === "items") {
+    const direction = options.sort === "asc" ? 1 : -1;
+    items = [...items].sort((left, right) => {
+      if (sortField === "total") {
+        return (left.total - right.total) * direction;
+      }
+      return (left.itemCount - right.itemCount) * direction;
+    });
+  }
+
+  return {
+    items,
+    total,
+    page,
+    limit,
+    totalPages: Math.max(1, Math.ceil(total / limit)),
+  };
 }
 
 export async function getInvoiceById(workspaceId: ObjectId, invoiceId: string) {

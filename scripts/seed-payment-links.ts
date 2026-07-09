@@ -23,12 +23,12 @@ function loadEnvFile() {
 loadEnvFile();
 
 async function main() {
-  const { ensureDbIndexes } = await import("../src/lib/db/seed");
+  const { bootstrapDatabase } = await import("../src/lib/db/seed");
   const { seedPaymentLinksForUserEmail } = await import(
     "../src/lib/db/seed-payment-links"
   );
 
-  await ensureDbIndexes();
+  await bootstrapDatabase();
 
   const args = process.argv.slice(2);
   const countArg = args.find((value) => /^\d+$/.test(value));

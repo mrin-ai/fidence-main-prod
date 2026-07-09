@@ -6,15 +6,11 @@ import {
   ACTIVITY_PAGE_LIMIT,
   listWorkspaceActivities,
 } from "@/lib/db/activity-feed";
-import { ensureDbIndexes } from "@/lib/db/seed";
-
 export default async function ActivityPage({
   searchParams,
 }: {
   searchParams: Promise<{ page?: string }>;
 }) {
-  await ensureDbIndexes();
-
   const session = await getSessionFromCookies();
   if (!session) {
     redirect("/sign-in?redirect=/activity");

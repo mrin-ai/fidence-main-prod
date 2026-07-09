@@ -8,6 +8,13 @@ import type {
   UserDoc,
 } from "@/lib/db/types";
 
+const MIGRATIONS_META_ID = "migrations_v1";
+
+type DbMetaDoc = {
+  _id: string;
+  completedAt: Date;
+};
+
 export async function migrateLegacyPaymentLinks() {
   const db = await getDb();
   const legacyLinks = await db
@@ -114,12 +121,30 @@ export async function migrateRemoveWorkspaceDemoData() {
   };
 }
 
-export async function ensureDbIndexes() {
+export async function runDbMigrations() {
   const db = await getDb();
+  const existing = await db.collection<DbMetaDoc>(COLLECTIONS.dbMeta).findOne({
+    _id: MIGRATIONS_META_ID,
+  });
+
+  if (existing) {
+    return { skipped: true as const };
+  }
 
   await migrateLegacyPaymentLinks();
   await migrateRemoveWorkspaceDemoData();
   await migrateWalletAddressesToVerifiedWallets();
+
+  await db.collection<DbMetaDoc>(COLLECTIONS.dbMeta).insertOne({
+    _id: MIGRATIONS_META_ID,
+    completedAt: new Date(),
+  });
+
+  return { skipped: false as const };
+}
+
+export async function ensureDbIndexes() {
+  const db = await getDb();
 
   await Promise.all([
     db.collection(COLLECTIONS.users).createIndex({ email: 1 }, { unique: true, sparse: true }),
@@ -134,6 +159,9 @@ export async function ensureDbIndexes() {
     db.collection(COLLECTIONS.sessions).createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
     db.collection(COLLECTIONS.paymentLinks).createIndex({ workspaceId: 1, createdAt: -1 }),
     db.collection(COLLECTIONS.paymentLinks).createIndex(
+      { workspaceId: 1, status: 1, createdAt: -1 },
+    ),
+    db.collection(COLLECTIONS.paymentLinks).createIndex(
       { publicId: 1 },
       { unique: true, sparse: true },
     ),
@@ -147,11 +175,25 @@ export async function ensureDbIndexes() {
       { unique: true, sparse: true },
     ),
     db.collection(COLLECTIONS.activityEvents).createIndex({ workspaceId: 1, occurredAt: -1 }),
+    db.collection(COLLECTIONS.activityEvents).createIndex({ occurredAt: 1 }),
+    db.collection(COLLECTIONS.activityEventsArchive).createIndex({ workspaceId: 1, occurredAt: -1 }),
+    db.collection(COLLECTIONS.activityEventsArchive).createIndex({ occurredAt: 1 }),
     db.collection(COLLECTIONS.invoices).createIndex({ workspaceId: 1, updatedAt: -1 }),
+    db.collection(COLLECTIONS.invoices).createIndex({ workspaceId: 1, createdAt: -1 }),
     db.collection(COLLECTIONS.invoices).createIndex(
       { workspaceId: 1, reference: 1 },
       { unique: true },
     ),
     db.collection(COLLECTIONS.balances).createIndex({ workspaceId: 1, tokenId: 1 }, { unique: true }),
+    db.collection(COLLECTIONS.workspaceDailyStats).createIndex(
+      { workspaceId: 1, date: -1 },
+      { unique: true },
+    ),
   ]);
+}
+
+export async function bootstrapDatabase() {
+  const migrationResult = await runDbMigrations();
+  await ensureDbIndexes();
+  return migrationResult;
 }

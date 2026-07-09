@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "db:setup": "npx tsx scripts/db-setup.ts",
+    "backfill:workspace-stats": "npx tsx scripts/backfill-workspace-stats.ts",
     "seed:payment-links": "npx tsx scripts/seed-payment-links.ts"
   },
   "dependencies": {
@@ -21,6 +23,8 @@
     "@react-pdf/renderer": "^4.5.1",
     "@tanstack/react-query": "^5.101.2",
     "@tanstack/react-table": "^8.21.3",
+    "@upstash/ratelimit": "^2.0.8",
+    "@upstash/redis": "^1.38.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",

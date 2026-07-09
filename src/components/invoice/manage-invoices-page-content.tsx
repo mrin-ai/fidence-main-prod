@@ -69,14 +69,6 @@ const statusLabel: Record<InvoiceStatus, string> = {
   cancelled: "Cancelled",
 };
 
-function countByStatus(
-  invoices: ManageInvoiceListItem[],
-  filter: ManageInvoiceFilterStatus,
-) {
-  if (filter === "all") return invoices.length;
-  return invoices.filter((invoice) => invoice.status === filter).length;
-}
-
 function SortableHead({
   label,
   field,
@@ -114,99 +106,62 @@ function SortableHead({
   );
 }
 
-function sortInvoices(
-  invoices: ManageInvoiceListItem[],
-  field: ManageInvoiceSortField,
-  sort: ManageInvoiceSort,
-) {
-  const direction = sort === "asc" ? 1 : -1;
-
-  return [...invoices].sort((left, right) => {
-    switch (field) {
-      case "total":
-        return (left.total - right.total) * direction;
-      case "items":
-        return (left.itemCount - right.itemCount) * direction;
-      case "invoiceDate":
-        return (
-          (new Date(left.invoiceDate).getTime() -
-            new Date(right.invoiceDate).getTime()) *
-          direction
-        );
-      case "createdAt":
-        return (
-          (new Date(left.createdAt).getTime() -
-            new Date(right.createdAt).getTime()) *
-          direction
-        );
-      case "paidAt": {
-        const leftTime = left.paidAt ? new Date(left.paidAt).getTime() : 0;
-        const rightTime = right.paidAt ? new Date(right.paidAt).getTime() : 0;
-        return (leftTime - rightTime) * direction;
-      }
-      default:
-        return 0;
-    }
-  });
+function buildManageInvoicesHref(options: {
+  page?: number;
+  status?: ManageInvoiceFilterStatus;
+  sortField?: ManageInvoiceSortField;
+  sort?: ManageInvoiceSort;
+}) {
+  const params = new URLSearchParams();
+  if (options.page && options.page > 1) {
+    params.set("page", String(options.page));
+  }
+  if (options.status && options.status !== "all") {
+    params.set("status", options.status);
+  }
+  if (options.sortField && options.sortField !== "createdAt") {
+    params.set("sortField", options.sortField);
+  }
+  if (options.sort && options.sort !== "desc") {
+    params.set("sort", options.sort);
+  }
+  const query = params.toString();
+  return query ? `/manage-invoices?${query}` : "/manage-invoices";
 }
 
 export function ManageInvoicesPageContent({
-  initialInvoices,
+  feed,
+  statusFilter,
+  sortField,
+  sort,
 }: {
-  initialInvoices: ManageInvoiceListItem[];
+  feed: {
+    items: ManageInvoiceListItem[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+  statusFilter: ManageInvoiceFilterStatus;
+  sortField: ManageInvoiceSortField;
+  sort: ManageInvoiceSort;
 }) {
-  const [statusFilter, setStatusFilter] =
-    React.useState<ManageInvoiceFilterStatus>("all");
-  const [sortField, setSortField] =
-    React.useState<ManageInvoiceSortField>("createdAt");
-  const [sort, setSort] = React.useState<ManageInvoiceSort>("desc");
-  const [page, setPage] = React.useState(1);
-
-  React.useEffect(() => {
-    setPage(1);
-  }, [statusFilter, sortField, sort]);
-
   function handleSort(field: ManageInvoiceSortField) {
-    if (sortField === field) {
-      setSort((current) => (current === "asc" ? "desc" : "asc"));
-      return;
-    }
-    setSortField(field);
-    setSort("desc");
+    const nextSort =
+      sortField === field ? (sort === "asc" ? "desc" : "asc") : "desc";
+    window.location.href = buildManageInvoicesHref({
+      page: 1,
+      status: statusFilter,
+      sortField: field,
+      sort: nextSort,
+    });
   }
 
-  const filteredInvoices = React.useMemo(() => {
-    const filtered =
-      statusFilter === "all"
-        ? initialInvoices
-        : initialInvoices.filter((invoice) => invoice.status === statusFilter);
-
-    return sortInvoices(filtered, sortField, sort);
-  }, [initialInvoices, sort, sortField, statusFilter]);
-
-  const totalPages = Math.max(
-    1,
-    Math.ceil(filteredInvoices.length / MANAGE_INVOICES_PAGE_SIZE),
-  );
-  const currentPage = Math.min(page, totalPages);
+  const currentPage = feed.page;
   const pageStart =
-    filteredInvoices.length === 0
-      ? 0
-      : (currentPage - 1) * MANAGE_INVOICES_PAGE_SIZE + 1;
-  const pageEnd = Math.min(
-    currentPage * MANAGE_INVOICES_PAGE_SIZE,
-    filteredInvoices.length,
-  );
-  const paginatedInvoices = filteredInvoices.slice(
-    (currentPage - 1) * MANAGE_INVOICES_PAGE_SIZE,
-    currentPage * MANAGE_INVOICES_PAGE_SIZE,
-  );
-
-  React.useEffect(() => {
-    if (page > totalPages) {
-      setPage(totalPages);
-    }
-  }, [page, totalPages]);
+    feed.total === 0 ? 0 : (currentPage - 1) * feed.limit + 1;
+  const pageEnd = Math.min(currentPage * feed.limit, feed.total);
+  const paginatedInvoices = feed.items;
 
   return (
     <div className="flex w-full flex-col gap-8 px-4 py-6 lg:px-8 lg:py-8">
@@ -229,32 +184,31 @@ export function ManageInvoicesPageContent({
 
           <Tabs
             value={statusFilter}
-            onValueChange={(value) =>
-              setStatusFilter(value as ManageInvoiceFilterStatus)
-            }
+            onValueChange={(value) => {
+              window.location.href = buildManageInvoicesHref({
+                page: 1,
+                status: value as ManageInvoiceFilterStatus,
+                sortField,
+                sort,
+              });
+            }}
           >
             <TabsList>
-              <TabsTrigger value="all">
-                All ({countByStatus(initialInvoices, "all")})
-              </TabsTrigger>
-              <TabsTrigger value="draft">
-                Draft ({countByStatus(initialInvoices, "draft")})
-              </TabsTrigger>
-              <TabsTrigger value="sent">
-                Sent ({countByStatus(initialInvoices, "sent")})
-              </TabsTrigger>
-              <TabsTrigger value="paid">
-                Paid ({countByStatus(initialInvoices, "paid")})
-              </TabsTrigger>
-              <TabsTrigger value="cancelled">
-                Cancelled ({countByStatus(initialInvoices, "cancelled")})
-              </TabsTrigger>
+              {(["all", "draft", "sent", "paid", "cancelled"] as const).map(
+                (status) => (
+                  <TabsTrigger key={status} value={status}>
+                    {status === "all"
+                      ? "All"
+                      : statusLabel[status as InvoiceStatus]}
+                  </TabsTrigger>
+                ),
+              )}
             </TabsList>
           </Tabs>
         </CardHeader>
 
         <CardContent>
-          {filteredInvoices.length === 0 ? (
+          {paginatedInvoices.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border/60 bg-secondary/10 px-6 py-16 text-center">
               <FileTextIcon className="size-8 text-primary/70" />
               <div>
@@ -408,21 +362,21 @@ export function ManageInvoicesPageContent({
                 </Table>
               </div>
 
-              {filteredInvoices.length > MANAGE_INVOICES_PAGE_SIZE ? (
+              {feed.total > MANAGE_INVOICES_PAGE_SIZE ? (
                 <div className="mt-4 flex flex-col gap-3 border-t border-border/50 pt-4 sm:flex-row sm:items-center sm:justify-between">
                   <p className="text-sm text-muted-foreground">
-                    Showing {pageStart}–{pageEnd} of {filteredInvoices.length}{" "}
-                    invoices
+                    Showing {pageStart}–{pageEnd} of {feed.total} invoices
                   </p>
                   <Pagination className="mx-0 w-auto justify-end">
                     <PaginationContent>
                       <PaginationItem>
                         <PaginationPrevious
-                          href="#"
-                          onClick={(event) => {
-                            event.preventDefault();
-                            setPage((current) => Math.max(1, current - 1));
-                          }}
+                          href={buildManageInvoicesHref({
+                            page: Math.max(1, currentPage - 1),
+                            status: statusFilter,
+                            sortField,
+                            sort,
+                          })}
                           className={
                             currentPage <= 1
                               ? "pointer-events-none opacity-50"
@@ -430,17 +384,18 @@ export function ManageInvoicesPageContent({
                           }
                         />
                       </PaginationItem>
-                      {Array.from({ length: totalPages }, (_, index) => {
+                      {Array.from({ length: feed.totalPages }, (_, index) => {
                         const pageNumber = index + 1;
                         return (
                           <PaginationItem key={pageNumber}>
                             <PaginationLink
-                              href="#"
+                              href={buildManageInvoicesHref({
+                                page: pageNumber,
+                                status: statusFilter,
+                                sortField,
+                                sort,
+                              })}
                               isActive={pageNumber === currentPage}
-                              onClick={(event) => {
-                                event.preventDefault();
-                                setPage(pageNumber);
-                              }}
                             >
                               {pageNumber}
                             </PaginationLink>
@@ -449,15 +404,14 @@ export function ManageInvoicesPageContent({
                       })}
                       <PaginationItem>
                         <PaginationNext
-                          href="#"
-                          onClick={(event) => {
-                            event.preventDefault();
-                            setPage((current) =>
-                              Math.min(totalPages, current + 1),
-                            );
-                          }}
+                          href={buildManageInvoicesHref({
+                            page: Math.min(feed.totalPages, currentPage + 1),
+                            status: statusFilter,
+                            sortField,
+                            sort,
+                          })}
                           className={
-                            currentPage >= totalPages
+                            currentPage >= feed.totalPages
                               ? "pointer-events-none opacity-50"
                               : undefined
                           }

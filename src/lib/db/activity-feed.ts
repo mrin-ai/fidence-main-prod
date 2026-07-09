@@ -1,5 +1,6 @@
 import type { ObjectId } from "mongodb";
 
+import { cacheGet, cacheSet } from "@/lib/cache/redis";
 import { formatActivityMeta } from "@/lib/format-date";
 import { getDb } from "@/lib/db/client";
 import { COLLECTIONS } from "@/lib/db/collections";
@@ -15,6 +16,7 @@ export type ActivityListItem = {
 };
 
 export const ACTIVITY_PAGE_LIMIT = 10;
+const ACTIVITY_COUNT_TTL_SECONDS = 60;
 
 function mapActivityDoc(event: ActivityEventDoc): ActivityListItem {
   return {
@@ -25,6 +27,25 @@ function mapActivityDoc(event: ActivityEventDoc): ActivityListItem {
     type: event.type,
     occurredAt: event.occurredAt.toISOString(),
   };
+}
+
+async function getWorkspaceActivityCount(workspaceId: ObjectId) {
+  const cacheKey = `activity:count:${workspaceId.toString()}`;
+  const cached = await cacheGet(cacheKey);
+  if (cached != null) {
+    const parsed = Number(cached);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
+  const db = await getDb();
+  const total = await db
+    .collection(COLLECTIONS.activityEvents)
+    .countDocuments({ workspaceId });
+
+  await cacheSet(cacheKey, String(total), ACTIVITY_COUNT_TTL_SECONDS);
+  return total;
 }
 
 export async function listWorkspaceActivities(
@@ -47,7 +68,7 @@ export async function listWorkspaceActivities(
       .skip(skip)
       .limit(limit)
       .toArray(),
-    db.collection(COLLECTIONS.activityEvents).countDocuments({ workspaceId }),
+    getWorkspaceActivityCount(workspaceId),
   ]);
 
   const totalPages = Math.max(1, Math.ceil(total / limit));

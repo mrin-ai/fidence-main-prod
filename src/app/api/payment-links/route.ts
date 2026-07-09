@@ -1,13 +1,9 @@
 import { NextResponse } from "next/server";
 
 import { getSessionFromCookies } from "@/lib/db/auth";
-import { createPaymentLink, listPaymentLinksForWorkspace } from "@/lib/db/payment-links";
+import { createPaymentLink, listPaymentLinksPaginated } from "@/lib/db/payment-links";
 import { requireRecipientAddress } from "@/lib/db/wallets";
-import {
-  matchesPaymentLinkFilter,
-  type PaymentLinkFilterStatus,
-  type PaymentLinkSort,
-} from "@/lib/payment-link-status";
+import type { PaymentLinkFilterStatus, PaymentLinkSort } from "@/lib/payment-link-status";
 
 export async function GET(request: Request) {
   const session = await getSessionFromCookies();
@@ -19,37 +15,25 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const status = (searchParams.get("status") ?? "all") as PaymentLinkFilterStatus;
   const sort = (searchParams.get("sort") ?? "newest") as PaymentLinkSort;
-  const query = searchParams.get("q")?.trim().toLowerCase() ?? "";
+  const query = searchParams.get("q")?.trim() ?? "";
+  const page = Number(searchParams.get("page") ?? "1");
+  const limit = Number(searchParams.get("limit") ?? "20");
 
-  let links = await listPaymentLinksForWorkspace(session.workspace._id);
-
-  if (status !== "all") {
-    links = links.filter((link) => matchesPaymentLinkFilter(link.status, status));
-  }
-
-  if (query) {
-    links = links.filter((link) => {
-      const haystack = [
-        link.publicId,
-        link.url,
-        link.amountLabel,
-        link.tokenSymbol,
-        link.networkLabel,
-        link.status,
-      ]
-        .join(" ")
-        .toLowerCase();
-      return haystack.includes(query);
-    });
-  }
-
-  links.sort((left, right) => {
-    const leftTime = new Date(left.createdAt).getTime();
-    const rightTime = new Date(right.createdAt).getTime();
-    return sort === "oldest" ? leftTime - rightTime : rightTime - leftTime;
+  const result = await listPaymentLinksPaginated(session.workspace._id, {
+    page: Number.isFinite(page) ? page : 1,
+    limit: Number.isFinite(limit) ? limit : 20,
+    status,
+    sort,
+    query,
   });
 
-  return NextResponse.json({ links });
+  return NextResponse.json({
+    links: result.items,
+    total: result.total,
+    page: result.page,
+    limit: result.limit,
+    totalPages: result.totalPages,
+  });
 }
 
 export async function POST(request: Request) {

@@ -6,11 +6,22 @@ import {
   sessionCookieOptions,
   upsertGoogleUser,
 } from "@/lib/db/auth";
-import { ensureDbIndexes } from "@/lib/db/seed";
+import {
+  checkRateLimit,
+  getClientIp,
+  rateLimitResponse,
+} from "@/lib/rate-limit";
 
-export async function POST() {
+export async function POST(request: Request) {
   try {
-    await ensureDbIndexes();
+    const ip = getClientIp(request);
+    const limit = await checkRateLimit(`auth:google:${ip}`, {
+      max: 10,
+      windowMs: 60_000,
+    });
+    if (!limit.allowed) {
+      return rateLimitResponse(limit);
+    }
 
     const user = await upsertGoogleUser({
       email: "alex.rivera@lcx.ag",

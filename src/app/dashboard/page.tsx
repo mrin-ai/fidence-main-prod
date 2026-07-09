@@ -9,13 +9,9 @@ import { SectionCards } from "@/components/section-cards";
 import { getSessionFromCookies } from "@/lib/db/auth";
 import { getDashboardOverview } from "@/lib/db/dashboard";
 import { buildProfileUrl } from "@/lib/profile-url";
-import { ensureDbIndexes } from "@/lib/db/seed";
-
 export const dynamic = "force-dynamic";
 
 export default async function Page() {
-  await ensureDbIndexes();
-
   const session = await getSessionFromCookies();
   if (!session) {
     redirect("/sign-in");

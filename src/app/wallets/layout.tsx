@@ -4,15 +4,11 @@ import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { getSessionFromCookies } from "@/lib/db/auth";
 import { buildProfileUrl } from "@/lib/profile-url";
-import { ensureDbIndexes } from "@/lib/db/seed";
-
 export default async function WalletsLayout({
   children,
 }: {
   children: ReactNode;
 }) {
-  await ensureDbIndexes();
-
   const session = await getSessionFromCookies();
   if (!session) {
     redirect("/sign-in?redirect=/wallets");

@@ -8,7 +8,10 @@ import {
 import { getNetworkById } from "@/lib/create-payment-link-data";
 import { logWalletVerifiedActivity } from "@/lib/db/activity";
 import { getSessionFromCookies } from "@/lib/db/auth";
-import { ensureDbIndexes } from "@/lib/db/seed";
+import {
+  checkRateLimit,
+  rateLimitResponse,
+} from "@/lib/rate-limit";
 import {
   addVerifiedWallet,
   isEvmAddress,
@@ -27,11 +30,17 @@ const WALLET_NETWORK_IDS = new Set([
 
 export async function POST(request: Request) {
   try {
-    await ensureDbIndexes();
-
     const session = await getSessionFromCookies();
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const limit = await checkRateLimit(
+      `wallet:verify:${session.user._id.toString()}`,
+      { max: 20, windowMs: 60 * 60 * 1000 },
+    );
+    if (!limit.allowed) {
+      return rateLimitResponse(limit);
     }
 
     if (!session.user.username) {

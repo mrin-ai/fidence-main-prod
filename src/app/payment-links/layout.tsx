@@ -5,15 +5,11 @@ import { AppShell } from "@/components/app-shell";
 import { getSessionFromCookies } from "@/lib/db/auth";
 import { buildProfileUrl } from "@/lib/profile-url";
 import { listPaymentLinksForWorkspace } from "@/lib/db/payment-links";
-import { ensureDbIndexes } from "@/lib/db/seed";
-
 export default async function PaymentLinksLayout({
   children,
 }: {
   children: ReactNode;
 }) {
-  await ensureDbIndexes();
-
   const session = await getSessionFromCookies();
   if (!session) {
     redirect("/sign-in?redirect=/payment-links");

@@ -16,6 +16,7 @@ import {
 } from "@/lib/db/activity";
 import { getDb } from "@/lib/db/client";
 import { COLLECTIONS } from "@/lib/db/collections";
+import { incrementDailyStat } from "@/lib/db/workspace-stats";
 import type { PaymentLinkDoc, PaymentLinkStatus, UserDoc, InvoiceDoc } from "@/lib/db/types";
 import type { PublicPaymentLink } from "@/lib/payment-link-types";
 import { formatPaymentDateTime } from "@/lib/format-date";
@@ -132,6 +133,13 @@ export async function createPaymentLink(input: {
       amount: input.amount,
       tokenSymbol: token?.symbol ?? input.tokenId.toUpperCase(),
     });
+  }
+
+  if (!input.invoiceId) {
+    await incrementDailyStat(input.workspaceId, "linksCreated", 1, now);
+    if (status === "pending") {
+      await incrementDailyStat(input.workspaceId, "linksPending", 1, now);
+    }
   }
 
   return {
@@ -385,6 +393,16 @@ export async function markPaymentLinkPaid(input: {
     createdAt: now,
   });
 
+  if (!syncedLink.invoiceId) {
+    await incrementDailyStat(syncedLink.workspaceId, "linksPaid", 1, now);
+    await incrementDailyStat(
+      syncedLink.workspaceId,
+      "receivedAmount",
+      syncedLink.amount,
+      now,
+    );
+  }
+
   if (syncedLink.invoiceId) {
     await db.collection<InvoiceDoc>(COLLECTIONS.invoices).updateOne(
       { _id: syncedLink.invoiceId, status: { $ne: "cancelled" } },
@@ -462,6 +480,67 @@ export async function listPaymentLinks(workspaceId: ObjectId) {
     .toArray();
 
   return Promise.all(links.map((link) => syncExpiredStatus(link)));
+}
+
+export async function listPaymentLinksPaginated(
+  workspaceId: ObjectId,
+  options: {
+    page?: number;
+    limit?: number;
+    status?: PaymentLinkStatus | "all" | "failed";
+    sort?: "newest" | "oldest";
+    query?: string;
+  } = {},
+) {
+  const db = await getDb();
+  const page = Math.max(1, options.page ?? 1);
+  const limit = Math.min(50, Math.max(1, options.limit ?? 20));
+  const skip = (page - 1) * limit;
+
+  const filter: Record<string, unknown> = {
+    workspaceId,
+    invoiceId: { $exists: false },
+  };
+
+  if (options.status && options.status !== "all") {
+    if (options.status === "failed") {
+      filter.status = { $in: ["expired", "cancelled"] };
+    } else {
+      filter.status = options.status;
+    }
+  }
+
+  if (options.query?.trim()) {
+    const query = options.query.trim();
+    filter.$or = [
+      { publicId: { $regex: query, $options: "i" } },
+      { url: { $regex: query, $options: "i" } },
+      { tokenId: { $regex: query, $options: "i" } },
+    ];
+  }
+
+  const sortOrder = options.sort === "oldest" ? 1 : -1;
+
+  const [links, total] = await Promise.all([
+    db
+      .collection<PaymentLinkDoc>(COLLECTIONS.paymentLinks)
+      .find(filter)
+      .sort({ createdAt: sortOrder })
+      .skip(skip)
+      .limit(limit)
+      .toArray(),
+    db.collection(COLLECTIONS.paymentLinks).countDocuments(filter),
+  ]);
+
+  const synced = await Promise.all(links.map((link) => syncExpiredStatus(link)));
+
+  return {
+    items: synced.map(serializePaymentLinkListItem),
+    total,
+    page,
+    limit,
+    totalPages: Math.max(1, Math.ceil(total / limit)),
+  };
 }
 
 export type PaymentLinkListItem = {

@@ -1,26 +1,18 @@
 import type { ObjectId } from "mongodb";
-import { getDb } from "@/lib/db/client";
-import { COLLECTIONS } from "@/lib/db/collections";
-import type { ActivityEventDoc } from "@/lib/db/types";
+
 import type { ActivityLogInput } from "@/lib/db/activity-types";
+import {
+  enqueueActivity,
+  writeActivityDirect,
+} from "@/lib/db/activity-queue";
 
 export async function logActivity(input: ActivityLogInput) {
-  const db = await getDb();
-  const now = new Date();
-  const occurredAt = input.occurredAt ?? now;
-
-  const doc: Omit<ActivityEventDoc, "_id"> = {
-    workspaceId: input.workspaceId,
-    type: input.type,
-    summary: input.summary,
-    meta: "",
-    status: input.status,
-    occurredAt,
-    createdAt: now,
-  };
-
-  const result = await db.collection(COLLECTIONS.activityEvents).insertOne(doc);
-  return result.insertedId;
+  try {
+    await enqueueActivity(input);
+    return null;
+  } catch {
+    return writeActivityDirect(input);
+  }
 }
 
 export async function logLoginActivity(
@@ -30,7 +22,7 @@ export async function logLoginActivity(
   const summary =
     method === "google" ? "Logged in via Google" : "Logged in via wallet";
 
-  return logActivity({
+  return writeActivityDirect({
     workspaceId,
     type: "login",
     summary,
@@ -38,7 +30,7 @@ export async function logLoginActivity(
 }
 
 export async function logLogoutActivity(workspaceId: ObjectId) {
-  return logActivity({
+  return writeActivityDirect({
     workspaceId,
     type: "logout",
     summary: "Logged out",

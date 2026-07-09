@@ -1,6 +1,6 @@
 import { PaymentLinksPageContent } from "@/components/payment-links-page-content";
 import { getSessionFromCookies } from "@/lib/db/auth";
-import { listPaymentLinksForWorkspace } from "@/lib/db/payment-links";
+import { listPaymentLinksPaginated } from "@/lib/db/payment-links";
 
 export const dynamic = "force-dynamic";
 
@@ -8,7 +8,10 @@ export default async function PaymentLinksPage() {
   const session = await getSessionFromCookies();
   if (!session) return null;
 
-  const links = await listPaymentLinksForWorkspace(session.workspace._id);
+  const feed = await listPaymentLinksPaginated(session.workspace._id, {
+    page: 1,
+    limit: 20,
+  });
 
-  return <PaymentLinksPageContent initialLinks={links} />;
+  return <PaymentLinksPageContent initialLinks={feed.items} />;
 }

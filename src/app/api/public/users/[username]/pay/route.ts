@@ -2,10 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getWorkspaceForUser } from "@/lib/db/auth";
 import { getPublicProfileByUsername } from "@/lib/db/public-profile";
-import {
-  checkProfilePayRateLimit,
-  recordProfilePayment,
-} from "@/lib/db/profile-payments";
+import { recordProfilePayment } from "@/lib/db/profile-payments";
 import { resolveRecipientAddress } from "@/lib/db/wallets";
 import { getTokenById } from "@/lib/create-payment-link-data";
 import { isReservedPaymentPathSegment } from "@/lib/payment-link-url";
@@ -14,6 +11,11 @@ import { getDb } from "@/lib/db/client";
 import { COLLECTIONS } from "@/lib/db/collections";
 import type { UserDoc } from "@/lib/db/types";
 import { supportsOnChainPayment } from "@/lib/payment-contracts";
+import {
+  checkRateLimit,
+  getClientIp,
+  rateLimitResponse,
+} from "@/lib/rate-limit";
 
 type RouteContext = { params: Promise<{ username: string }> };
 
@@ -26,13 +28,13 @@ export async function POST(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    const clientIp =
-      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-      request.headers.get("x-real-ip") ??
-      "unknown";
-
-    if (!checkProfilePayRateLimit(clientIp)) {
-      return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+    const clientIp = getClientIp(request);
+    const limit = await checkRateLimit(`pay:${clientIp}`, {
+      max: 10,
+      windowMs: 60_000,
+    });
+    if (!limit.allowed) {
+      return rateLimitResponse(limit);
     }
 
     const body = (await request.json()) as {

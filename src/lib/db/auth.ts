@@ -2,6 +2,11 @@ import { cookies } from "next/headers";
 import { randomUUID } from "crypto";
 import { ObjectId } from "mongodb";
 import { AUTH_COOKIE, SESSION_MAX_AGE_SECONDS, getInitials, slugify } from "@/lib/auth-session";
+import {
+  getCachedSession,
+  invalidateSession,
+  setCachedSession,
+} from "@/lib/cache/session-cache";
 import { getDb } from "@/lib/db/client";
 import { COLLECTIONS } from "@/lib/db/collections";
 import type {
@@ -103,6 +108,7 @@ export async function createSessionForUser(
   }
 
   const token = randomUUID();
+  const sessionId = new ObjectId();
   const session: Omit<SessionDoc, "_id"> = {
     token,
     userId: user._id,
@@ -113,15 +119,23 @@ export async function createSessionForUser(
     createdAt: now,
   };
 
-  await db.collection<SessionDoc>(COLLECTIONS.sessions).insertOne({
-    _id: new ObjectId(),
+  const sessionDoc: SessionDoc = {
+    _id: sessionId,
     ...session,
-  });
+  };
+
+  await db.collection<SessionDoc>(COLLECTIONS.sessions).insertOne(sessionDoc);
 
   await db.collection(COLLECTIONS.users).updateOne(
     { _id: user._id },
     { $set: { lastLoginAt: now, updatedAt: now } },
   );
+
+  await setCachedSession(token, {
+    session: sessionDoc,
+    user,
+    workspace,
+  });
 
   return { token, user, workspace };
 }
@@ -218,6 +232,11 @@ export async function upsertWalletUser(address: string) {
 }
 
 export async function getSessionByToken(token: string) {
+  const cached = await getCachedSession(token);
+  if (cached) {
+    return cached;
+  }
+
   const db = await getDb();
   const session = await db.collection<SessionDoc>(COLLECTIONS.sessions).findOne({
     token,
@@ -235,7 +254,9 @@ export async function getSessionByToken(token: string) {
 
   if (!user || !workspace) return null;
 
-  return { session, user, workspace } satisfies SessionContext;
+  const context = { session, user, workspace } satisfies SessionContext;
+  await setCachedSession(token, context);
+  return context;
 }
 
 export async function getSessionFromCookies() {
@@ -248,4 +269,5 @@ export async function getSessionFromCookies() {
 export async function deleteSessionByToken(token: string) {
   const db = await getDb();
   await db.collection(COLLECTIONS.sessions).deleteOne({ token });
+  await invalidateSession(token);
 }

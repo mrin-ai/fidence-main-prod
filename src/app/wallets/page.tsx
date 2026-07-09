@@ -3,11 +3,7 @@ import { redirect } from "next/navigation";
 import { WalletsPageContent } from "@/components/wallets/wallets-page-content";
 import { getSessionFromCookies } from "@/lib/db/auth";
 import { listVerifiedWallets } from "@/lib/db/wallets";
-import { ensureDbIndexes } from "@/lib/db/seed";
-
 export default async function WalletsPage() {
-  await ensureDbIndexes();
-
   const session = await getSessionFromCookies();
   if (!session) {
     redirect("/sign-in?redirect=/wallets");

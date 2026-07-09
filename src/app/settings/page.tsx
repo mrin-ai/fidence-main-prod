@@ -4,8 +4,6 @@ import { AppShell } from "@/components/app-shell";
 import { SettingsPageContent } from "@/components/settings/settings-page-content";
 import { getSessionFromCookies } from "@/lib/db/auth";
 import { buildProfileUrl } from "@/lib/profile-url";
-import { ensureDbIndexes } from "@/lib/db/seed";
-
 function splitName(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) {
@@ -21,8 +19,6 @@ function splitName(name: string) {
 }
 
 export default async function SettingsPage() {
-  await ensureDbIndexes();
-
   const session = await getSessionFromCookies();
   if (!session) {
     redirect("/sign-in?redirect=/settings");

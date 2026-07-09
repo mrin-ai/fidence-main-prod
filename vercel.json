@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/internal/jobs/drain-activity",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/internal/jobs/archive-activity",
+      "schedule": "0 3 * * *"
+    }
+  ]
+}
