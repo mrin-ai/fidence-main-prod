@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/sidebar"
 import {
   BellIcon,
+  HistoryIcon,
   LogOutIcon,
   SettingsIcon,
 } from "lucide-react"
@@ -100,6 +101,10 @@ export function NavUser({
               <DropdownMenuItem>
                 <BellIcon />
                 Notifications
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push("/activity")}>
+                <HistoryIcon />
+                Activity
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => router.push("/settings")}>
                 <SettingsIcon />

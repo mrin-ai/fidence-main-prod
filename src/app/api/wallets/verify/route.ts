@@ -6,6 +6,7 @@ import {
   WALLET_VERIFY_MAX_AGE_MS,
 } from "@/lib/auth-session";
 import { getNetworkById } from "@/lib/create-payment-link-data";
+import { logWalletVerifiedActivity } from "@/lib/db/activity";
 import { getSessionFromCookies } from "@/lib/db/auth";
 import { ensureDbIndexes } from "@/lib/db/seed";
 import {
@@ -132,6 +133,12 @@ export async function POST(request: Request) {
     }
 
     const network = getNetworkById(typedNetworkId);
+
+    await logWalletVerifiedActivity({
+      workspaceId: session.workspace._id,
+      networkLabel: network?.label ?? typedNetworkId,
+      address: normalizedAddress,
+    });
 
     return NextResponse.json({
       wallet: {

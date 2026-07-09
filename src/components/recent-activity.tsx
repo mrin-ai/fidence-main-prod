@@ -1,19 +1,14 @@
 "use client"
 
 import * as React from "react"
-import {
-  BanIcon,
-  ChevronDownIcon,
-  CircleCheckIcon,
-  CreditCardIcon,
-  FileTextIcon,
-  LinkIcon,
-  LogInIcon,
-  LogOutIcon,
-  ShoppingCartIcon,
-} from "lucide-react"
+import Link from "next/link"
+import { ChevronDownIcon } from "lucide-react"
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  ActivityList,
+  type ActivityItem,
+} from "@/components/activity/activity-list"
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { EmptyStateLottie } from "@/components/empty-state-lottie"
 import {
   dashboardCardClassName,
@@ -23,90 +18,7 @@ import {
   dashboardPanelScrollClassName,
   dashboardPanelTitleClassName,
 } from "@/lib/dashboard-styles"
-import type { ActivityStatus } from "@/lib/db/types"
 import { cn } from "@/lib/utils"
-
-type ActivityItem = {
-  id: string
-  summary: string
-  meta: string
-  status?: ActivityStatus
-  type: string
-}
-
-function getActivityVisual(type: string, status?: ActivityStatus) {
-  if (type === "login") {
-    return {
-      icon: <LogInIcon className="size-3.5" />,
-      iconClassName: "bg-secondary text-primary",
-    }
-  }
-
-  if (type === "logout") {
-    return {
-      icon: <LogOutIcon className="size-3.5" />,
-      iconClassName: "bg-muted text-muted-foreground",
-    }
-  }
-
-  if (type === "payment_link_created") {
-    return {
-      icon: <LinkIcon className="size-3.5" />,
-      iconClassName: "bg-accent/70 text-primary",
-    }
-  }
-
-  if (type === "payment_received" || type === "profile_payment") {
-    return {
-      icon: <CircleCheckIcon className="size-3.5" />,
-      iconClassName: "bg-green-500/10 text-green-600",
-    }
-  }
-
-  if (type === "invoice_created") {
-    return {
-      icon: <FileTextIcon className="size-3.5" />,
-      iconClassName: "bg-secondary text-secondary-foreground",
-    }
-  }
-
-  if (status === "blocked" || type === "blocked") {
-    return {
-      icon: <BanIcon className="size-3.5" />,
-      iconClassName: "bg-destructive/8 text-destructive",
-    }
-  }
-
-  if (type === "wallet_funded") {
-    return {
-      icon: <CreditCardIcon className="size-3.5" />,
-      iconClassName: "bg-secondary text-primary",
-    }
-  }
-
-  if (type === "approval") {
-    return {
-      icon: <CircleCheckIcon className="size-3.5" />,
-      iconClassName: "bg-secondary text-secondary-foreground",
-    }
-  }
-
-  return {
-    icon: <ShoppingCartIcon className="size-3.5" />,
-    iconClassName: "bg-accent/70 text-primary",
-  }
-}
-
-function ActivityStatusDot({ status }: { status: ActivityStatus }) {
-  return (
-    <span
-      className={cn(
-        "mt-1 size-1.5 shrink-0 rounded-full",
-        status === "settled" ? "bg-green-500" : "bg-red-500"
-      )}
-    />
-  )
-}
 
 export function RecentActivity({
   activities,
@@ -140,7 +52,7 @@ export function RecentActivity({
       el.removeEventListener("scroll", updateScrollFade)
       window.removeEventListener("resize", updateScrollFade)
     }
-  }, [updateScrollFade])
+  }, [updateScrollFade, activities.length])
 
   return (
     <Card className={cn(dashboardCardClassName, "w-full self-start", className)}>
@@ -148,6 +60,16 @@ export function RecentActivity({
         <CardTitle className={dashboardPanelTitleClassName}>
           Recent activity
         </CardTitle>
+        {activities.length > 0 ? (
+          <CardAction>
+            <Link
+              href="/activity"
+              className="text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+            >
+              View all
+            </Link>
+          </CardAction>
+        ) : null}
       </CardHeader>
       <CardContent className="relative pt-0">
         <div
@@ -157,42 +79,16 @@ export function RecentActivity({
             dashboardPanelScrollClassName,
             activities.length === 0
               ? "flex items-center justify-center"
-              : "flex flex-col gap-4",
+              : undefined,
           )}
         >
           {activities.length === 0 ? (
             <EmptyStateLottie
               title="No activity yet"
-              description="Logins, payments, and invoices will show up here."
+              description="Logins, payments, invoices, and wallets will show up here."
             />
           ) : (
-            activities.map((activity) => {
-            const visual = getActivityVisual(activity.type, activity.status)
-
-            return (
-              <div key={activity.id} className="flex items-start gap-3">
-                <div
-                  className={cn(
-                    "flex size-8 shrink-0 items-center justify-center rounded-lg",
-                    visual.iconClassName
-                  )}
-                >
-                  {visual.icon}
-                </div>
-                <div className="min-w-0 flex-1 space-y-1">
-                  <p className="text-sm leading-snug text-foreground/90">
-                    {activity.summary}
-                  </p>
-                  <p className="font-mono text-[0.6875rem] text-muted-foreground">
-                    {activity.meta}
-                  </p>
-                </div>
-                {activity.status ? (
-                  <ActivityStatusDot status={activity.status} />
-                ) : null}
-              </div>
-            )
-          })
+            <ActivityList activities={activities} />
           )}
         </div>
         {activities.length > 0 ? (

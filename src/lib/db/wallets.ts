@@ -146,7 +146,7 @@ export async function removeVerifiedWallet(userId: ObjectId, walletId: string) {
     },
   );
 
-  return { ok: true as const };
+  return { ok: true as const, wallet };
 }
 
 export function requireRecipientAddress(user: UserDoc, networkId: string) {

@@ -8,6 +8,9 @@ import {
   getTokenById,
 } from "@/lib/create-payment-link-data";
 import {
+  logInvoicePaidActivity,
+  logInvoicePaymentLinkCreatedActivity,
+  logInvoicePaymentLinkUpdatedActivity,
   logPaymentLinkCreatedActivity,
   logPaymentReceivedActivity,
 } from "@/lib/db/activity";
@@ -198,6 +201,19 @@ export async function upsertInvoicePaymentLink(input: {
         throw new Error("Failed to load updated invoice payment link");
       }
 
+      const invoice = await db.collection<InvoiceDoc>(COLLECTIONS.invoices).findOne({
+        _id: input.invoiceId,
+      });
+      const token = getTokenById(input.tokenId);
+      if (invoice) {
+        await logInvoicePaymentLinkUpdatedActivity({
+          workspaceId: input.workspaceId,
+          reference: invoice.reference,
+          amount: input.amount,
+          tokenSymbol: token?.symbol ?? input.tokenId.toUpperCase(),
+        });
+      }
+
       return {
         id: updated._id.toString(),
         publicId: updated.publicId,
@@ -210,7 +226,7 @@ export async function upsertInvoicePaymentLink(input: {
     }
   }
 
-  return createPaymentLink({
+  const createdLink = await createPaymentLink({
     workspaceId: input.workspaceId,
     userId: input.userId,
     username: input.username,
@@ -221,12 +237,27 @@ export async function upsertInvoicePaymentLink(input: {
     expiresAt: input.expiresAt,
     invoiceId: input.invoiceId,
     logActivity: false,
-  }).then((link) => ({
-    ...link,
+  });
+
+  const invoice = await db.collection<InvoiceDoc>(COLLECTIONS.invoices).findOne({
+    _id: input.invoiceId,
+  });
+  const token = getTokenById(input.tokenId);
+  if (invoice) {
+    await logInvoicePaymentLinkCreatedActivity({
+      workspaceId: input.workspaceId,
+      reference: invoice.reference,
+      amount: input.amount,
+      tokenSymbol: token?.symbol ?? input.tokenId.toUpperCase(),
+    });
+  }
+
+  return {
+    ...createdLink,
     amount: input.amount,
     tokenId: input.tokenId,
     networkId: input.networkId,
-  }));
+  };
 }
 
 export async function getInvoicePaymentLinkById(
@@ -373,6 +404,20 @@ export async function markPaymentLinkPaid(input: {
       amount: syncedLink.amount,
       tokenSymbol: token?.symbol ?? syncedLink.tokenId.toUpperCase(),
     });
+
+    if (syncedLink.invoiceId) {
+      const invoice = await db.collection<InvoiceDoc>(COLLECTIONS.invoices).findOne({
+        _id: syncedLink.invoiceId,
+      });
+      if (invoice) {
+        await logInvoicePaidActivity({
+          workspaceId: syncedLink.workspaceId,
+          reference: invoice.reference,
+          amount: syncedLink.amount,
+          tokenSymbol: token?.symbol ?? syncedLink.tokenId.toUpperCase(),
+        });
+      }
+    }
   }
 
   const updated = await db.collection<PaymentLinkDoc>(COLLECTIONS.paymentLinks).findOne({

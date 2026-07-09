@@ -13,6 +13,7 @@ const RESERVED_USERNAMES = new Set([
   "invoices",
   "login",
   "manage-invoices",
+  "activity",
   "payment-links",
   "settings",
   "sign-in",

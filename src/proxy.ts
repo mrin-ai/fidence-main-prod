@@ -17,6 +17,7 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith("/wallets") ||
     pathname.startsWith("/invoice") ||
     pathname.startsWith("/manage-invoices") ||
+    pathname.startsWith("/activity") ||
     pathname.startsWith("/payment-links");
 
   if (isProtected && !hasValidSession) {
@@ -61,6 +62,8 @@ export const config = {
     "/invoice/:path*",
     "/manage-invoices",
     "/manage-invoices/:path*",
+    "/activity",
+    "/activity/:path*",
     "/payment-links",
     "/payment-links/:path*",
     "/wallets",

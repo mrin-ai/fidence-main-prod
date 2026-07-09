@@ -1,11 +1,10 @@
 import { ObjectId } from "mongodb";
 
-import { formatActivityMeta } from "@/lib/format-date";
+import { listWorkspaceActivities } from "@/lib/db/activity-feed";
 import { buildProfileUrl } from "@/lib/profile-url";
 import { COLLECTIONS } from "@/lib/db/collections";
 import { getDb } from "@/lib/db/client";
 import type {
-  ActivityEventDoc,
   BalanceDoc,
   DashboardOverview,
   PaymentLinkDoc,
@@ -60,7 +59,7 @@ export async function getDashboardOverview(
     linkSparklineSource,
     paymentTransactions,
     transactions,
-    activities,
+    activityFeed,
     balances,
   ] = await Promise.all([
     db.collection(COLLECTIONS.workspaces).findOne({ _id: workspaceId }),
@@ -104,12 +103,7 @@ export async function getDashboardOverview(
       .sort({ occurredAt: -1 })
       .limit(20)
       .toArray(),
-    db
-      .collection<ActivityEventDoc>(COLLECTIONS.activityEvents)
-      .find({ workspaceId })
-      .sort({ occurredAt: -1 })
-      .limit(50)
-      .toArray(),
+    listWorkspaceActivities(workspaceId, { page: 1, limit: 100 }),
     db
       .collection<BalanceDoc>(COLLECTIONS.balances)
       .find({ workspaceId })
@@ -174,13 +168,7 @@ export async function getDashboardOverview(
       date: formatDate(tx.occurredAt),
       amount: `+${formatTokenAmount(tx.amount, tx.symbol)}`,
     })),
-    activities: activities.map((event) => ({
-      id: event._id.toString(),
-      summary: event.summary,
-      meta: formatActivityMeta(event.occurredAt),
-      status: event.status,
-      type: event.type,
-    })),
+    activities: activityFeed.items,
     balances: balances.map((balance) => ({
       id: balance.tokenId,
       label: balance.label,

@@ -1,6 +1,12 @@
 import { ObjectId } from "mongodb";
 
-import { logInvoiceCreatedActivity } from "@/lib/db/activity";
+import {
+  logInvoiceCreatedActivity,
+  logInvoiceDeletedActivity,
+  logInvoicePaidActivity,
+  logInvoiceSentActivity,
+  logInvoiceUpdatedActivity,
+} from "@/lib/db/activity";
 import { getDb } from "@/lib/db/client";
 import { COLLECTIONS } from "@/lib/db/collections";
 import {
@@ -249,6 +255,18 @@ export async function saveInvoiceWithPaymentLink(input: {
       throw new Error("Invoice not found");
     }
 
+    if (nextStatus === "sent" && existing.status !== "sent") {
+      await logInvoiceSentActivity({
+        workspaceId: input.workspaceId,
+        reference: updateResult.reference,
+      });
+    } else {
+      await logInvoiceUpdatedActivity({
+        workspaceId: input.workspaceId,
+        reference: updateResult.reference,
+      });
+    }
+
     const paymentLink = await upsertInvoicePaymentLink({
       workspaceId: input.workspaceId,
       userId: input.userId,
@@ -303,6 +321,11 @@ export async function saveInvoiceWithPaymentLink(input: {
     { $set: { paymentLinkId: new ObjectId(paymentLink.id) } },
   );
 
+  await logInvoiceSentActivity({
+    workspaceId: input.workspaceId,
+    reference: created.reference,
+  });
+
   return {
     id: created.id,
     reference: created.reference,
@@ -313,8 +336,20 @@ export async function saveInvoiceWithPaymentLink(input: {
 
 export async function deleteInvoice(workspaceId: ObjectId, invoiceId: string) {
   const db = await getDb();
+  const invoice = await db.collection<InvoiceDoc>(COLLECTIONS.invoices).findOne({
+    _id: new ObjectId(invoiceId),
+    workspaceId,
+  });
+
   await db.collection(COLLECTIONS.invoices).deleteOne({
     _id: new ObjectId(invoiceId),
     workspaceId,
   });
+
+  if (invoice) {
+    await logInvoiceDeletedActivity({
+      workspaceId,
+      reference: invoice.reference,
+    });
+  }
 }

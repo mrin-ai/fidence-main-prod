@@ -11,6 +11,7 @@ const RESERVED_PATHS = new Set([
   "invoice",
   "invoices",
   "manage-invoices",
+  "activity",
   "payment-links",
   "_next",
   "icon.png",
