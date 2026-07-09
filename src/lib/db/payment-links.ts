@@ -346,7 +346,7 @@ export async function markPaymentLinkPaid(input: {
       ? `Invoice payment`
       : `Payment from ${payerAddress.slice(0, 6)}…${payerAddress.slice(-4)}`,
     amount: syncedLink.amount,
-    symbol: token?.symbol.toLowerCase() ?? syncedLink.tokenId,
+    symbol: token?.symbol?.toLowerCase() ?? syncedLink.tokenId,
     networkId: syncedLink.networkId,
     txHash: input.txHash,
     status: "confirmed",

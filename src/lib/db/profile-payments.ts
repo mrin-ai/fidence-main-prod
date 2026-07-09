@@ -81,7 +81,7 @@ export async function recordProfilePayment(input: {
     type: "profile_payment",
     label,
     amount: input.amount,
-    symbol: token?.symbol.toLowerCase() ?? input.tokenId,
+    symbol: token?.symbol?.toLowerCase() ?? input.tokenId,
     networkId: input.networkId,
     txHash: normalizedTxHash,
     payerAddress: input.payerAddress.toLowerCase(),
