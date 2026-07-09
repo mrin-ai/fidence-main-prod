@@ -25,6 +25,7 @@ export default async function EditInvoicePage({ params }: PageProps) {
         defaultValues={invoice.fields}
         invoiceId={invoice.id}
         initialPaymentLink={invoice.paymentLink}
+        initialStatus={invoice.status}
       />
     </div>
   );

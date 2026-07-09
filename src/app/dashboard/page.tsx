@@ -8,6 +8,7 @@ import { RecentTransactions } from "@/components/recent-transactions";
 import { SectionCards } from "@/components/section-cards";
 import { getSessionFromCookies } from "@/lib/db/auth";
 import { getDashboardOverview } from "@/lib/db/dashboard";
+import { buildProfileUrl } from "@/lib/profile-url";
 import { ensureDbIndexes } from "@/lib/db/seed";
 
 export const dynamic = "force-dynamic";
@@ -31,11 +32,13 @@ export default async function Page() {
   const workspace = {
     name: session.workspace.name,
     slug: session.workspace.slug,
-    paymentLink: `pay.fidence.xyz/${session.workspace.slug}`,
+    paymentLink: session.user.username
+      ? buildProfileUrl(session.user.username)
+      : overview.workspace.paymentLink,
   };
 
   return (
-    <AppShell title="Overview" user={user} workspace={workspace} scanQr={overview}>
+    <AppShell title="Overview" user={user} workspace={workspace}>
       <div className="flex w-full flex-col gap-8 px-4 py-6 lg:px-8 lg:py-8">
         <SectionCards metrics={overview.metrics} />
         <div className="grid items-start gap-6 lg:grid-cols-3">

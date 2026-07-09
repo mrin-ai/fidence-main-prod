@@ -9,11 +9,17 @@ const RESERVED_USERNAMES = new Set([
   "api",
   "dashboard",
   "help",
+  "invoice",
+  "invoices",
   "login",
+  "manage-invoices",
+  "payment-links",
   "settings",
   "sign-in",
   "sign-up",
   "support",
+  "wallet",
+  "wallets",
   "www",
 ]);
 

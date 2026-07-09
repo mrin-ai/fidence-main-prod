@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { ArrowLeftIcon, CheckIcon, CopyIcon, Link2Icon } from "lucide-react"
 import { toast } from "sonner"
 
@@ -121,7 +122,23 @@ function CreatePaymentLinkModal({
   const [draft, setDraft] = React.useState<PaymentLinkDraft>(initialDraft)
   const [createdLink, setCreatedLink] = React.useState<string | null>(null)
   const [copied, setCopied] = React.useState(false)
+  const [verifiedNetworkIds, setVerifiedNetworkIds] = React.useState<string[]>([])
   const router = useRouter()
+
+  React.useEffect(() => {
+    if (!open) return
+
+    void fetch("/api/wallets")
+      .then((response) => response.json())
+      .then((data: { verifiedNetworkIds?: string[] }) => {
+        setVerifiedNetworkIds(data.verifiedNetworkIds ?? [])
+      })
+      .catch(() => setVerifiedNetworkIds([]))
+  }, [open])
+
+  const hasVerifiedWalletForNetwork = draft.networkId
+    ? verifiedNetworkIds.includes(draft.networkId)
+    : true
 
   const availableNetworks = React.useMemo(
     () => getNetworksForToken(draft.tokenId),
@@ -192,6 +209,8 @@ function CreatePaymentLinkModal({
     if (!response.ok) {
       if (payload.code === "USERNAME_REQUIRED") {
         toast.error("Set a username in Settings before creating links")
+      } else if (payload.code === "WALLET_NOT_VERIFIED_FOR_NETWORK") {
+        toast.error(payload.error ?? "Add a verified wallet for this network")
       } else if (payload.code === "WALLET_REQUIRED") {
         toast.error("Connect a wallet to your account to receive payments")
       } else {
@@ -313,6 +332,15 @@ function CreatePaymentLinkModal({
                   </button>
                 )
               })}
+              {draft.networkId && !hasVerifiedWalletForNetwork ? (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                  Add and verify a wallet for {selectedNetwork?.label ?? draft.networkId} in{" "}
+                  <Link href="/wallets" className="font-medium underline">
+                    Wallets
+                  </Link>{" "}
+                  before creating this link.
+                </div>
+              ) : null}
             </div>
           ) : null}
 
@@ -397,7 +425,7 @@ function CreatePaymentLinkModal({
             <Button
               type="button"
               className="flex-1"
-              disabled={!createdLink && !canContinue()}
+              disabled={!createdLink && (!canContinue() || (step === 4 && !hasVerifiedWalletForNetwork))}
               onClick={() => {
                 if (createdLink) {
                   onOpenChange(false)

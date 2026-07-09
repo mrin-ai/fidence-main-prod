@@ -1,4 +1,5 @@
 import type { UserDoc } from "@/lib/db/types";
+import { listVerifiedWallets } from "@/lib/db/wallets";
 import {
   invoiceFormDefaultValues,
   type InvoiceFormData,
@@ -31,7 +32,13 @@ export function buildInvoiceDefaults(input: {
     .filter(Boolean)
     .join("\n");
 
-  const wallet = input.user.walletAddresses[0];
+  const verifiedWallets = listVerifiedWallets(input.user);
+  const walletHint =
+    verifiedWallets.length > 0
+      ? verifiedWallets
+          .map((wallet) => `${wallet.networkId}: ${wallet.address}`)
+          .join("\n")
+      : null;
 
   return {
     ...invoiceFormDefaultValues,
@@ -62,9 +69,9 @@ export function buildInvoiceDefaults(input: {
       paymentInformation:
         (input.existing?.metadata.paymentInformation.length ?? 0) > 0
           ? input.existing!.metadata.paymentInformation
-          : wallet
-            ? [{ label: "Wallet", value: wallet }]
-            : [],
+          : walletHint
+            ? [{ label: "Verified wallets", value: walletHint }]
+            : [{ label: "Wallets", value: "Configure wallets in Wallets settings" }],
     },
   };
 }

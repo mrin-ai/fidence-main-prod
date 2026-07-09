@@ -33,14 +33,12 @@ import {
   InvoiceStringFieldRows,
 } from "@/components/invoice/invoice-field-rows";
 import { InvoiceItemsSection } from "@/components/invoice/invoice-items-section";
-import { InvoicePaymentActions } from "@/components/invoice/invoice-payment-actions";
 import { InvoicePaymentLinkSection } from "@/components/invoice/invoice-payment-link-section";
 import { currenciesWithSymbols } from "@/lib/invoice/currency";
 import {
   invoiceFormDefaultValues,
   invoiceFormSchema,
   type InvoiceFormData,
-  invoiceReference,
 } from "@/lib/invoice/schema";
 import type { InvoicePaymentLinkInfo } from "@/lib/invoice/invoice-payment-link";
 import { cn } from "@/lib/utils";
@@ -349,15 +347,6 @@ export function InvoiceFormPanel({
               form={form}
               savedPaymentLink={savedPaymentLink}
             />
-            {savedPaymentLink ? (
-              <div className="mt-4">
-                <InvoicePaymentActions
-                  paymentLink={savedPaymentLink}
-                  invoiceReference={invoiceReference(form.getValues())}
-                  compact
-                />
-              </div>
-            ) : null}
           </AccordionContent>
         </AccordionItem>
       </Accordion>

@@ -14,6 +14,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { EmptyStateLottie } from "@/components/empty-state-lottie"
 import {
   dashboardCardClassName,
   dashboardPanelBodyHeightClassName,
@@ -61,10 +62,18 @@ export function RecentTransactions({
           className={cn(
             dashboardPanelBodyHeightClassName,
             dashboardPanelScrollClassName,
-            "flex flex-col gap-4"
+            transactions.length === 0
+              ? "flex items-center justify-center"
+              : "flex flex-col gap-4",
           )}
         >
-          {transactions.map((tx) => (
+          {transactions.length === 0 ? (
+            <EmptyStateLottie
+              title="No transactions yet"
+              description="Payments you receive will appear here."
+            />
+          ) : (
+            transactions.map((tx) => (
             <div
               key={tx.id}
               className="flex items-center gap-3"
@@ -90,17 +99,20 @@ export function RecentTransactions({
                 <ArrowUpRightIcon className="size-3.5" />
               </Button>
             </div>
-          ))}
-        </div>
-        <div
-          aria-hidden
-          className={cn(
-            dashboardPanelFadeClassName,
-            showBottomFade ? "opacity-100" : "opacity-0"
+            ))
           )}
-        >
-          <ChevronDownIcon className="size-3.5 text-primary/50" />
         </div>
+        {transactions.length > 0 ? (
+          <div
+            aria-hidden
+            className={cn(
+              dashboardPanelFadeClassName,
+              showBottomFade ? "opacity-100" : "opacity-0",
+            )}
+          >
+            <ChevronDownIcon className="size-3.5 text-primary/50" />
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   )

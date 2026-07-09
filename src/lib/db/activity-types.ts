@@ -5,6 +5,7 @@ export const ACTIVITY_EVENT_TYPES = {
   logout: "logout",
   paymentLinkCreated: "payment_link_created",
   paymentReceived: "payment_received",
+  profilePayment: "profile_payment",
   invoiceCreated: "invoice_created",
 } as const;
 

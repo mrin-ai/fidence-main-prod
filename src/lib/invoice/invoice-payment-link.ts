@@ -1,4 +1,5 @@
 import type { InvoiceFormData } from "@/lib/invoice/schema";
+import { getNetworkById, getTokenById } from "@/lib/create-payment-link-data";
 
 export type InvoicePaymentLinkInfo = {
   id: string;
@@ -9,6 +10,29 @@ export type InvoicePaymentLinkInfo = {
   tokenId: string;
   networkId: string;
 };
+
+export type InvoicePdfPayment = {
+  url: string;
+  amount: number;
+  tokenSymbol: string;
+  networkLabel: string;
+  status: InvoicePaymentLinkInfo["status"];
+};
+
+export function paymentLinkToPdfPayment(
+  paymentLink: InvoicePaymentLinkInfo,
+): InvoicePdfPayment {
+  const token = getTokenById(paymentLink.tokenId);
+  const network = getNetworkById(paymentLink.networkId);
+
+  return {
+    url: paymentLink.url,
+    amount: paymentLink.amount,
+    tokenSymbol: token?.symbol ?? paymentLink.tokenId.toUpperCase(),
+    networkLabel: network?.label ?? paymentLink.networkId,
+    status: paymentLink.status,
+  };
+}
 
 export function resolveInvoicePaymentExpiry(data: InvoiceFormData) {
   if (data.invoiceDetails.dueDate) {

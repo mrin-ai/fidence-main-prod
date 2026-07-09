@@ -72,6 +72,10 @@ export function getChainIdForNetwork(networkId: string) {
   return networkChainIds[networkId];
 }
 
+export function getNetworkIdForChainId(chainId: number) {
+  return Object.entries(networkChainIds).find(([, id]) => id === chainId)?.[0];
+}
+
 export function getTokenContract(networkId: string, tokenId: string) {
   return tokenContracts[networkId]?.[tokenId] ?? null;
 }

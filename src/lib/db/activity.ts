@@ -70,6 +70,20 @@ export async function logPaymentReceivedActivity(input: {
   });
 }
 
+export async function logProfilePaymentReceivedActivity(input: {
+  workspaceId: ObjectId;
+  amount: number;
+  tokenSymbol: string;
+  username: string;
+}) {
+  return logActivity({
+    workspaceId: input.workspaceId,
+    type: "profile_payment",
+    summary: `Profile payment received · ${input.amount} ${input.tokenSymbol} · @${input.username}`,
+    status: "settled",
+  });
+}
+
 export async function logInvoiceCreatedActivity(input: {
   workspaceId: ObjectId;
   reference: string;

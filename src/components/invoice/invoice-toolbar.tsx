@@ -13,6 +13,7 @@ import { toast } from "sonner";
 
 import { InvoiceTabSwitch, type InvoiceViewTab } from "@/components/invoice/invoice-tab-switch";
 import { downloadInvoicePdf } from "@/components/invoice/invoice-preview";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -21,24 +22,37 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { InvoicePaymentLinkInfo } from "@/lib/invoice/invoice-payment-link";
+import type { InvoiceStatus } from "@/lib/db/types";
 import {
   invoiceFormSchema,
   type InvoiceFormData,
 } from "@/lib/invoice/schema";
+
+const statusLabel: Record<InvoiceStatus, string> = {
+  draft: "Draft",
+  sent: "Awaiting payment",
+  paid: "Paid",
+  cancelled: "Cancelled",
+};
 
 export function InvoiceToolbar({
   form,
   viewTab,
   onViewTabChange,
   invoiceId,
+  invoiceStatus,
+  paymentLink,
   onSaved,
 }: {
   form: UseFormReturn<InvoiceFormData>;
   viewTab: InvoiceViewTab;
   onViewTabChange: (tab: InvoiceViewTab) => void;
   invoiceId?: string;
+  invoiceStatus?: InvoiceStatus;
+  paymentLink?: InvoicePaymentLinkInfo | null;
   onSaved?: (payload: {
     id: string;
+    status?: InvoiceStatus;
     paymentLink?: InvoicePaymentLinkInfo;
   }) => void;
 }) {
@@ -65,12 +79,23 @@ export function InvoiceToolbar({
 
       const payload = (await response.json()) as {
         error?: string;
+        code?: string;
         id?: string;
         reference?: string;
+        status?: InvoiceStatus;
         paymentLink?: InvoicePaymentLinkInfo;
       };
 
       if (!response.ok) {
+        if (payload.code === "WALLET_NOT_VERIFIED_FOR_NETWORK") {
+          toast.error(payload.error ?? "Add a verified wallet for this network", {
+            action: {
+              label: "Wallets",
+              onClick: () => router.push("/wallets"),
+            },
+          });
+          return;
+        }
         throw new Error(payload.error ?? "Failed to save invoice");
       }
 
@@ -80,6 +105,7 @@ export function InvoiceToolbar({
       if (savedId) {
         onSaved?.({
           id: savedId,
+          status: payload.status,
           paymentLink: payload.paymentLink,
         });
       }
@@ -97,7 +123,7 @@ export function InvoiceToolbar({
 
   async function handleDownload() {
     try {
-      await downloadInvoicePdf(form);
+      await downloadInvoicePdf(form, paymentLink);
       await saveInvoice();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to download PDF");
@@ -106,16 +132,28 @@ export function InvoiceToolbar({
 
   async function handleViewPdf() {
     try {
-      await downloadInvoicePdf(form);
+      await downloadInvoicePdf(form, paymentLink);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to open PDF");
     }
   }
 
+  const displayStatus = paymentLink?.status === "paid" ? "paid" : invoiceStatus;
+
   return (
     <div className="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-border/50 px-3">
-      <div className="text-sm text-muted-foreground">
-        {invoiceId ? "Edit invoice" : "Create invoice"}
+      <div className="flex min-w-0 items-center gap-2">
+        <span className="truncate text-sm text-muted-foreground">
+          {invoiceId ? "Edit invoice" : "Create invoice"}
+        </span>
+        {displayStatus ? (
+          <Badge
+            variant={displayStatus === "paid" ? "default" : "secondary"}
+            className="shrink-0"
+          >
+            {statusLabel[displayStatus]}
+          </Badge>
+        ) : null}
       </div>
       <div className="flex items-center gap-2">
         <InvoiceTabSwitch value={viewTab} onChange={onViewTabChange} />

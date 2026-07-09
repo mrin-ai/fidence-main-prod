@@ -366,6 +366,7 @@ export function ManageInvoicesPageContent({
                               variant="ghost"
                               size="icon-sm"
                               aria-label="Edit invoice"
+                              nativeButton={false}
                               render={<Link href={`/invoice/${invoice.id}`} />}
                             >
                               <PencilIcon className="size-3.5" />

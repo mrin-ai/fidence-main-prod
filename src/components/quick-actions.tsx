@@ -1,6 +1,7 @@
 "use client"
 
 import type { ReactNode } from "react"
+import Link from "next/link"
 import {
   ArrowRightIcon,
   Code2Icon,
@@ -105,7 +106,7 @@ function ActionCard({
   }
 
   return (
-    <a
+    <Link
       href={href}
       className={cn(
         "group flex min-h-[8.75rem] flex-col justify-between rounded-xl p-4 transition-colors",
@@ -115,7 +116,7 @@ function ActionCard({
       )}
     >
       {content}
-    </a>
+    </Link>
   )
 }
 
@@ -134,6 +135,7 @@ export function QuickActions() {
       title: "Manage Links",
       subtitle: "View all payment links",
       icon: <Link2Icon className="size-4" />,
+      href: "/payment-links",
     },
     {
       title: "Rewards",

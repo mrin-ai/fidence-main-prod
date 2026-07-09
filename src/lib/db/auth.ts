@@ -72,7 +72,7 @@ async function createDefaultWorkspace(user: UserDoc) {
   });
 }
 
-async function getWorkspaceForUser(userId: ObjectId) {
+export async function getWorkspaceForUser(userId: ObjectId) {
   const db = await getDb();
   const membership = await db
     .collection(COLLECTIONS.workspaceMembers)
@@ -168,6 +168,7 @@ export async function upsertGoogleUser(input: {
       { type: "google", providerId: input.email, email: input.email },
     ],
     walletAddresses: [],
+    verifiedWallets: [],
     lastLoginAt: now,
     createdAt: now,
     updatedAt: now,
@@ -207,6 +208,7 @@ export async function upsertWalletUser(address: string) {
     role: "owner",
     authProviders: [{ type: "wallet", providerId: normalized }],
     walletAddresses: [normalized],
+    verifiedWallets: [],
     lastLoginAt: now,
     createdAt: now,
     updatedAt: now,

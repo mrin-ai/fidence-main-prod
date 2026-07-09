@@ -10,6 +10,10 @@ import {
   downloadBlob,
 } from "@/lib/invoice/pdf/create-pdf-blob";
 import {
+  paymentLinkToPdfPayment,
+  type InvoicePaymentLinkInfo,
+} from "@/lib/invoice/invoice-payment-link";
+import {
   coerceInvoicePreviewData,
   type InvoiceFormData,
 } from "@/lib/invoice/schema";
@@ -37,8 +41,10 @@ const InvoicePdfViewer = dynamic(
 
 export function InvoicePreviewPanel({
   form,
+  paymentLink,
 }: {
   form: UseFormReturn<InvoiceFormData>;
+  paymentLink?: InvoicePaymentLinkInfo | null;
 }) {
   const [previewData, setPreviewData] = React.useState<InvoiceFormData | null>(
     null,
@@ -53,6 +59,9 @@ export function InvoicePreviewPanel({
 
     async function generatePreview(value: unknown) {
       const previewData = coerceInvoicePreviewData(value);
+      const pdfPayment = paymentLink
+        ? paymentLinkToPdfPayment(paymentLink)
+        : undefined;
 
       if (!cancelled) {
         setPreviewData(previewData);
@@ -61,7 +70,7 @@ export function InvoicePreviewPanel({
       }
 
       try {
-        const blob = await createInvoicePdfBlob(previewData);
+        const blob = await createInvoicePdfBlob(previewData, pdfPayment);
         const nextUrl = URL.createObjectURL(blob);
         if (!cancelled) {
           setPdfUrl((current) => {
@@ -98,7 +107,7 @@ export function InvoicePreviewPanel({
       if (debounceTimer) clearTimeout(debounceTimer);
       subscription.unsubscribe();
     };
-  }, [form]);
+  }, [form, paymentLink]);
 
   React.useEffect(() => {
     return () => {
@@ -133,7 +142,10 @@ export function InvoicePreviewPanel({
   );
 }
 
-export async function downloadInvoicePdf(form: UseFormReturn<InvoiceFormData>) {
+export async function downloadInvoicePdf(
+  form: UseFormReturn<InvoiceFormData>,
+  paymentLink?: InvoicePaymentLinkInfo | null,
+) {
   const previewData = coerceInvoicePreviewData(form.getValues());
   const saveParsed = invoiceFormSchema.safeParse(form.getValues());
   if (!saveParsed.success) {
@@ -142,6 +154,9 @@ export async function downloadInvoicePdf(form: UseFormReturn<InvoiceFormData>) {
     );
   }
 
-  const blob = await createInvoicePdfBlob(previewData);
+  const blob = await createInvoicePdfBlob(
+    previewData,
+    paymentLink ? paymentLinkToPdfPayment(paymentLink) : undefined,
+  );
   downloadBlob(blob, `${invoiceReference(previewData)}.pdf`);
 }

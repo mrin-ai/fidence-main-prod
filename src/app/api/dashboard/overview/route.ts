@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionFromCookies } from "@/lib/db/auth";
 import { getDashboardOverview } from "@/lib/db/dashboard";
+import { buildProfileUrl } from "@/lib/profile-url";
 
 export async function GET() {
   const session = await getSessionFromCookies();
@@ -21,7 +22,9 @@ export async function GET() {
     workspace: {
       name: session.workspace.name,
       slug: session.workspace.slug,
-      paymentLink: `pay.fidence.xyz/${session.workspace.slug}`,
+      paymentLink: session.user.username
+        ? buildProfileUrl(session.user.username)
+        : overview.workspace.paymentLink,
     },
   });
 }

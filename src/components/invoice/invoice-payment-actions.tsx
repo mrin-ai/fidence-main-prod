@@ -111,6 +111,7 @@ export function InvoicePaymentActions({
             variant="ghost"
             size="icon"
             aria-label="Open payment link"
+            nativeButton={false}
             render={
               <Link href={paymentLink.url} target="_blank" rel="noreferrer" />
             }

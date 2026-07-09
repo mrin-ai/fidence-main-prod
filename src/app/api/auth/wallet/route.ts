@@ -7,7 +7,7 @@ import {
   sessionCookieOptions,
   upsertWalletUser,
 } from "@/lib/db/auth";
-import { ensureDbIndexes, seedWorkspaceDemoData } from "@/lib/db/seed";
+import { ensureDbIndexes } from "@/lib/db/seed";
 
 export async function POST(request: Request) {
   try {
@@ -52,7 +52,6 @@ export async function POST(request: Request) {
       "wallet",
       address,
     );
-    await seedWorkspaceDemoData(workspace._id, user._id);
     await logLoginActivity(workspace._id, "wallet");
 
     const cookieStore = await cookies();

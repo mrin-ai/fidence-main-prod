@@ -2,11 +2,9 @@ import { ObjectId } from "mongodb";
 import { buildPaymentLinkUrl, generatePublicId } from "@/lib/payment-link-url";
 import { getDb } from "@/lib/db/client";
 import { COLLECTIONS } from "@/lib/db/collections";
+import { migrateWalletAddressesToVerifiedWallets } from "@/lib/db/wallets";
 import type {
-  ActivityEventDoc,
-  BalanceDoc,
   PaymentLinkDoc,
-  TransactionDoc,
   UserDoc,
 } from "@/lib/db/types";
 
@@ -54,10 +52,74 @@ export async function migrateLegacyPaymentLinks() {
   }
 }
 
+export async function purgeWorkspaceDemoData(workspaceId: ObjectId) {
+  const db = await getDb();
+
+  const demoActivitySummaries = [
+    "Payment link created · 10 USDC",
+    "Payment received · 25 USDC",
+    "Invoice created · INV-2026-0042",
+    "Payment link created · 50 USDC",
+    "Payment received · 100 USDC",
+  ];
+
+  const [transactions, balances, activities] = await Promise.all([
+    db.collection(COLLECTIONS.transactions).deleteMany({
+      workspaceId,
+      paymentLinkId: { $exists: false },
+      txHash: { $exists: false },
+    }),
+    db.collection(COLLECTIONS.balances).deleteMany({ workspaceId }),
+    db.collection(COLLECTIONS.activityEvents).deleteMany({
+      workspaceId,
+      summary: { $in: demoActivitySummaries },
+    }),
+  ]);
+
+  return {
+    removedTransactions: transactions.deletedCount,
+    removedBalances: balances.deletedCount,
+    removedActivities: activities.deletedCount,
+  };
+}
+
+export async function migrateRemoveWorkspaceDemoData() {
+  const db = await getDb();
+  const workspaces = await db
+    .collection(COLLECTIONS.workspaces)
+    .find({ demoDataPurgedAt: { $exists: false } }, { projection: { _id: 1 } })
+    .toArray();
+
+  let removedTransactions = 0;
+  let removedBalances = 0;
+  let removedActivities = 0;
+
+  for (const workspace of workspaces) {
+    const result = await purgeWorkspaceDemoData(workspace._id);
+    removedTransactions += result.removedTransactions;
+    removedBalances += result.removedBalances;
+    removedActivities += result.removedActivities;
+
+    await db.collection(COLLECTIONS.workspaces).updateOne(
+      { _id: workspace._id },
+      { $set: { demoDataPurgedAt: new Date() } },
+    );
+  }
+
+  return {
+    workspaces: workspaces.length,
+    removedTransactions,
+    removedBalances,
+    removedActivities,
+  };
+}
+
 export async function ensureDbIndexes() {
   const db = await getDb();
 
   await migrateLegacyPaymentLinks();
+  await migrateRemoveWorkspaceDemoData();
+  await migrateWalletAddressesToVerifiedWallets();
 
   await Promise.all([
     db.collection(COLLECTIONS.users).createIndex({ email: 1 }, { unique: true, sparse: true }),
@@ -80,6 +142,10 @@ export async function ensureDbIndexes() {
       { unique: true, sparse: true },
     ),
     db.collection(COLLECTIONS.transactions).createIndex({ workspaceId: 1, occurredAt: -1 }),
+    db.collection(COLLECTIONS.transactions).createIndex(
+      { txHash: 1 },
+      { unique: true, sparse: true },
+    ),
     db.collection(COLLECTIONS.activityEvents).createIndex({ workspaceId: 1, occurredAt: -1 }),
     db.collection(COLLECTIONS.invoices).createIndex({ workspaceId: 1, updatedAt: -1 }),
     db.collection(COLLECTIONS.invoices).createIndex(
@@ -88,177 +154,4 @@ export async function ensureDbIndexes() {
     ),
     db.collection(COLLECTIONS.balances).createIndex({ workspaceId: 1, tokenId: 1 }, { unique: true }),
   ]);
-}
-
-export async function seedWorkspaceDemoData(workspaceId: ObjectId, userId: ObjectId) {
-  const db = await getDb();
-  const existingActivities = await db
-    .collection(COLLECTIONS.activityEvents)
-    .countDocuments({ workspaceId });
-
-  if (existingActivities > 0) return { seeded: false };
-
-  const now = new Date();
-
-  const transactions: Omit<TransactionDoc, "_id">[] = [
-    {
-      workspaceId,
-      type: "payment_received",
-      label: "Payment received",
-      amount: 10,
-      symbol: "USDC",
-      networkId: "base",
-      status: "confirmed",
-      occurredAt: new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000),
-      createdAt: now,
-    },
-    {
-      workspaceId,
-      type: "payment_received",
-      label: "Payment received",
-      amount: 25,
-      symbol: "USDC",
-      networkId: "ethereum",
-      status: "confirmed",
-      occurredAt: new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000),
-      createdAt: now,
-    },
-    {
-      workspaceId,
-      type: "payment_received",
-      label: "Payment received",
-      amount: 8,
-      symbol: "USDC",
-      networkId: "polygon",
-      status: "confirmed",
-      occurredAt: new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000),
-      createdAt: now,
-    },
-    {
-      workspaceId,
-      type: "payment_received",
-      label: "Payment received",
-      amount: 120,
-      symbol: "USDC",
-      networkId: "arbitrum",
-      status: "confirmed",
-      occurredAt: new Date(now.getTime() - 4 * 24 * 60 * 60 * 1000),
-      createdAt: now,
-    },
-    {
-      workspaceId,
-      type: "payment_received",
-      label: "Payment received",
-      amount: 45,
-      symbol: "USDC",
-      networkId: "base",
-      status: "confirmed",
-      occurredAt: new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000),
-      createdAt: now,
-    },
-    {
-      workspaceId,
-      type: "payment_received",
-      label: "Payment received",
-      amount: 16,
-      symbol: "USDC",
-      networkId: "base",
-      status: "confirmed",
-      occurredAt: new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000),
-      createdAt: now,
-    },
-  ];
-
-  const activities: Omit<ActivityEventDoc, "_id">[] = [
-    {
-      workspaceId,
-      type: "login",
-      summary: "Logged in via Google",
-      meta: "",
-      occurredAt: new Date(now.getTime() - 5 * 60 * 1000),
-      createdAt: now,
-    },
-    {
-      workspaceId,
-      type: "payment_link_created",
-      summary: "Payment link created · 10 USDC",
-      meta: "",
-      occurredAt: new Date(now.getTime() - 15 * 60 * 1000),
-      createdAt: now,
-    },
-    {
-      workspaceId,
-      type: "payment_received",
-      summary: "Payment received · 25 USDC",
-      meta: "",
-      status: "settled",
-      occurredAt: new Date(now.getTime() - 45 * 60 * 1000),
-      createdAt: now,
-    },
-    {
-      workspaceId,
-      type: "invoice_created",
-      summary: "Invoice created · INV-2026-0042",
-      meta: "",
-      occurredAt: new Date(now.getTime() - 2 * 60 * 60 * 1000),
-      createdAt: now,
-    },
-    {
-      workspaceId,
-      type: "payment_link_created",
-      summary: "Payment link created · 50 USDC",
-      meta: "",
-      occurredAt: new Date(now.getTime() - 4 * 60 * 60 * 1000),
-      createdAt: now,
-    },
-    {
-      workspaceId,
-      type: "logout",
-      summary: "Logged out",
-      meta: "",
-      occurredAt: new Date(now.getTime() - 6 * 60 * 60 * 1000),
-      createdAt: now,
-    },
-    {
-      workspaceId,
-      type: "payment_received",
-      summary: "Payment received · 100 USDC",
-      meta: "",
-      status: "settled",
-      occurredAt: new Date(now.getTime() - 24 * 60 * 60 * 1000),
-      createdAt: now,
-    },
-  ];
-
-  const balances: Omit<BalanceDoc, "_id">[] = [
-    {
-      workspaceId,
-      tokenId: "usdc",
-      label: "USDC",
-      amount: 1240,
-      updatedAt: now,
-    },
-    {
-      workspaceId,
-      tokenId: "eth",
-      label: "Ethereum",
-      amount: 0.42,
-      updatedAt: now,
-    },
-    {
-      workspaceId,
-      tokenId: "sol",
-      label: "Solana",
-      amount: 12.4,
-      updatedAt: now,
-    },
-  ];
-
-  await Promise.all([
-    db.collection(COLLECTIONS.transactions).insertMany(transactions),
-    db.collection(COLLECTIONS.activityEvents).insertMany(activities),
-    db.collection(COLLECTIONS.balances).insertMany(balances),
-  ]);
-
-  return { seeded: true };
 }

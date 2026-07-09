@@ -1,6 +1,7 @@
 import { ObjectId } from "mongodb";
 
 import { formatActivityMeta } from "@/lib/format-date";
+import { buildProfileUrl } from "@/lib/profile-url";
 import { COLLECTIONS } from "@/lib/db/collections";
 import { getDb } from "@/lib/db/client";
 import type {
@@ -9,7 +10,16 @@ import type {
   DashboardOverview,
   PaymentLinkDoc,
   TransactionDoc,
+  UserDoc,
 } from "@/lib/db/types";
+
+/** Creator rewards accrue at 0.6% of confirmed payments received. */
+const CREATOR_REWARD_RATE = 0.006;
+
+const standaloneLinkFilter = (workspaceId: ObjectId) => ({
+  workspaceId,
+  invoiceId: { $exists: false },
+});
 
 function formatUsd(amount: number) {
   return `$${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -38,60 +48,102 @@ export async function getDashboardOverview(
   workspaceId: ObjectId,
 ): Promise<DashboardOverview> {
   const db = await getDb();
+  const linkFilter = standaloneLinkFilter(workspaceId);
 
-  const [workspace, paymentLinks, transactions, activities, balances] =
-    await Promise.all([
-      db.collection(COLLECTIONS.workspaces).findOne({ _id: workspaceId }),
-      db
-        .collection<PaymentLinkDoc>(COLLECTIONS.paymentLinks)
-        .find({ workspaceId, invoiceId: { $exists: false } })
-        .sort({ createdAt: -1 })
-        .limit(20)
-        .toArray(),
-      db
-        .collection<TransactionDoc>(COLLECTIONS.transactions)
-        .find({ workspaceId })
-        .sort({ occurredAt: -1 })
-        .limit(20)
-        .toArray(),
-      db
-        .collection<ActivityEventDoc>(COLLECTIONS.activityEvents)
-        .find({ workspaceId })
-        .sort({ occurredAt: -1 })
-        .limit(50)
-        .toArray(),
-      db
-        .collection<BalanceDoc>(COLLECTIONS.balances)
-        .find({ workspaceId })
-        .sort({ label: 1 })
-        .toArray(),
-    ]);
+  const [
+    workspace,
+    workspaceOwner,
+    totalLinks,
+    completedLinks,
+    pendingLinks,
+    paymentLinks,
+    linkSparklineSource,
+    paymentTransactions,
+    transactions,
+    activities,
+    balances,
+  ] = await Promise.all([
+    db.collection(COLLECTIONS.workspaces).findOne({ _id: workspaceId }),
+    db.collection(COLLECTIONS.workspaces).findOne({ _id: workspaceId }).then(async (ws) => {
+      if (!ws) return null;
+      return db.collection<UserDoc>(COLLECTIONS.users).findOne({ _id: ws.ownerId });
+    }),
+    db.collection(COLLECTIONS.paymentLinks).countDocuments(linkFilter),
+    db
+      .collection(COLLECTIONS.paymentLinks)
+      .countDocuments({ ...linkFilter, status: "paid" }),
+    db
+      .collection(COLLECTIONS.paymentLinks)
+      .countDocuments({ ...linkFilter, status: "pending" }),
+    db
+      .collection<PaymentLinkDoc>(COLLECTIONS.paymentLinks)
+      .find(linkFilter)
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .toArray(),
+    db
+      .collection<PaymentLinkDoc>(COLLECTIONS.paymentLinks)
+      .find(linkFilter, {
+        projection: { createdAt: 1, status: 1, paidAt: 1, updatedAt: 1 },
+      })
+      .toArray(),
+    db
+      .collection<TransactionDoc>(COLLECTIONS.transactions)
+      .find(
+        {
+          workspaceId,
+          type: { $in: ["payment_received", "profile_payment"] },
+          status: "confirmed",
+        },
+        { projection: { amount: 1, occurredAt: 1 } },
+      )
+      .toArray(),
+    db
+      .collection<TransactionDoc>(COLLECTIONS.transactions)
+      .find({ workspaceId })
+      .sort({ occurredAt: -1 })
+      .limit(20)
+      .toArray(),
+    db
+      .collection<ActivityEventDoc>(COLLECTIONS.activityEvents)
+      .find({ workspaceId })
+      .sort({ occurredAt: -1 })
+      .limit(50)
+      .toArray(),
+    db
+      .collection<BalanceDoc>(COLLECTIONS.balances)
+      .find({ workspaceId })
+      .sort({ label: 1 })
+      .toArray(),
+  ]);
 
-  const totalLinks = paymentLinks.length;
-  const completedLinks = paymentLinks.filter((link) => link.status === "paid").length;
-  const pendingLinks = paymentLinks.filter((link) => link.status === "pending").length;
-  const receivedAmount = transactions
-    .filter((tx) => tx.type === "payment_received" && tx.status === "confirmed")
-    .reduce((sum, tx) => sum + tx.amount, 0);
-  const rewardsAmount = 1.13;
+  const receivedAmount = paymentTransactions.reduce(
+    (sum, transaction) => sum + transaction.amount,
+    0,
+  );
+  const rewardsAmount = receivedAmount * CREATOR_REWARD_RATE;
 
   const linksByDay = groupCountByDay(
-    paymentLinks.map((link) => link.createdAt),
+    linkSparklineSource.map((link) => link.createdAt),
   );
   const completedByDay = groupCountByDay(
-    paymentLinks
+    linkSparklineSource
       .filter((link) => link.status === "paid")
       .map((link) => link.paidAt ?? link.updatedAt),
   );
   const pendingByDay = groupCountByDay(
-    paymentLinks
+    linkSparklineSource
       .filter((link) => link.status === "pending")
       .map((link) => link.createdAt),
   );
   const receivedByDay = groupSumByDay(
-    transactions
-      .filter((tx) => tx.type === "payment_received")
-      .map((tx) => ({ date: tx.occurredAt, value: tx.amount })),
+    paymentTransactions.map((transaction) => ({
+      date: transaction.occurredAt,
+      value: transaction.amount,
+    })),
+  );
+  const rewardsByDay = receivedByDay.map(
+    (amount) => Math.round(amount * CREATOR_REWARD_RATE * 100) / 100,
   );
 
   return {
@@ -106,7 +158,7 @@ export async function getDashboardOverview(
         completed: buildSparkline(completedByDay),
         pending: buildSparkline(pendingByDay),
         received: buildSparkline(receivedByDay),
-        rewards: buildSparkline([0.42, 0.58, 0.71, 0.84, 0.96, 1.05, rewardsAmount]),
+        rewards: buildSparkline(rewardsByDay),
       },
     },
     paymentLinks: paymentLinks.map((link) => ({
@@ -140,7 +192,9 @@ export async function getDashboardOverview(
     workspace: {
       name: workspace?.name ?? "Workspace",
       slug: workspace?.slug ?? "workspace",
-      paymentLink: `pay.fidence.xyz/${workspace?.slug ?? "workspace"}`,
+      paymentLink: workspaceOwner?.username
+        ? buildProfileUrl(workspaceOwner.username)
+        : "",
     },
     user: {
       name: "",

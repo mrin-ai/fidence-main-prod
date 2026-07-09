@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { usePanelRef } from "react-resizable-panels";
+import { toast } from "sonner";
 
 import { InvoiceFormPanel, useInvoiceForm } from "@/components/invoice/invoice-form";
 import { InvoicePreviewPanel } from "@/components/invoice/invoice-preview";
@@ -13,6 +14,7 @@ import {
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
 import { useIsMobile } from "@/hooks/use-mobile";
+import type { InvoiceStatus } from "@/lib/db/types";
 import type { InvoicePaymentLinkInfo } from "@/lib/invoice/invoice-payment-link";
 import type { InvoiceFormData } from "@/lib/invoice/schema";
 import { cn } from "@/lib/utils";
@@ -21,10 +23,12 @@ export function InvoiceEditor({
   defaultValues,
   invoiceId,
   initialPaymentLink,
+  initialStatus,
 }: {
   defaultValues: InvoiceFormData;
   invoiceId?: string;
   initialPaymentLink?: InvoicePaymentLinkInfo | null;
+  initialStatus?: InvoiceStatus;
 }) {
   const form = useInvoiceForm(defaultValues);
   const isMobile = useIsMobile();
@@ -32,8 +36,66 @@ export function InvoiceEditor({
   const [paymentLink, setPaymentLink] = React.useState<
     InvoicePaymentLinkInfo | null | undefined
   >(initialPaymentLink);
+  const [invoiceStatus, setInvoiceStatus] = React.useState<
+    InvoiceStatus | undefined
+  >(initialStatus);
+  const paidToastShownRef = React.useRef(false);
   const formPanelRef = usePanelRef();
   const previewPanelRef = usePanelRef();
+
+  const refreshPaymentStatus = React.useCallback(async () => {
+    if (!invoiceId) return;
+
+    try {
+      const response = await fetch(`/api/invoices/${invoiceId}`);
+      if (!response.ok) return;
+
+      const payload = (await response.json()) as {
+        invoice?: {
+          status?: InvoiceStatus;
+          paymentLink?: InvoicePaymentLinkInfo | null;
+        };
+      };
+
+      const invoice = payload.invoice;
+      if (!invoice) return;
+
+      if (invoice.paymentLink) {
+        setPaymentLink(invoice.paymentLink);
+      }
+      if (invoice.status) {
+        setInvoiceStatus(invoice.status);
+      }
+
+      if (
+        invoice.paymentLink?.status === "paid" ||
+        invoice.status === "paid"
+      ) {
+        if (!paidToastShownRef.current) {
+          paidToastShownRef.current = true;
+          toast.success("Invoice marked as paid");
+        }
+      }
+    } catch {
+      // Ignore refresh errors.
+    }
+  }, [invoiceId]);
+
+  React.useEffect(() => {
+    if (!invoiceId || paymentLink?.status !== "pending") return;
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === "visible") {
+        void refreshPaymentStatus();
+      }
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [invoiceId, paymentLink?.status, refreshPaymentStatus]);
 
   React.useEffect(() => {
     const formPanel = formPanelRef.current;
@@ -72,12 +134,20 @@ export function InvoiceEditor({
         viewTab={viewTab}
         onViewTabChange={setViewTab}
         invoiceId={invoiceId}
-        onSaved={({ id, paymentLink: savedPaymentLink }) => {
+        invoiceStatus={invoiceStatus}
+        paymentLink={paymentLink}
+        onSaved={({ id, paymentLink: savedPaymentLink, status }) => {
           if (savedPaymentLink) {
             setPaymentLink(savedPaymentLink);
           }
+          if (status) {
+            setInvoiceStatus(status);
+          }
           if (!invoiceId && id) {
             setPaymentLink(savedPaymentLink ?? paymentLink);
+          }
+          if (savedPaymentLink?.status !== "paid") {
+            paidToastShownRef.current = false;
           }
         }}
       />
@@ -102,7 +172,7 @@ export function InvoiceEditor({
             viewTab === "both" && isMobile && "hidden",
           )}
         >
-          <InvoicePreviewPanel form={form} />
+          <InvoicePreviewPanel form={form} paymentLink={paymentLink} />
         </ResizablePanel>
       </ResizablePanelGroup>
     </div>

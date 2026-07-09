@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import type { UseFormReturn } from "react-hook-form";
 
 import {
@@ -48,6 +49,19 @@ export function InvoicePaymentLinkSection({
 
   const selectedToken = getTokenById(tokenId);
   const selectedNetwork = getNetworkById(networkId);
+  const [verifiedNetworkIds, setVerifiedNetworkIds] = React.useState<string[]>([]);
+
+  React.useEffect(() => {
+    void fetch("/api/wallets")
+      .then((response) => response.json())
+      .then((data: { verifiedNetworkIds?: string[] }) => {
+        setVerifiedNetworkIds(data.verifiedNetworkIds ?? []);
+      })
+      .catch(() => setVerifiedNetworkIds([]));
+  }, []);
+
+  const hasVerifiedWallet =
+    !networkId || verifiedNetworkIds.includes(networkId);
   const invoiceTotal = React.useMemo(
     () =>
       calculateInvoiceTotal({
@@ -166,11 +180,31 @@ export function InvoicePaymentLinkSection({
         </FieldContent>
       </Field>
 
+      {networkId && !hasVerifiedWallet ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          Add and verify a wallet for {selectedNetwork?.label ?? networkId} in{" "}
+          <Link href="/wallets" className="font-medium underline">
+            Wallets
+          </Link>{" "}
+          before saving this invoice.
+        </div>
+      ) : null}
+
       {savedPaymentLink ? (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-          Payment link is active for this invoice. Use{" "}
-          <span className="font-medium">Make payment</span> in the preview after
-          saving.
+        <div className="rounded-xl border border-border/60 bg-secondary/10 px-4 py-3 text-sm text-muted-foreground">
+          {savedPaymentLink.status === "paid" ? (
+            <>
+              This invoice is marked as{" "}
+              <span className="font-medium text-emerald-700">Paid</span> on the
+              invoice preview.
+            </>
+          ) : (
+            <>
+              Payment is enabled. Use the{" "}
+              <span className="font-medium text-foreground">Pay invoice</span>{" "}
+              button at the bottom of the invoice preview.
+            </>
+          )}
         </div>
       ) : (
         <FieldDescription>

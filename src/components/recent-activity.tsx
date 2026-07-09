@@ -14,6 +14,7 @@ import {
 } from "lucide-react"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { EmptyStateLottie } from "@/components/empty-state-lottie"
 import {
   dashboardCardClassName,
   dashboardPanelBodyHeightClassName,
@@ -55,7 +56,7 @@ function getActivityVisual(type: string, status?: ActivityStatus) {
     }
   }
 
-  if (type === "payment_received") {
+  if (type === "payment_received" || type === "profile_payment") {
     return {
       icon: <CircleCheckIcon className="size-3.5" />,
       iconClassName: "bg-green-500/10 text-green-600",
@@ -154,10 +155,18 @@ export function RecentActivity({
           className={cn(
             dashboardPanelBodyHeightClassName,
             dashboardPanelScrollClassName,
-            "flex flex-col gap-4"
+            activities.length === 0
+              ? "flex items-center justify-center"
+              : "flex flex-col gap-4",
           )}
         >
-          {activities.map((activity) => {
+          {activities.length === 0 ? (
+            <EmptyStateLottie
+              title="No activity yet"
+              description="Logins, payments, and invoices will show up here."
+            />
+          ) : (
+            activities.map((activity) => {
             const visual = getActivityVisual(activity.type, activity.status)
 
             return (
@@ -183,17 +192,20 @@ export function RecentActivity({
                 ) : null}
               </div>
             )
-          })}
-        </div>
-        <div
-          aria-hidden
-          className={cn(
-            dashboardPanelFadeClassName,
-            showBottomFade ? "opacity-100" : "opacity-0"
+          })
           )}
-        >
-          <ChevronDownIcon className="size-3.5 text-primary/50" />
         </div>
+        {activities.length > 0 ? (
+          <div
+            aria-hidden
+            className={cn(
+              dashboardPanelFadeClassName,
+              showBottomFade ? "opacity-100" : "opacity-0",
+            )}
+          >
+            <ChevronDownIcon className="size-3.5 text-primary/50" />
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   )

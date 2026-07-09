@@ -35,6 +35,7 @@ export function InvoicePdfViewer({ url }: { url: string }) {
               key={`page-${index + 1}`}
               pageNumber={index + 1}
               width={520}
+              renderAnnotationLayer
               className="overflow-hidden rounded-lg border border-border/50 bg-white shadow-sm"
             />
           ))}

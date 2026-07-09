@@ -10,26 +10,17 @@ import {
   WalletIcon,
   XCircleIcon,
 } from "lucide-react";
-import { parseEther, parseUnits } from "viem";
-import {
-  useAccount,
-  usePublicClient,
-  useSendTransaction,
-  useSwitchChain,
-  useWriteContract,
-} from "wagmi";
 import { toast } from "sonner";
 
 import type { PublicPaymentLink } from "@/lib/payment-link-types";
 import { PayPageNavbar } from "@/components/pay/pay-page-navbar";
+import { useOnchainPayment } from "@/components/pay/use-onchain-payment";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import {
-  erc20TransferAbi,
   getChainIdForNetwork,
-  getTokenContract,
   supportsOnChainPayment,
 } from "@/lib/payment-contracts";
 import { cn } from "@/lib/utils";
@@ -84,14 +75,10 @@ export function PaymentLinkCheckout({
   initialLink: PublicPaymentLink;
 }) {
   const [link, setLink] = useState(initialLink);
-  const [isPaying, setIsPaying] = useState(false);
 
-  const { address, isConnected, chainId } = useAccount();
   const { openConnectModal } = useConnectModal();
-  const publicClient = usePublicClient();
-  const { switchChainAsync } = useSwitchChain();
-  const { sendTransactionAsync } = useSendTransaction();
-  const { writeContractAsync } = useWriteContract();
+  const { address, isConnected, chainId, isPaying, executePayment } =
+    useOnchainPayment();
 
   const requiredChainId = getChainIdForNetwork(link.networkId);
   const isWrongNetwork =
@@ -133,48 +120,19 @@ export function PaymentLinkCheckout({
       return;
     }
 
-    setIsPaying(true);
-
     try {
-      if (chainId !== requiredChainId) {
-        await switchChainAsync({ chainId: requiredChainId });
-      }
-
-      let txHash: `0x${string}`;
-
-      if (link.tokenId === "eth") {
-        txHash = await sendTransactionAsync({
-          to: link.recipientAddress as `0x${string}`,
-          value: parseEther(link.amount.toString()),
-        });
-      } else {
-        const token = getTokenContract(link.networkId, link.tokenId);
-        if (!token) {
-          throw new Error("Token contract not configured for this network");
-        }
-
-        txHash = await writeContractAsync({
-          address: token.address,
-          abi: erc20TransferAbi,
-          functionName: "transfer",
-          args: [
-            link.recipientAddress as `0x${string}`,
-            parseUnits(link.amount.toString(), token.decimals),
-          ],
-        });
-      }
-
-      if (publicClient) {
-        await publicClient.waitForTransactionReceipt({ hash: txHash });
-      }
+      const { txHash } = await executePayment({
+        recipientAddress: link.recipientAddress,
+        amount: link.amount,
+        tokenId: link.tokenId,
+        networkId: link.networkId,
+      });
 
       await recordPayment(txHash);
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Payment failed. Try again.",
       );
-    } finally {
-      setIsPaying(false);
     }
   }
 

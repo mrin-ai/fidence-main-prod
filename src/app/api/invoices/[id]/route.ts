@@ -6,11 +6,15 @@ import {
   getInvoiceById,
   saveInvoiceWithPaymentLink,
 } from "@/lib/db/invoices";
+import { requireRecipientAddress } from "@/lib/db/wallets";
 import { invoiceFormSchema } from "@/lib/invoice/schema";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
-function invoiceSaveRequirements(session: NonNullable<Awaited<ReturnType<typeof getSessionFromCookies>>>) {
+function invoiceSaveRequirements(
+  session: NonNullable<Awaited<ReturnType<typeof getSessionFromCookies>>>,
+  networkId: string,
+) {
   if (!session.user.username) {
     return {
       error: "Set a username in Settings before saving invoices with payment links",
@@ -18,17 +22,17 @@ function invoiceSaveRequirements(session: NonNullable<Awaited<ReturnType<typeof 
     };
   }
 
-  const recipientAddress = session.user.walletAddresses[0];
-  if (!recipientAddress) {
+  const recipient = requireRecipientAddress(session.user, networkId);
+  if (!recipient.ok) {
     return {
-      error: "Connect a wallet to your account to receive invoice payments",
-      code: "WALLET_REQUIRED",
+      error: recipient.error,
+      code: recipient.code,
     };
   }
 
   return {
     username: session.user.username,
-    recipientAddress,
+    recipientAddress: recipient.recipientAddress,
   };
 }
 
@@ -54,11 +58,6 @@ export async function PATCH(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const requirements = invoiceSaveRequirements(session);
-  if ("error" in requirements) {
-    return NextResponse.json(requirements, { status: 400 });
-  }
-
   const { id } = await context.params;
   const body = await request.json();
   const parsed = invoiceFormSchema.safeParse(body);
@@ -68,6 +67,14 @@ export async function PATCH(request: Request, context: RouteContext) {
       { error: "Invalid invoice payload", issues: parsed.error.issues },
       { status: 400 },
     );
+  }
+
+  const requirements = invoiceSaveRequirements(
+    session,
+    parsed.data.paymentLink.networkId,
+  );
+  if ("error" in requirements) {
+    return NextResponse.json(requirements, { status: 400 });
   }
 
   try {

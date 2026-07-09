@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getSessionFromCookies } from "@/lib/db/auth";
 import { createPaymentLink, listPaymentLinksForWorkspace } from "@/lib/db/payment-links";
+import { requireRecipientAddress } from "@/lib/db/wallets";
 import {
   matchesPaymentLinkFilter,
   type PaymentLinkFilterStatus,
@@ -68,18 +69,6 @@ export async function POST(request: Request) {
     );
   }
 
-  const recipientAddress = session.user.walletAddresses[0];
-
-  if (!recipientAddress) {
-    return NextResponse.json(
-      {
-        error: "Connect a wallet to your account to receive payments",
-        code: "WALLET_REQUIRED",
-      },
-      { status: 400 },
-    );
-  }
-
   const body = (await request.json()) as {
     amount?: number | string;
     tokenId?: string;
@@ -96,11 +85,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid payment link payload" }, { status: 400 });
   }
 
+  const recipient = requireRecipientAddress(session.user, networkId);
+  if (!recipient.ok) {
+    return NextResponse.json(
+      { error: recipient.error, code: recipient.code },
+      { status: 400 },
+    );
+  }
+
   const link = await createPaymentLink({
     workspaceId: session.workspace._id,
     userId: session.user._id,
     username: session.user.username,
-    recipientAddress,
+    recipientAddress: recipient.recipientAddress,
     amount,
     tokenId,
     networkId,

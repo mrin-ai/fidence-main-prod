@@ -14,6 +14,7 @@ export async function proxy(request: NextRequest) {
   const isProtected =
     pathname.startsWith("/dashboard") ||
     pathname.startsWith("/settings") ||
+    pathname.startsWith("/wallets") ||
     pathname.startsWith("/invoice") ||
     pathname.startsWith("/manage-invoices") ||
     pathname.startsWith("/payment-links");
@@ -62,6 +63,8 @@ export const config = {
     "/manage-invoices/:path*",
     "/payment-links",
     "/payment-links/:path*",
+    "/wallets",
+    "/wallets/:path*",
     "/sign-in",
     "/sign-up",
   ],

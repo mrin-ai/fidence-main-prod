@@ -6,7 +6,7 @@ import {
   sessionCookieOptions,
   upsertGoogleUser,
 } from "@/lib/db/auth";
-import { ensureDbIndexes, seedWorkspaceDemoData } from "@/lib/db/seed";
+import { ensureDbIndexes } from "@/lib/db/seed";
 
 export async function POST() {
   try {
@@ -22,7 +22,6 @@ export async function POST() {
     }
 
     const { token, workspace } = await createSessionForUser(user, "google");
-    await seedWorkspaceDemoData(workspace._id, user._id);
     await logLoginActivity(workspace._id, "google");
 
     const cookieStore = await cookies();

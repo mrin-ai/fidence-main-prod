@@ -1,6 +1,7 @@
 import {
   Document,
   Image,
+  Link,
   Page,
   StyleSheet,
   Text,
@@ -10,6 +11,7 @@ import {
 import { amountToWords } from "@/lib/invoice/amount-to-words";
 import { calculateInvoiceTotal, calculateSubtotal } from "@/lib/invoice/calculate-totals";
 import { formatCurrency } from "@/lib/invoice/currency";
+import type { InvoicePdfPayment } from "@/lib/invoice/invoice-payment-link";
 import type { InvoiceFormData } from "@/lib/invoice/schema";
 import { invoiceReference } from "@/lib/invoice/schema";
 
@@ -138,13 +140,14 @@ function createStyles(
     },
     totalsBlock: {
       width: 220,
+      alignSelf: "flex-end",
     },
     bottomSection: {
       marginTop: "auto",
-      alignItems: "flex-end",
       paddingTop: 24,
       borderTopWidth: 1,
       borderTopColor: "#E5E7EB",
+      width: "100%",
     },
     totalRow: {
       flexDirection: "row",
@@ -209,10 +212,49 @@ function createStyles(
       objectFit: "contain",
       marginTop: 8,
     },
+    paymentDivider: {
+      marginTop: 12,
+      paddingTop: 12,
+      borderTopWidth: 1,
+      borderTopColor: "#E5E7EB",
+    },
+    paymentButton: {
+      marginTop: 10,
+      borderWidth: 1,
+      borderColor: accentColor,
+      backgroundColor: "#FFFFFF",
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+      borderRadius: 6,
+      textDecoration: "none",
+      textAlign: "center",
+    },
+    paymentButtonText: {
+      color: accentColor,
+      fontSize: 10,
+      fontWeight: 600,
+      textAlign: "center",
+    },
+    paymentPaidText: {
+      marginTop: 12,
+      paddingTop: 12,
+      borderTopWidth: 1,
+      borderTopColor: "#E5E7EB",
+      fontSize: 10,
+      fontWeight: 600,
+      color: "#047857",
+      textAlign: "right",
+    },
   });
 }
 
-export function DefaultInvoicePdf({ data }: { data: InvoiceFormData }) {
+export function DefaultInvoicePdf({
+  data,
+  payment,
+}: {
+  data: InvoiceFormData;
+  payment?: InvoicePdfPayment;
+}) {
   const currency = data.invoiceDetails.currency;
   const subtotal = calculateSubtotal(data.items);
   const total = calculateInvoiceTotal(data);
@@ -390,6 +432,35 @@ export function DefaultInvoicePdf({ data }: { data: InvoiceFormData }) {
             </View>
             <Text style={styles.totalInWordsLabel}>Invoice Total (in words)</Text>
             <Text style={styles.totalInWordsValue}>{amountToWords(total)}</Text>
+
+            {payment ? (
+              payment.status === "paid" ? (
+                <Text style={styles.paymentPaidText}>Paid</Text>
+              ) : (
+                <View style={styles.paymentDivider}>
+                  <View style={styles.totalRow}>
+                    <Text style={styles.totalLabel}>Payment due</Text>
+                    <Text style={styles.totalValue}>
+                      {payment.amount.toLocaleString("en-US", {
+                        maximumFractionDigits: 2,
+                      })}{" "}
+                      {payment.tokenSymbol}
+                    </Text>
+                  </View>
+                  <Text
+                    style={[
+                      styles.totalInWordsValue,
+                      { textAlign: "right", marginBottom: 0 },
+                    ]}
+                  >
+                    {payment.networkLabel}
+                  </Text>
+                  <Link src={payment.url} style={styles.paymentButton}>
+                    <Text style={styles.paymentButtonText}>Pay invoice</Text>
+                  </Link>
+                </View>
+              )
+            ) : null}
           </View>
         </View>
       </Page>

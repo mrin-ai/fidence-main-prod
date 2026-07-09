@@ -12,6 +12,7 @@ import {
 import { toast } from "sonner"
 
 import { useCreatePaymentLink } from "@/components/create-payment-link-sheet"
+import { EmptyStateLottie } from "@/components/empty-state-lottie"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -96,10 +97,18 @@ export function PaymentLinks({
           className={cn(
             dashboardPanelBodyHeightClassName,
             dashboardPanelScrollClassName,
-            "flex flex-col gap-4"
+            links.length === 0
+              ? "flex items-center justify-center"
+              : "flex flex-col gap-4",
           )}
         >
-          {links.map((link) => (
+          {links.length === 0 ? (
+            <EmptyStateLottie
+              title="No payment links yet"
+              description="Create a link to start collecting payments."
+            />
+          ) : (
+            links.map((link) => (
             <div key={link.id} className="flex items-center gap-2.5">
               <div
                 className={cn(
@@ -155,17 +164,20 @@ export function PaymentLinks({
                 </DropdownMenu>
               </div>
             </div>
-          ))}
-        </div>
-        <div
-          aria-hidden
-          className={cn(
-            dashboardPanelFadeClassName,
-            showBottomFade ? "opacity-100" : "opacity-0"
+            ))
           )}
-        >
-          <ChevronDownIcon className="size-3.5 text-primary/50" />
         </div>
+        {links.length > 0 ? (
+          <div
+            aria-hidden
+            className={cn(
+              dashboardPanelFadeClassName,
+              showBottomFade ? "opacity-100" : "opacity-0",
+            )}
+          >
+            <ChevronDownIcon className="size-3.5 text-primary/50" />
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   )

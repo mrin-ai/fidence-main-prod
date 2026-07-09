@@ -2,9 +2,13 @@ import { NextResponse } from "next/server";
 
 import { getSessionFromCookies } from "@/lib/db/auth";
 import { listInvoices, saveInvoiceWithPaymentLink } from "@/lib/db/invoices";
+import { requireRecipientAddress } from "@/lib/db/wallets";
 import { invoiceFormSchema } from "@/lib/invoice/schema";
 
-function invoiceSaveRequirements(session: NonNullable<Awaited<ReturnType<typeof getSessionFromCookies>>>) {
+function invoiceSaveRequirements(
+  session: NonNullable<Awaited<ReturnType<typeof getSessionFromCookies>>>,
+  networkId: string,
+) {
   if (!session.user.username) {
     return {
       error: "Set a username in Settings before saving invoices with payment links",
@@ -12,17 +16,17 @@ function invoiceSaveRequirements(session: NonNullable<Awaited<ReturnType<typeof 
     };
   }
 
-  const recipientAddress = session.user.walletAddresses[0];
-  if (!recipientAddress) {
+  const recipient = requireRecipientAddress(session.user, networkId);
+  if (!recipient.ok) {
     return {
-      error: "Connect a wallet to your account to receive invoice payments",
-      code: "WALLET_REQUIRED",
+      error: recipient.error,
+      code: recipient.code,
     };
   }
 
   return {
     username: session.user.username,
-    recipientAddress,
+    recipientAddress: recipient.recipientAddress,
   };
 }
 
@@ -42,11 +46,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const requirements = invoiceSaveRequirements(session);
-  if ("error" in requirements) {
-    return NextResponse.json(requirements, { status: 400 });
-  }
-
   const body = await request.json();
   const parsed = invoiceFormSchema.safeParse(body);
 
@@ -55,6 +54,14 @@ export async function POST(request: Request) {
       { error: "Invalid invoice payload", issues: parsed.error.issues },
       { status: 400 },
     );
+  }
+
+  const requirements = invoiceSaveRequirements(
+    session,
+    parsed.data.paymentLink.networkId,
+  );
+  if ("error" in requirements) {
+    return NextResponse.json(requirements, { status: 400 });
   }
 
   try {

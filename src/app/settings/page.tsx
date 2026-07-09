@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { SettingsPageContent } from "@/components/settings/settings-page-content";
 import { getSessionFromCookies } from "@/lib/db/auth";
+import { buildProfileUrl } from "@/lib/profile-url";
 import { ensureDbIndexes } from "@/lib/db/seed";
 
 function splitName(name: string) {
@@ -63,7 +64,9 @@ export default async function SettingsPage() {
   const shellWorkspace = {
     name: session.workspace.name,
     slug: session.workspace.slug,
-    paymentLink: `pay.fidence.xyz/${session.workspace.slug}`,
+    paymentLink: session.user.username
+      ? buildProfileUrl(session.user.username)
+      : "",
   };
 
   return (

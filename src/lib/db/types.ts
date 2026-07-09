@@ -15,6 +15,22 @@ export type UserProfile = {
   company?: string;
 };
 
+export type WalletNetworkId =
+  | "base"
+  | "ethereum"
+  | "arbitrum"
+  | "polygon"
+  | "solana";
+
+export type VerifiedWallet = {
+  id: string;
+  networkId: WalletNetworkId;
+  address: string;
+  label?: string;
+  verifiedAt: Date;
+  verificationMethod: "eip191" | "solana" | "manual";
+};
+
 export type UserDoc = {
   _id: ObjectId;
   email?: string;
@@ -25,6 +41,7 @@ export type UserDoc = {
   role: "owner" | "admin" | "member";
   authProviders: AuthProvider[];
   walletAddresses: string[];
+  verifiedWallets?: VerifiedWallet[];
   lastLoginAt: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -87,12 +104,15 @@ export type TransactionDoc = {
   _id: ObjectId;
   workspaceId: ObjectId;
   paymentLinkId?: ObjectId;
-  type: "payment_received" | "payout" | "refund";
+  type: "payment_received" | "profile_payment" | "payout" | "refund";
   label: string;
   amount: number;
   symbol: string;
   networkId?: string;
   txHash?: string;
+  payerAddress?: string;
+  recipientUserId?: ObjectId;
+  recipientAddress?: string;
   status: "pending" | "confirmed" | "failed";
   occurredAt: Date;
   createdAt: Date;
