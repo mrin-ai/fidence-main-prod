@@ -11,7 +11,6 @@ import {
 import type { UseFormReturn } from "react-hook-form";
 import { toast } from "sonner";
 
-import { InvoiceTabSwitch, type InvoiceViewTab } from "@/components/invoice/invoice-tab-switch";
 import { downloadInvoicePdf } from "@/components/invoice/invoice-preview";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -37,16 +36,12 @@ const statusLabel: Record<InvoiceStatus, string> = {
 
 export function InvoiceToolbar({
   form,
-  viewTab,
-  onViewTabChange,
   invoiceId,
   invoiceStatus,
   paymentLink,
   onSaved,
 }: {
   form: UseFormReturn<InvoiceFormData>;
-  viewTab: InvoiceViewTab;
-  onViewTabChange: (tab: InvoiceViewTab) => void;
   invoiceId?: string;
   invoiceStatus?: InvoiceStatus;
   paymentLink?: InvoicePaymentLinkInfo | null;
@@ -121,15 +116,6 @@ export function InvoiceToolbar({
     }
   }
 
-  async function handleDownload() {
-    try {
-      await downloadInvoicePdf(form, paymentLink);
-      await saveInvoice();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to download PDF");
-    }
-  }
-
   async function handleViewPdf() {
     try {
       await downloadInvoicePdf(form, paymentLink);
@@ -156,7 +142,6 @@ export function InvoiceToolbar({
         ) : null}
       </div>
       <div className="flex items-center gap-2">
-        <InvoiceTabSwitch value={viewTab} onChange={onViewTabChange} />
         <DropdownMenu>
           <DropdownMenuTrigger
             render={<Button size="sm" disabled={isSaving} />}
@@ -176,10 +161,6 @@ export function InvoiceToolbar({
             <DropdownMenuItem onClick={() => void handleViewPdf()}>
               <EyeIcon className="size-4" />
               Download PDF
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => void handleDownload()}>
-              <DownloadIcon className="size-4" />
-              Save & download PDF
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

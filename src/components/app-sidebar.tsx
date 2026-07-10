@@ -101,7 +101,7 @@ const data = {
       items: [
         {
           title: "Transactions",
-          url: "#",
+          url: "/transactions",
           icon: <ReceiptIcon />,
         },
         {

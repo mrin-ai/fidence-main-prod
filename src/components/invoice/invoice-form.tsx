@@ -79,31 +79,6 @@ export function InvoiceFormPanel({
 
   return (
     <div className="flex h-full flex-col overflow-y-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-      <div className="flex h-14 shrink-0 items-center justify-between border-b border-border/50 px-4">
-        <span className="text-sm font-medium">Invoice template</span>
-        <div className="flex items-center gap-2">
-          <Select
-            value={form.watch("invoiceDetails.theme.template") ?? "default"}
-            onValueChange={(value) => {
-              if (!value) return;
-              form.setValue(
-                "invoiceDetails.theme.template",
-                value as "default" | "vercel",
-                { shouldDirty: true },
-              );
-            }}
-          >
-            <SelectTrigger className="w-32">
-              <SelectValue placeholder="Template" />
-            </SelectTrigger>
-            <SelectContent align="end">
-              <SelectItem value="default">Default</SelectItem>
-              <SelectItem value="vercel">Minimal</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
       <Accordion defaultValue={["company-details"]} className="w-full divide-y border-b">
         <AccordionItem value="company-details">
           <AccordionTrigger className="px-4">Company details</AccordionTrigger>
@@ -330,11 +305,6 @@ export function InvoiceFormPanel({
                 <Textarea {...form.register("metadata.terms")} />
               </FieldContent>
             </Field>
-            <InvoiceStringFieldRows
-              form={form}
-              name="metadata.paymentInformation"
-              label="Payment information"
-            />
           </AccordionContent>
         </AccordionItem>
 

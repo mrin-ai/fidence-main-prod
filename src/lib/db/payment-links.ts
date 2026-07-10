@@ -16,6 +16,7 @@ import {
 } from "@/lib/db/activity";
 import { getDb } from "@/lib/db/client";
 import { COLLECTIONS } from "@/lib/db/collections";
+import { recordPaymentSentForPayer } from "@/lib/db/payment-sent";
 import { incrementDailyStat } from "@/lib/db/workspace-stats";
 import type { PaymentLinkDoc, PaymentLinkStatus, UserDoc, InvoiceDoc } from "@/lib/db/types";
 import type { PublicPaymentLink } from "@/lib/payment-link-types";
@@ -387,7 +388,7 @@ export async function markPaymentLinkPaid(input: {
     amount: syncedLink.amount,
     symbol: token?.symbol?.toLowerCase() ?? syncedLink.tokenId,
     networkId: syncedLink.networkId,
-    txHash: input.txHash,
+    txHash: input.txHash.toLowerCase(),
     status: "confirmed",
     occurredAt: now,
     createdAt: now,
@@ -438,6 +439,23 @@ export async function markPaymentLinkPaid(input: {
     }
   }
 
+  const merchant = await db.collection<UserDoc>(COLLECTIONS.users).findOne({
+    _id: syncedLink.createdBy,
+  });
+
+  await recordPaymentSentForPayer({
+    payerAddress,
+    merchantWorkspaceId: syncedLink.workspaceId,
+    amount: syncedLink.amount,
+    tokenId: syncedLink.tokenId,
+    networkId: syncedLink.networkId,
+    txHash: input.txHash,
+    merchantLabel: merchant?.username
+      ? `@${merchant.username}`
+      : syncedLink.username,
+    paymentLinkId: syncedLink._id,
+  });
+
   const updated = await db.collection<PaymentLinkDoc>(COLLECTIONS.paymentLinks).findOne({
     _id: syncedLink._id,
   });
@@ -445,10 +463,6 @@ export async function markPaymentLinkPaid(input: {
   if (!updated) {
     return { ok: false as const, error: "Failed to load updated payment link" };
   }
-
-  const merchant = await db.collection<UserDoc>(COLLECTIONS.users).findOne({
-    _id: updated.createdBy,
-  });
 
   if (!merchant) {
     return { ok: false as const, error: "Merchant not found" };

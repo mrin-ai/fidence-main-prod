@@ -2,6 +2,7 @@ import { ObjectId } from "mongodb";
 
 import { listWorkspaceActivities } from "@/lib/db/activity-feed";
 import { buildProfileUrl } from "@/lib/profile-url";
+import { getTxExplorerUrl } from "@/lib/block-explorer";
 import { COLLECTIONS } from "@/lib/db/collections";
 import { getDb } from "@/lib/db/client";
 import { getSparklineStats } from "@/lib/db/workspace-stats";
@@ -131,12 +132,23 @@ export async function getDashboardOverview(
       url: link.url,
       publicId: link.publicId,
     })),
-    transactions: transactions.map((tx) => ({
-      id: tx._id.toString(),
-      label: tx.label,
-      date: formatDate(tx.occurredAt),
-      amount: `+${formatTokenAmount(tx.amount, tx.symbol)}`,
-    })),
+    transactions: transactions.map((tx) => {
+      const isOutgoing = tx.type === "payment_sent";
+      const explorerUrl =
+        tx.txHash && tx.networkId
+          ? getTxExplorerUrl(tx.networkId, tx.txHash) ?? undefined
+          : undefined;
+
+      return {
+        id: tx._id.toString(),
+        label: tx.label,
+        date: formatDate(tx.occurredAt),
+        amount: `${isOutgoing ? "-" : "+"}${formatTokenAmount(tx.amount, tx.symbol)}`,
+        direction: isOutgoing ? ("out" as const) : ("in" as const),
+        txHash: tx.txHash,
+        explorerUrl,
+      };
+    }),
     activities: activityFeed.items,
     balances: balances.map((balance) => ({
       id: balance.tokenId,

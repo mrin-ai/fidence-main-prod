@@ -1,4 +1,4 @@
-import type { ObjectId } from "mongodb";
+import { ObjectId } from "mongodb";
 
 import { cacheDel, cacheLlen, cacheLpop, cacheRpush } from "@/lib/cache/redis";
 import { getDb } from "@/lib/db/client";
@@ -8,8 +8,48 @@ import type { ActivityEventDoc } from "@/lib/db/types";
 
 const ACTIVITY_QUEUE_KEY = "activity:queue";
 
+type QueuedActivityPayload = {
+  workspaceId: string;
+  type: ActivityLogInput["type"];
+  summary: string;
+  status?: ActivityLogInput["status"];
+  occurredAt?: string;
+};
+
+function serializeActivityInput(input: ActivityLogInput): string {
+  const payload: QueuedActivityPayload = {
+    workspaceId: input.workspaceId.toString(),
+    type: input.type,
+    summary: input.summary,
+    status: input.status,
+    occurredAt: input.occurredAt?.toISOString(),
+  };
+  return JSON.stringify(payload);
+}
+
+function parseQueuedActivity(raw: unknown): ActivityLogInput | null {
+  try {
+    const payload = (
+      typeof raw === "string" ? JSON.parse(raw) : raw
+    ) as QueuedActivityPayload;
+    if (!payload.workspaceId || !payload.type || !payload.summary) {
+      return null;
+    }
+
+    return {
+      workspaceId: new ObjectId(payload.workspaceId),
+      type: payload.type,
+      summary: payload.summary,
+      status: payload.status,
+      occurredAt: payload.occurredAt ? new Date(payload.occurredAt) : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function enqueueActivity(input: ActivityLogInput) {
-  await cacheRpush(ACTIVITY_QUEUE_KEY, JSON.stringify(input));
+  await cacheRpush(ACTIVITY_QUEUE_KEY, serializeActivityInput(input));
 }
 
 export async function drainActivityQueue(batchSize = 50) {
@@ -23,10 +63,9 @@ export async function drainActivityQueue(batchSize = 50) {
   for (let index = 0; index < batchSize; index += 1) {
     const raw = await cacheLpop(ACTIVITY_QUEUE_KEY);
     if (!raw) break;
-    try {
-      payloads.push(JSON.parse(raw) as ActivityLogInput);
-    } catch {
-      continue;
+    const parsed = parseQueuedActivity(raw);
+    if (parsed) {
+      payloads.push(parsed);
     }
   }
 

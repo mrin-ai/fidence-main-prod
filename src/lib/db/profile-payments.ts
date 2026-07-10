@@ -4,6 +4,7 @@ import { getTokenById } from "@/lib/create-payment-link-data";
 import { getDb } from "@/lib/db/client";
 import { COLLECTIONS } from "@/lib/db/collections";
 import { logProfilePaymentReceivedActivity } from "@/lib/db/activity";
+import { recordPaymentSentForPayer } from "@/lib/db/payment-sent";
 import { getSettlementVerifier } from "@/lib/payment/settlement";
 import { incrementDailyStat } from "@/lib/db/workspace-stats";
 import type { TransactionDoc } from "@/lib/db/types";
@@ -87,6 +88,16 @@ export async function recordProfilePayment(input: {
     input.amount,
     now,
   );
+
+  await recordPaymentSentForPayer({
+    payerAddress: input.payerAddress,
+    merchantWorkspaceId: input.workspaceId,
+    amount: input.amount,
+    tokenId: input.tokenId,
+    networkId: input.networkId,
+    txHash: normalizedTxHash,
+    merchantLabel: `@${input.username}`,
+  });
 
   return {
     ok: true as const,

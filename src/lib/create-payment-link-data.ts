@@ -1,3 +1,5 @@
+import { testnetsEnabled } from "@/lib/testnets"
+
 export type PaymentToken = {
   id: string
   label: string
@@ -8,6 +10,7 @@ export type PaymentNetwork = {
   id: string
   label: string
   tokenIds: string[]
+  testnet?: boolean
 }
 
 export const paymentTokens: PaymentToken[] = [
@@ -17,13 +20,24 @@ export const paymentTokens: PaymentToken[] = [
   { id: "sol", label: "Solana", symbol: "SOL" },
 ]
 
-export const paymentNetworks: PaymentNetwork[] = [
+const productionPaymentNetworks: PaymentNetwork[] = [
   { id: "base", label: "Base", tokenIds: ["usdc", "usdt", "eth"] },
   { id: "ethereum", label: "Ethereum", tokenIds: ["usdc", "usdt", "eth"] },
   { id: "arbitrum", label: "Arbitrum", tokenIds: ["usdc", "usdt", "eth"] },
   { id: "polygon", label: "Polygon", tokenIds: ["usdc", "usdt"] },
   { id: "solana", label: "Solana", tokenIds: ["usdc", "usdt", "sol"] },
 ]
+
+const sepoliaPaymentNetwork: PaymentNetwork = {
+  id: "sepolia",
+  label: "Sepolia (testnet)",
+  tokenIds: ["usdc", "eth"],
+  testnet: true,
+}
+
+export const paymentNetworks: PaymentNetwork[] = testnetsEnabled()
+  ? [...productionPaymentNetworks, sepoliaPaymentNetwork]
+  : productionPaymentNetworks
 
 export function getTokenById(id: string) {
   return paymentTokens.find((token) => token.id === id)

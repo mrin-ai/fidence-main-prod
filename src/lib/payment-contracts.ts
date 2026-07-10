@@ -1,4 +1,4 @@
-import { arbitrum, base, mainnet, polygon } from "wagmi/chains";
+import { arbitrum, base, mainnet, polygon, sepolia } from "wagmi/chains";
 
 export const erc20TransferAbi = [
   {
@@ -59,6 +59,13 @@ const tokenContracts: Record<string, Record<string, TokenContract>> = {
       decimals: 6,
     },
   },
+  sepolia: {
+    usdc: {
+      // Test USDC on Sepolia (local dev token)
+      address: "0x3402d41AA8e34e0DF605c12109de2f8F4FF33A87",
+      decimals: 6,
+    },
+  },
 };
 
 const networkChainIds: Record<string, number> = {
@@ -66,6 +73,7 @@ const networkChainIds: Record<string, number> = {
   base: base.id,
   arbitrum: arbitrum.id,
   polygon: polygon.id,
+  sepolia: sepolia.id,
 };
 
 export function getChainIdForNetwork(networkId: string) {

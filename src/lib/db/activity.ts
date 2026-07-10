@@ -2,6 +2,7 @@ import type { ObjectId } from "mongodb";
 
 import type { ActivityLogInput } from "@/lib/db/activity-types";
 import {
+  drainActivityQueue,
   enqueueActivity,
   writeActivityDirect,
 } from "@/lib/db/activity-queue";
@@ -9,6 +10,7 @@ import {
 export async function logActivity(input: ActivityLogInput) {
   try {
     await enqueueActivity(input);
+    await drainActivityQueue(50);
     return null;
   } catch {
     return writeActivityDirect(input);
@@ -84,6 +86,20 @@ export async function logPaymentReceivedActivity(input: {
     workspaceId: input.workspaceId,
     type: "payment_received",
     summary: `Payment received · ${input.amount} ${input.tokenSymbol}`,
+    status: "settled",
+  });
+}
+
+export async function logPaymentSentActivity(input: {
+  workspaceId: ObjectId;
+  amount: number;
+  tokenSymbol: string;
+  merchantLabel: string;
+}) {
+  return logActivity({
+    workspaceId: input.workspaceId,
+    type: "payment_sent",
+    summary: `Payment sent · ${input.amount} ${input.tokenSymbol} · ${input.merchantLabel}`,
     status: "settled",
   });
 }

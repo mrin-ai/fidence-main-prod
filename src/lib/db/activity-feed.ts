@@ -1,5 +1,6 @@
 import type { ObjectId } from "mongodb";
 
+import { drainActivityQueue } from "@/lib/db/activity-queue";
 import { cacheGet, cacheSet } from "@/lib/cache/redis";
 import { formatActivityMeta } from "@/lib/format-date";
 import { getDb } from "@/lib/db/client";
@@ -52,6 +53,8 @@ export async function listWorkspaceActivities(
   workspaceId: ObjectId,
   options: { page?: number; limit?: number } = {},
 ) {
+  await drainActivityQueue(50);
+
   const page = Math.max(1, options.page ?? 1);
   const limit = Math.min(
     100,

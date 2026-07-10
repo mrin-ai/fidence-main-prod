@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  ArrowUpRightIcon,
   BanIcon,
   CircleCheckIcon,
   CreditCardIcon,
@@ -60,6 +61,13 @@ export function getActivityVisual(type: string, status?: ActivityStatus) {
     return {
       icon: <CircleCheckIcon className="size-3.5" />,
       iconClassName: "bg-green-500/10 text-green-600",
+    };
+  }
+
+  if (type === "payment_sent") {
+    return {
+      icon: <ArrowUpRightIcon className="size-3.5" />,
+      iconClassName: "bg-amber-500/10 text-amber-700",
     };
   }
 

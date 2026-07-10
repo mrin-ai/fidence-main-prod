@@ -20,6 +20,7 @@ export type WalletNetworkId =
   | "ethereum"
   | "arbitrum"
   | "polygon"
+  | "sepolia"
   | "solana";
 
 export type VerifiedWallet = {
@@ -104,7 +105,7 @@ export type TransactionDoc = {
   _id: ObjectId;
   workspaceId: ObjectId;
   paymentLinkId?: ObjectId;
-  type: "payment_received" | "profile_payment" | "payout" | "refund";
+  type: "payment_received" | "payment_sent" | "profile_payment" | "payout" | "refund";
   label: string;
   amount: number;
   symbol: string;
@@ -239,6 +240,9 @@ export type DashboardOverview = {
     label: string;
     date: string;
     amount: string;
+    direction: "in" | "out";
+    txHash?: string;
+    explorerUrl?: string;
   }>;
   activities: Array<{
     id: string;

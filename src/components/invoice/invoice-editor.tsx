@@ -7,7 +7,6 @@ import { toast } from "sonner";
 import { InvoiceFormPanel, useInvoiceForm } from "@/components/invoice/invoice-form";
 import { InvoicePreviewPanel } from "@/components/invoice/invoice-preview";
 import { InvoiceToolbar } from "@/components/invoice/invoice-toolbar";
-import type { InvoiceViewTab } from "@/components/invoice/invoice-tab-switch";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -32,7 +31,6 @@ export function InvoiceEditor({
 }) {
   const form = useInvoiceForm(defaultValues);
   const isMobile = useIsMobile();
-  const [viewTab, setViewTab] = React.useState<InvoiceViewTab>("both");
   const [paymentLink, setPaymentLink] = React.useState<
     InvoicePaymentLinkInfo | null | undefined
   >(initialPaymentLink);
@@ -102,22 +100,10 @@ export function InvoiceEditor({
     const previewPanel = previewPanelRef.current;
     if (!formPanel || !previewPanel) return;
 
-    if (isMobile && viewTab === "both") {
-      setViewTab("form");
-      return;
-    }
-
-    if (viewTab === "form") {
+    if (isMobile) {
       formPanel.expand();
       previewPanel.collapse();
       formPanel.resize("100%");
-      return;
-    }
-
-    if (viewTab === "preview") {
-      previewPanel.expand();
-      formPanel.collapse();
-      previewPanel.resize("100%");
       return;
     }
 
@@ -125,14 +111,12 @@ export function InvoiceEditor({
     previewPanel.expand();
     formPanel.resize("50%");
     previewPanel.resize("50%");
-  }, [viewTab, isMobile, formPanelRef, previewPanelRef]);
+  }, [isMobile, formPanelRef, previewPanelRef]);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
       <InvoiceToolbar
         form={form}
-        viewTab={viewTab}
-        onViewTabChange={setViewTab}
         invoiceId={invoiceId}
         invoiceStatus={invoiceStatus}
         paymentLink={paymentLink}
@@ -167,10 +151,7 @@ export function InvoiceEditor({
           panelRef={previewPanelRef}
           defaultSize="50%"
           collapsible
-          className={cn(
-            "min-h-0 flex flex-col",
-            viewTab === "both" && isMobile && "hidden",
-          )}
+          className={cn("min-h-0 flex flex-col", isMobile && "hidden")}
         >
           <InvoicePreviewPanel form={form} paymentLink={paymentLink} />
         </ResizablePanel>

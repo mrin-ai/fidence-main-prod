@@ -363,10 +363,7 @@ export function DefaultInvoicePdf({
             ))}
           </View>
 
-          {(data.metadata.notes ||
-            data.metadata.terms ||
-            data.metadata.paymentInformation.length > 0 ||
-            signature) && (
+          {(data.metadata.notes || data.metadata.terms || signature) && (
             <View style={styles.footer}>
               {data.metadata.notes ? (
                 <View>
@@ -378,19 +375,6 @@ export function DefaultInvoicePdf({
                 <View>
                   <Text style={styles.footerTitle}>Terms</Text>
                   <Text style={styles.footerText}>{data.metadata.terms}</Text>
-                </View>
-              ) : null}
-              {data.metadata.paymentInformation.length > 0 ? (
-                <View>
-                  <Text style={styles.footerTitle}>Payment information</Text>
-                  {data.metadata.paymentInformation.map((row) => (
-                    <Text
-                      key={`payment-${row.label}-${row.value}`}
-                      style={styles.footerText}
-                    >
-                      {row.label}: {row.value}
-                    </Text>
-                  ))}
                 </View>
               ) : null}
               {signature ? (

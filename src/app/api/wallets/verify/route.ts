@@ -5,7 +5,7 @@ import {
   parseWalletVerifyFields,
   WALLET_VERIFY_MAX_AGE_MS,
 } from "@/lib/auth-session";
-import { getNetworkById } from "@/lib/create-payment-link-data";
+import { getNetworkById, paymentNetworks } from "@/lib/create-payment-link-data";
 import { logWalletVerifiedActivity } from "@/lib/db/activity";
 import { getSessionFromCookies } from "@/lib/db/auth";
 import {
@@ -18,15 +18,8 @@ import {
   normalizeWalletAddress,
 } from "@/lib/db/wallets";
 import type { WalletNetworkId } from "@/lib/db/types";
-import { isValidSolanaAddress } from "@/lib/wallets/solana-verify";
 
-const WALLET_NETWORK_IDS = new Set([
-  "base",
-  "ethereum",
-  "arbitrum",
-  "polygon",
-  "solana",
-]);
+const WALLET_NETWORK_IDS = new Set(paymentNetworks.map((network) => network.id));
 
 export async function POST(request: Request) {
   try {

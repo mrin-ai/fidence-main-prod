@@ -6,6 +6,7 @@ export const ACTIVITY_EVENT_TYPES = {
   paymentLinkCreated: "payment_link_created",
   invoicePaymentLinkCreated: "invoice_payment_link_created",
   paymentReceived: "payment_received",
+  paymentSent: "payment_sent",
   profilePayment: "profile_payment",
   invoiceCreated: "invoice_created",
   invoiceUpdated: "invoice_updated",
@@ -23,7 +24,8 @@ export type ActivityEventType =
   | "agent_spend"
   | "blocked"
   | "approval"
-  | "wallet_funded";
+  | "wallet_funded"
+  | "payment_sent";
 
 export type ActivityLogInput = {
   workspaceId: import("mongodb").ObjectId;

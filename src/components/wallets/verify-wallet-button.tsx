@@ -126,7 +126,7 @@ export function VerifyWalletButton({
     return (
       <Button
         type="button"
-        className={cn("h-10 w-full rounded-xl", className)}
+        className={cn("h-10 w-full", className)}
         onClick={() => openConnectModal?.()}
         disabled={disabled}
       >
@@ -139,20 +139,20 @@ export function VerifyWalletButton({
   return (
     <Button
       type="button"
-      className={cn("h-10 w-full rounded-xl", className)}
+      className={cn("h-10 w-full", className)}
       disabled={disabled || loading}
       onClick={() => void verifyWallet()}
     >
       {loading ? (
         <>
           <Loader2Icon className="size-4 animate-spin" />
-          {isWrongNetwork ? "Switching network..." : "Verifying..."}
+          {isWrongNetwork ? "Switching…" : "Verifying…"}
         </>
       ) : (
         <>
           <WalletIcon className="size-4" />
           {isWrongNetwork
-            ? `Switch to ${network?.label ?? networkId} & verify`
+            ? `Switch to ${network?.label ?? networkId}`
             : "Sign to verify"}
         </>
       )}

@@ -170,10 +170,17 @@ export async function ensureDbIndexes() {
       { unique: true, sparse: true },
     ),
     db.collection(COLLECTIONS.transactions).createIndex({ workspaceId: 1, occurredAt: -1 }),
-    db.collection(COLLECTIONS.transactions).createIndex(
-      { txHash: 1 },
-      { unique: true, sparse: true },
-    ),
+    (async () => {
+      try {
+        await db.collection(COLLECTIONS.transactions).dropIndex("txHash_1");
+      } catch {
+        // Legacy index may already be removed.
+      }
+      await db.collection(COLLECTIONS.transactions).createIndex(
+        { workspaceId: 1, txHash: 1 },
+        { unique: true, sparse: true },
+      );
+    })(),
     db.collection(COLLECTIONS.activityEvents).createIndex({ workspaceId: 1, occurredAt: -1 }),
     db.collection(COLLECTIONS.activityEvents).createIndex({ occurredAt: 1 }),
     db.collection(COLLECTIONS.activityEventsArchive).createIndex({ workspaceId: 1, occurredAt: -1 }),

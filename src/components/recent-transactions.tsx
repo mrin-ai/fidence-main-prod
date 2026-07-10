@@ -1,12 +1,13 @@
 "use client"
 
+import Link from "next/link"
 import {
   ArrowDownLeftIcon,
   ArrowUpRightIcon,
   ChevronDownIcon,
 } from "lucide-react"
 
-import { Button } from "@/components/ui/button"
+import { buttonVariants } from "@/components/ui/button"
 import {
   Card,
   CardAction,
@@ -35,6 +36,9 @@ export function RecentTransactions({
     label: string
     date: string
     amount: string
+    direction: "in" | "out"
+    txHash?: string
+    explorerUrl?: string
   }>
   className?: string
 }) {
@@ -47,13 +51,13 @@ export function RecentTransactions({
           Recent Transactions
         </CardTitle>
         <CardAction>
-          <Button
-            variant="link"
-            className="h-auto gap-1 px-0 text-xs font-medium text-muted-foreground"
+          <Link
+            href="/transactions"
+            className="inline-flex h-auto items-center gap-1 px-0 text-xs font-medium text-muted-foreground hover:text-foreground"
           >
-            View All
+            View all
             <ArrowUpRightIcon className="size-3" />
-          </Button>
+          </Link>
         </CardAction>
       </CardHeader>
       <CardContent className="relative pt-0">
@@ -70,36 +74,60 @@ export function RecentTransactions({
           {transactions.length === 0 ? (
             <EmptyStateLottie
               title="No transactions yet"
-              description="Payments you receive will appear here."
+              description="Payments you send or receive will appear here."
             />
           ) : (
-            transactions.map((tx) => (
-            <div
-              key={tx.id}
-              className="flex items-center gap-3"
-            >
-              <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600">
-                <ArrowDownLeftIcon className="size-3.5" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium leading-snug">{tx.label}</p>
-                <p className="text-xs text-muted-foreground">{tx.date}</p>
-              </div>
-              <div className="shrink-0 text-right">
-                <p className="text-sm font-semibold tabular-nums text-emerald-600">
-                  {tx.amount}
-                </p>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                className="shrink-0 text-muted-foreground"
-                aria-label="Open transaction"
-              >
-                <ArrowUpRightIcon className="size-3.5" />
-              </Button>
-            </div>
-            ))
+            transactions.map((tx) => {
+              const isOutgoing = tx.direction === "out"
+
+              return (
+                <div key={tx.id} className="flex items-center gap-3">
+                  <div
+                    className={cn(
+                      "flex size-8 shrink-0 items-center justify-center rounded-lg",
+                      isOutgoing
+                        ? "bg-amber-500/10 text-amber-700"
+                        : "bg-emerald-500/10 text-emerald-600",
+                    )}
+                  >
+                    {isOutgoing ? (
+                      <ArrowUpRightIcon className="size-3.5" />
+                    ) : (
+                      <ArrowDownLeftIcon className="size-3.5" />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium leading-snug">{tx.label}</p>
+                    <p className="text-xs text-muted-foreground">{tx.date}</p>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <p
+                      className={cn(
+                        "text-sm font-semibold tabular-nums",
+                        isOutgoing ? "text-amber-700" : "text-emerald-600",
+                      )}
+                    >
+                      {tx.amount}
+                    </p>
+                  </div>
+                  {tx.explorerUrl ? (
+                    <a
+                      href={tx.explorerUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      aria-label="View transaction on block explorer"
+                      className={buttonVariants({
+                        variant: "ghost",
+                        size: "icon-xs",
+                        className: "shrink-0 text-muted-foreground",
+                      })}
+                    >
+                      <ArrowUpRightIcon className="size-3.5" />
+                    </a>
+                  ) : null}
+                </div>
+              )
+            })
           )}
         </div>
         {transactions.length > 0 ? (
