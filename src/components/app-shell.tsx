@@ -2,7 +2,7 @@ import type { ReactNode } from "react"
 
 import { AppSidebar } from "@/components/app-sidebar"
 import { CreatePaymentLinkProvider } from "@/components/create-payment-link-sheet"
-import { SiteHeader } from "@/components/site-header"
+import { ShellHeader } from "@/components/shell-header"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 
 export function AppShell({
@@ -12,7 +12,7 @@ export function AppShell({
   hideSiteHeader = false,
   children,
 }: {
-  title: string
+  title?: string
   user: {
     name: string
     role: string
@@ -38,7 +38,7 @@ export function AppShell({
       >
         <AppSidebar variant="inset" user={user} workspace={workspace} />
         <SidebarInset className="bg-muted/20">
-          {!hideSiteHeader && <SiteHeader title={title} />}
+          {!hideSiteHeader && <ShellHeader title={title} />}
           <div className="flex flex-1 flex-col">{children}</div>
         </SidebarInset>
       </SidebarProvider>
