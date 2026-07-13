@@ -126,12 +126,16 @@ export async function hasCachedSession(token: string) {
 export async function setCachedSession(token: string, context: SessionContext) {
   if (!isSessionCacheEnabled()) return;
 
-  const ttl = ttlSecondsUntil(context.session.expiresAt);
-  await cacheSet(
-    sessionKey(token),
-    JSON.stringify(serializeSessionContext(context)),
-    ttl,
-  );
+  try {
+    const ttl = ttlSecondsUntil(context.session.expiresAt);
+    await cacheSet(
+      sessionKey(token),
+      JSON.stringify(serializeSessionContext(context)),
+      ttl,
+    );
+  } catch (error) {
+    console.error("Session cache write failed:", error);
+  }
 }
 
 export async function invalidateSession(token: string) {

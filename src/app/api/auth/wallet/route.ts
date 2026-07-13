@@ -47,7 +47,7 @@ export async function POST(request: Request) {
       address: address as `0x${string}`,
       message,
       signature: signature as `0x${string}`,
-    });
+    }).catch(() => false);
 
     if (!valid) {
       return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
@@ -70,15 +70,20 @@ export async function POST(request: Request) {
       "wallet",
       address,
     );
-    await logLoginActivity(workspace._id, "wallet");
-    await logSecurityEvent({
-      workspaceId: workspace._id,
-      actorType: "user",
-      actorId: user._id.toString(),
-      action: "human_login_wallet",
-      resourceType: "session",
-      security: extractSecurityContext(request),
-    });
+
+    try {
+      await logLoginActivity(workspace._id, "wallet");
+      await logSecurityEvent({
+        workspaceId: workspace._id,
+        actorType: "user",
+        actorId: user._id.toString(),
+        action: "human_login_wallet",
+        resourceType: "session",
+        security: extractSecurityContext(request),
+      });
+    } catch (logError) {
+      console.error("Wallet auth audit logging failed:", logError);
+    }
 
     const cookieStore = await cookies();
     cookieStore.set(sessionCookieOptions(token));
@@ -96,6 +101,13 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error("Wallet auth failed:", error);
-    return NextResponse.json({ error: "Authentication failed" }, { status: 500 });
+    const message =
+      error instanceof Error &&
+      /MongoServerSelectionError|ECONNREFUSED|ENOTFOUND|timed out/i.test(
+        error.message,
+      )
+        ? "Database connection failed. Check server configuration."
+        : "Authentication failed";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
