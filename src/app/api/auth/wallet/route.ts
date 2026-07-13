@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import { verifyMessage } from "viem";
 import { logLoginActivity } from "@/lib/db/activity";
 import { logSecurityEvent } from "@/lib/db/security-audit";
@@ -85,10 +84,7 @@ export async function POST(request: Request) {
       console.error("Wallet auth audit logging failed:", logError);
     }
 
-    const cookieStore = await cookies();
-    cookieStore.set(sessionCookieOptions(token));
-
-    return NextResponse.json({
+    const response = NextResponse.json({
       user: {
         name: user.name,
         role: user.role,
@@ -99,6 +95,8 @@ export async function POST(request: Request) {
         slug: workspace.slug,
       },
     });
+    response.cookies.set(sessionCookieOptions(token));
+    return response;
   } catch (error) {
     console.error("Wallet auth failed:", error);
     const message =

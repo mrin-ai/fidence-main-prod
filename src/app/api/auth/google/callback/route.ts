@@ -107,7 +107,9 @@ export async function GET(request: Request) {
     cookieStore.set(sessionCookieOptions(token));
     clearOAuthCookies(cookieStore);
 
-    return NextResponse.redirect(new URL(redirectPath, request.url));
+    const response = NextResponse.redirect(new URL(redirectPath, request.url));
+    response.cookies.set(sessionCookieOptions(token));
+    return response;
   } catch (authError) {
     console.error("Google auth callback failed:", authError);
     clearOAuthCookies(cookieStore);

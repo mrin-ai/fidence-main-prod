@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { useAccount, useSignMessage } from "wagmi";
 import { Loader2 } from "lucide-react";
@@ -10,7 +10,6 @@ import { buildSignInMessage } from "@/lib/auth-session";
 import { getClientReferralCode } from "@/components/referrals/referral-capture";
 
 export function Web3WalletButton() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const redirect = searchParams.get("redirect") ?? "/dashboard";
   const referralCode = getClientReferralCode(searchParams);
@@ -50,8 +49,8 @@ export function Web3WalletButton() {
           throw new Error(data?.error ?? "Wallet sign-in failed");
         }
 
-        router.push(redirect);
-        router.refresh();
+        window.location.assign(redirect);
+        return;
       } catch (walletError) {
         pendingConnect.current = false;
         setError(
@@ -63,7 +62,7 @@ export function Web3WalletButton() {
         setLoading(false);
       }
     },
-    [redirect, referralCode, router, signMessageAsync],
+    [redirect, referralCode, signMessageAsync],
   );
 
   useEffect(() => {
