@@ -220,3 +220,44 @@ export async function logProfileUpdatedActivity(workspaceId: ObjectId) {
     summary: "Profile details updated",
   });
 }
+
+export async function logAgentLinkCreatedActivity(input: {
+  workspaceId: ObjectId;
+  agentPublicId: string;
+  amount: number;
+  tokenSymbol: string;
+}) {
+  return logActivity({
+    workspaceId: input.workspaceId,
+    type: "agent_link_created",
+    summary: `Agent link created · ${input.agentPublicId} · ${input.amount} ${input.tokenSymbol}`,
+  });
+}
+
+export async function logAgentPaymentSentActivity(input: {
+  workspaceId: ObjectId;
+  agentPublicId: string;
+  amount: number;
+  tokenSymbol: string;
+}) {
+  return logActivity({
+    workspaceId: input.workspaceId,
+    type: "agent_payment_sent",
+    summary: `Agent payment sent · ${input.agentPublicId} · ${input.amount} ${input.tokenSymbol}`,
+    status: "settled",
+  });
+}
+
+export async function logAgentPaymentReceivedActivity(input: {
+  workspaceId: ObjectId;
+  agentPublicId: string;
+  amount: number;
+  tokenSymbol: string;
+}) {
+  return logActivity({
+    workspaceId: input.workspaceId,
+    type: "agent_payment_received",
+    summary: `Agent payment received · ${input.agentPublicId} · ${input.amount} ${input.tokenSymbol}`,
+    status: "settled",
+  });
+}

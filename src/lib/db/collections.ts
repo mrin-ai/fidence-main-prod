@@ -10,5 +10,8 @@ export const COLLECTIONS = {
   activityEventsArchive: "activity_events_archive",
   invoices: "invoices",
   workspaceDailyStats: "workspace_daily_stats",
+  apiKeys: "api_keys",
+  agents: "agents",
+  securityAudit: "security_audit",
   dbMeta: "db_meta",
 } as const;

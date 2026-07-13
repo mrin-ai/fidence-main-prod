@@ -4,6 +4,9 @@ import { getSessionFromCookies } from "@/lib/db/auth";
 import { createPaymentLink, listPaymentLinksPaginated } from "@/lib/db/payment-links";
 import { requireRecipientAddress } from "@/lib/db/wallets";
 import type { PaymentLinkFilterStatus, PaymentLinkSort } from "@/lib/payment-link-status";
+import type { CommerceSource } from "@/lib/db/merchant-types";
+import { extractSecurityContext } from "@/lib/request-security";
+import { logSecurityEvent } from "@/lib/db/security-audit";
 
 export async function GET(request: Request) {
   const session = await getSessionFromCookies();
@@ -16,6 +19,7 @@ export async function GET(request: Request) {
   const status = (searchParams.get("status") ?? "all") as PaymentLinkFilterStatus;
   const sort = (searchParams.get("sort") ?? "newest") as PaymentLinkSort;
   const query = searchParams.get("q")?.trim() ?? "";
+  const source = (searchParams.get("source") ?? "human") as CommerceSource;
   const page = Number(searchParams.get("page") ?? "1");
   const limit = Number(searchParams.get("limit") ?? "20");
 
@@ -25,6 +29,7 @@ export async function GET(request: Request) {
     status,
     sort,
     query,
+    source,
   });
 
   return NextResponse.json({
@@ -86,6 +91,17 @@ export async function POST(request: Request) {
     tokenId,
     networkId,
     expiresAt,
+    source: "human",
+  });
+
+  await logSecurityEvent({
+    workspaceId: session.workspace._id,
+    actorType: "user",
+    actorId: session.user._id.toString(),
+    action: "human_payment_link_created",
+    resourceType: "payment_link",
+    resourceId: link.id,
+    security: extractSecurityContext(request),
   });
 
   return NextResponse.json(link);

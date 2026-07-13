@@ -2,12 +2,14 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { verifyMessage } from "viem";
 import { logLoginActivity } from "@/lib/db/activity";
+import { logSecurityEvent } from "@/lib/db/security-audit";
 import {
   createSessionForUser,
   sessionCookieOptions,
   upsertWalletUser,
 } from "@/lib/db/auth";
 import { parseReferralCookie } from "@/lib/referrals";
+import { extractSecurityContext } from "@/lib/request-security";
 import {
   checkRateLimit,
   getClientIp,
@@ -69,6 +71,14 @@ export async function POST(request: Request) {
       address,
     );
     await logLoginActivity(workspace._id, "wallet");
+    await logSecurityEvent({
+      workspaceId: workspace._id,
+      actorType: "user",
+      actorId: user._id.toString(),
+      action: "human_login_wallet",
+      resourceType: "session",
+      security: extractSecurityContext(request),
+    });
 
     const cookieStore = await cookies();
     cookieStore.set(sessionCookieOptions(token));

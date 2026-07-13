@@ -4,7 +4,13 @@ import {
   getPaymentLinkByUsernameAndPublicId,
   markPaymentLinkPaid,
 } from "@/lib/db/payment-links";
+import { getWorkspaceForUser } from "@/lib/db/auth";
+import { getDb } from "@/lib/db/client";
+import { COLLECTIONS } from "@/lib/db/collections";
+import type { UserDoc } from "@/lib/db/types";
 import { isReservedPaymentPathSegment } from "@/lib/payment-link-url";
+import { logWorkspaceSecurityEvent } from "@/lib/security-logging";
+import { extractSecurityContext } from "@/lib/request-security";
 
 type RouteContext = {
   params: Promise<{ username: string; linkId: string }>;
@@ -53,6 +59,7 @@ export async function POST(request: Request, context: RouteContext) {
     publicId: linkId,
     payerAddress,
     txHash,
+    paidVia: "human",
   });
 
   if (!result.ok) {
@@ -64,6 +71,24 @@ export async function POST(request: Request, context: RouteContext) {
           : 400;
 
     return NextResponse.json({ error: result.error }, { status });
+  }
+
+  const db = await getDb();
+  const merchant = await db.collection<UserDoc>(COLLECTIONS.users).findOne({
+    username: username.trim().toLowerCase(),
+  });
+  const workspace = merchant ? await getWorkspaceForUser(merchant._id) : null;
+
+  if (workspace) {
+    await logWorkspaceSecurityEvent({
+      workspaceId: workspace._id,
+      actorType: "user",
+      actorId: payerAddress,
+      action: "human_payment_link_paid",
+      resourceType: "payment_link",
+      resourceId: linkId,
+      security: extractSecurityContext(request),
+    });
   }
 
   return NextResponse.json(result.link);

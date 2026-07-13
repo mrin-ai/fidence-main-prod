@@ -17,6 +17,13 @@ export const ACTIVITY_EVENT_TYPES = {
   walletRemoved: "wallet_removed",
   usernameUpdated: "username_updated",
   profileUpdated: "profile_updated",
+  agentRegistered: "agent_registered",
+  agentEnabled: "agent_enabled",
+  agentDisabled: "agent_disabled",
+  agentLinkCreated: "agent_link_created",
+  agentPaymentSent: "agent_payment_sent",
+  agentPaymentReceived: "agent_payment_received",
+  apiKeyRotated: "api_key_rotated",
 } as const;
 
 export type ActivityEventType =

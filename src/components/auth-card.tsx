@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Loader2, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { Web3WalletButton } from "@/components/web3-wallet-button";
@@ -41,33 +41,20 @@ export default function AuthCard({
   description,
   mode = "sign-in",
 }: AuthCardProps) {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const redirect = searchParams.get("redirect") ?? "/dashboard";
   const referralCode = getClientReferralCode(searchParams);
 
   const [googleLoading, setGoogleLoading] = useState(false);
 
-  const signInWithGoogle = async () => {
+  const signInWithGoogle = () => {
     setGoogleLoading(true);
-    try {
-      const response = await fetch("/api/auth/google", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...(referralCode ? { referralCode } : {}),
-        }),
-      });
-      if (!response.ok) {
-        throw new Error("Google sign-in failed");
-      }
-      router.push(redirect);
-      router.refresh();
-    } catch {
-      // keep user on page
-    } finally {
-      setGoogleLoading(false);
+    const params = new URLSearchParams();
+    if (redirect !== "/dashboard") {
+      params.set("redirect", redirect);
     }
+    const query = params.toString();
+    window.location.href = `/api/auth/google${query ? `?${query}` : ""}`;
   };
 
   const redirectQuery = new URLSearchParams();

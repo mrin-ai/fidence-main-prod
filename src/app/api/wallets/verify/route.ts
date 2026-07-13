@@ -8,6 +8,8 @@ import {
 import { getWalletNetworkById, isSupportedWalletNetworkId } from "@/lib/wallet-networks";
 import { logWalletVerifiedActivity } from "@/lib/db/activity";
 import { getSessionFromCookies } from "@/lib/db/auth";
+import { logWorkspaceSecurityEvent } from "@/lib/security-logging";
+import { extractSecurityContext } from "@/lib/request-security";
 import {
   checkRateLimit,
   rateLimitResponse,
@@ -151,6 +153,16 @@ export async function POST(request: Request) {
       workspaceId: session.workspace._id,
       networkLabel: network?.label ?? typedNetworkId,
       address: normalizedAddress,
+    });
+
+    await logWorkspaceSecurityEvent({
+      workspaceId: session.workspace._id,
+      actorType: "user",
+      actorId: session.user._id.toString(),
+      action: "human_wallet_verified",
+      resourceType: "wallet",
+      resourceId: result.wallet.id,
+      security: extractSecurityContext(request),
     });
 
     return NextResponse.json({

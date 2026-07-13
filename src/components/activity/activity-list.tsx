@@ -3,6 +3,7 @@
 import {
   ArrowUpRightIcon,
   BanIcon,
+  BotIcon,
   CircleCheckIcon,
   CreditCardIcon,
   FileTextIcon,
@@ -26,6 +27,7 @@ export type ActivityItem = {
   meta: string;
   status?: ActivityStatus;
   type: string;
+  occurredAt?: string;
 };
 
 export function getActivityVisual(type: string, status?: ActivityStatus) {
@@ -68,6 +70,18 @@ export function getActivityVisual(type: string, status?: ActivityStatus) {
     return {
       icon: <ArrowUpRightIcon className="size-3.5" />,
       iconClassName: "bg-amber-500/10 text-amber-700",
+    };
+  }
+
+  if (
+    type === "agent_registered" ||
+    type === "agent_link_created" ||
+    type === "agent_payment_sent" ||
+    type === "agent_payment_received"
+  ) {
+    return {
+      icon: <BotIcon className="size-3.5" />,
+      iconClassName: "bg-violet-500/10 text-violet-700",
     };
   }
 

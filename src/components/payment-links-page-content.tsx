@@ -33,6 +33,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CommerceSourceToggle } from "@/components/merchant/commerce-source-toggle";
+import type { CommerceSource } from "@/lib/db/merchant-types";
 import {
   Pagination,
   PaginationContent,
@@ -86,6 +88,7 @@ export function PaymentLinksPageContent({
 }) {
   const { openCreatePaymentLink } = useCreatePaymentLink();
   const [links, setLinks] = React.useState(initialLinks);
+  const [sourceMode, setSourceMode] = React.useState<CommerceSource>("human");
   const [statusFilter, setStatusFilter] =
     React.useState<PaymentLinkFilterStatus>("all");
   const [sort, setSort] = React.useState<PaymentLinkSort>("newest");
@@ -95,14 +98,15 @@ export function PaymentLinksPageContent({
 
   React.useEffect(() => {
     setPage(1);
-  }, [statusFilter, sort, search]);
+  }, [statusFilter, sort, search, sourceMode]);
 
   React.useEffect(() => {
-    setLinks(initialLinks);
-  }, [initialLinks]);
-
-  React.useEffect(() => {
-    if (statusFilter === "all" && sort === "newest" && !search.trim()) {
+    if (
+      sourceMode === "human" &&
+      statusFilter === "all" &&
+      sort === "newest" &&
+      !search.trim()
+    ) {
       setLinks(initialLinks);
       return;
     }
@@ -114,6 +118,7 @@ export function PaymentLinksPageContent({
         const params = new URLSearchParams({
           status: statusFilter,
           sort,
+          source: sourceMode,
         });
         if (search.trim()) {
           params.set("q", search.trim());
@@ -136,7 +141,7 @@ export function PaymentLinksPageContent({
       controller.abort();
       window.clearTimeout(timer);
     };
-  }, [statusFilter, sort, search, initialLinks]);
+  }, [statusFilter, sort, search, sourceMode, initialLinks]);
 
   async function handleCopy(url: string) {
     await navigator.clipboard.writeText(url);
@@ -167,13 +172,23 @@ export function PaymentLinksPageContent({
             <div>
               <CardTitle className="text-base font-medium">Payment links</CardTitle>
               <p className="text-sm text-muted-foreground">
-                Create, share, and track crypto payment links for your workspace.
+                {sourceMode === "agent"
+                  ? "Payment links created by registered agents through your API."
+                  : "Create, share, and track crypto payment links for your workspace."}
               </p>
             </div>
-            <Button type="button" onClick={openCreatePaymentLink}>
-              <PlusIcon data-icon="inline-start" />
-              New link
-            </Button>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <CommerceSourceToggle
+                value={sourceMode}
+                onChange={setSourceMode}
+              />
+              {sourceMode === "human" ? (
+                <Button type="button" onClick={openCreatePaymentLink}>
+                  <PlusIcon data-icon="inline-start" />
+                  New link
+                </Button>
+              ) : null}
+            </div>
           </div>
 
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -241,7 +256,7 @@ export function PaymentLinksPageContent({
                     : "Create your first payment link to start collecting."}
                 </p>
               </div>
-              {!search.trim() && statusFilter === "all" ? (
+              {!search.trim() && statusFilter === "all" && sourceMode === "human" ? (
                 <Button type="button" onClick={openCreatePaymentLink}>
                   Create link
                 </Button>
@@ -253,6 +268,9 @@ export function PaymentLinksPageContent({
                 <TableHeader>
                   <TableRow>
                     <TableHead>Amount</TableHead>
+                    {sourceMode === "agent" ? (
+                      <TableHead>Agent</TableHead>
+                    ) : null}
                     <TableHead>Status</TableHead>
                     <TableHead>Network</TableHead>
                     <TableHead>Link</TableHead>
@@ -267,6 +285,11 @@ export function PaymentLinksPageContent({
                       <TableCell className="font-mono text-sm font-medium tabular-nums">
                         {link.amountLabel}
                       </TableCell>
+                      {sourceMode === "agent" ? (
+                        <TableCell className="font-mono text-xs">
+                          {link.agentPublicId ?? "—"}
+                        </TableCell>
+                      ) : null}
                       <TableCell>
                         <Badge variant={statusVariant[link.status] ?? "outline"}>
                           {statusLabel[link.status]}

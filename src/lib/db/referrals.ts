@@ -3,6 +3,7 @@ import type { ObjectId } from "mongodb";
 
 import { getPaymentBaseUrl } from "@/lib/payment-link-url";
 import { buildReferralSignupUrl, normalizeReferralCode } from "@/lib/referrals";
+import { REFERRAL_CREDITS_PER_SIGNUP } from "@/lib/reward-config";
 import { truncateAddress } from "@/lib/profile-url";
 import { getDb } from "@/lib/db/client";
 import { COLLECTIONS } from "@/lib/db/collections";
@@ -175,13 +176,12 @@ export async function getReferralOverview(userId: ObjectId): Promise<ReferralOve
   ]);
 
   const totalReferrals = referrals.length;
-  const creditsPerReferral = 5;
 
   return {
     referralCode,
     referralUrl: buildReferralSignupUrl(referralCode),
     totalReferrals,
-    lcxRewards: totalReferrals * creditsPerReferral,
+    lcxRewards: totalReferrals * REFERRAL_CREDITS_PER_SIGNUP,
     referredBy: referrer
       ? {
           name: referrer.name,

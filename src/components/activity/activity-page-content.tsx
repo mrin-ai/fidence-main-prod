@@ -26,7 +26,8 @@ export function ActivityPageContent({
       <div className="space-y-1">
         <h2 className="text-lg font-semibold">Activity</h2>
         <p className="text-sm text-muted-foreground">
-          Full audit trail of logins, wallets, invoices, and payments.
+          Full audit trail of logins, wallets, invoices, and payments. New events
+          also appear in the top bar notifications bell.
         </p>
       </div>
 

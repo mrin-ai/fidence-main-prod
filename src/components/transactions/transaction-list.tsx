@@ -12,14 +12,20 @@ import type { TransactionListItem } from "@/lib/db/transactions-feed";
 
 export function TransactionList({
   transactions,
+  source = "human",
 }: {
   transactions: TransactionListItem[];
+  source?: "human" | "agent";
 }) {
   if (transactions.length === 0) {
     return (
       <EmptyStateLottie
         title="No transactions yet"
-        description="Payments you send or receive will show up here."
+        description={
+          source === "agent"
+            ? "Agent payments will show up here."
+            : "Payments you send or receive will show up here."
+        }
       />
     );
   }

@@ -2,12 +2,14 @@ import type { ObjectId } from "mongodb";
 
 import { COLLECTIONS } from "@/lib/db/collections";
 import { getDb } from "@/lib/db/client";
+import { calculatePaymentRewardCredits } from "@/lib/reward-config";
 
 export type WorkspaceDailyStatField =
   | "linksCreated"
   | "linksPaid"
   | "linksPending"
-  | "receivedAmount";
+  | "receivedAmount"
+  | "sentAmount";
 
 export type WorkspaceDailyStatsDoc = {
   _id?: ObjectId;
@@ -17,6 +19,7 @@ export type WorkspaceDailyStatsDoc = {
   linksPaid: number;
   linksPending: number;
   receivedAmount: number;
+  sentAmount: number;
   updatedAt: Date;
 };
 
@@ -87,8 +90,7 @@ export async function getSparklineStats(workspaceId: ObjectId, days = 7) {
   const linksPaid = keys.map((key) => byDate[key]?.linksPaid ?? 0);
   const linksPending = keys.map((key) => byDate[key]?.linksPending ?? 0);
   const receivedAmount = keys.map((key) => byDate[key]?.receivedAmount ?? 0);
-
-  const CREATOR_REWARD_RATE = 0.006;
+  const sentAmount = keys.map((key) => byDate[key]?.sentAmount ?? 0);
 
   return {
     links: buildCumulative(linksCreated),
@@ -96,9 +98,10 @@ export async function getSparklineStats(workspaceId: ObjectId, days = 7) {
     pending: buildCumulative(linksPending),
     received: buildCumulative(receivedAmount),
     rewards: buildCumulative(
-      receivedAmount.map(
-        (amount) => Math.round(amount * CREATOR_REWARD_RATE * 100) / 100,
-      ),
+      receivedAmount.map((amount, index) => {
+        const rewardVolume = amount + (sentAmount[index] ?? 0);
+        return calculatePaymentRewardCredits(rewardVolume);
+      }),
     ),
   };
 }

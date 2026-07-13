@@ -11,13 +11,23 @@ import {
   logInvoicePaidActivity,
   logInvoicePaymentLinkCreatedActivity,
   logInvoicePaymentLinkUpdatedActivity,
+  logAgentLinkCreatedActivity,
   logPaymentLinkCreatedActivity,
   logPaymentReceivedActivity,
 } from "@/lib/db/activity";
 import { getDb } from "@/lib/db/client";
 import { COLLECTIONS } from "@/lib/db/collections";
+import { buildCommerceSourceFilter } from "@/lib/db/commerce-source";
+import type { CommerceSource } from "@/lib/db/merchant-types";
+import { incrementAgentLinkCount } from "@/lib/db/agents";
 import { recordPaymentSentForPayer } from "@/lib/db/payment-sent";
 import { incrementDailyStat } from "@/lib/db/workspace-stats";
+import {
+  incrementAgentPaymentStats,
+} from "@/lib/db/agents";
+import {
+  logAgentPaymentReceivedActivity,
+} from "@/lib/db/activity";
 import type { PaymentLinkDoc, PaymentLinkStatus, UserDoc, InvoiceDoc } from "@/lib/db/types";
 import type { PublicPaymentLink } from "@/lib/payment-link-types";
 import { formatPaymentDateTime } from "@/lib/format-date";
@@ -103,6 +113,9 @@ export async function createPaymentLink(input: {
   expiresAt: Date;
   invoiceId?: ObjectId;
   logActivity?: boolean;
+  source?: CommerceSource;
+  agentId?: ObjectId;
+  agentPublicId?: string;
 }) {
   const db = await getDb();
   const now = new Date();
@@ -116,6 +129,9 @@ export async function createPaymentLink(input: {
     workspaceId: input.workspaceId,
     createdBy: input.userId,
     ...(input.invoiceId ? { invoiceId: input.invoiceId } : {}),
+    ...(input.source ? { source: input.source } : {}),
+    ...(input.agentId ? { agentId: input.agentId } : {}),
+    ...(input.agentPublicId ? { agentPublicId: input.agentPublicId } : {}),
     username: input.username,
     publicId,
     slug: publicId,
@@ -134,11 +150,24 @@ export async function createPaymentLink(input: {
   const token = getTokenById(input.tokenId);
 
   if (input.logActivity !== false && !input.invoiceId) {
-    await logPaymentLinkCreatedActivity({
-      workspaceId: input.workspaceId,
-      amount: input.amount,
-      tokenSymbol: token?.symbol ?? input.tokenId.toUpperCase(),
-    });
+    if (input.source === "agent" && input.agentPublicId) {
+      await logAgentLinkCreatedActivity({
+        workspaceId: input.workspaceId,
+        agentPublicId: input.agentPublicId,
+        amount: input.amount,
+        tokenSymbol: token?.symbol ?? input.tokenId.toUpperCase(),
+      });
+    } else {
+      await logPaymentLinkCreatedActivity({
+        workspaceId: input.workspaceId,
+        amount: input.amount,
+        tokenSymbol: token?.symbol ?? input.tokenId.toUpperCase(),
+      });
+    }
+  }
+
+  if (input.agentId) {
+    await incrementAgentLinkCount(input.agentId);
   }
 
   if (!input.invoiceId) {
@@ -338,6 +367,9 @@ export async function markPaymentLinkPaid(input: {
   payerAddress: string;
   txHash: string;
   logActivity?: boolean;
+  paidVia?: "human" | "agent";
+  payerAgentId?: import("mongodb").ObjectId;
+  payerAgentPublicId?: string;
 }) {
   const db = await getDb();
   const now = new Date();
@@ -392,13 +424,17 @@ export async function markPaymentLinkPaid(input: {
     workspaceId: syncedLink.workspaceId,
     paymentLinkId: syncedLink._id,
     type: "payment_received",
-    label: syncedLink.invoiceId
-      ? `Invoice payment`
-      : `Payment from ${payerAddress.slice(0, 6)}…${payerAddress.slice(-4)}`,
+    label: syncedLink.source === "agent" && syncedLink.agentPublicId
+      ? `Agent payment received · ${syncedLink.agentPublicId}`
+      : syncedLink.invoiceId
+        ? `Invoice payment`
+        : `Payment from ${payerAddress.slice(0, 6)}…${payerAddress.slice(-4)}`,
     amount: syncedLink.amount,
     symbol: token?.symbol?.toLowerCase() ?? syncedLink.tokenId,
     networkId: syncedLink.networkId,
     txHash: normalizedTxHash,
+    ...(syncedLink.source ? { source: syncedLink.source } : {}),
+    ...(syncedLink.agentId ? { agentId: syncedLink.agentId } : {}),
     status: "confirmed",
     occurredAt: now,
     createdAt: now,
@@ -428,11 +464,20 @@ export async function markPaymentLinkPaid(input: {
   }
 
   if (input.logActivity !== false) {
-    await logPaymentReceivedActivity({
-      workspaceId: syncedLink.workspaceId,
-      amount: syncedLink.amount,
-      tokenSymbol: token?.symbol ?? syncedLink.tokenId.toUpperCase(),
-    });
+    if (syncedLink.source === "agent" && syncedLink.agentPublicId) {
+      await logAgentPaymentReceivedActivity({
+        workspaceId: syncedLink.workspaceId,
+        agentPublicId: syncedLink.agentPublicId,
+        amount: syncedLink.amount,
+        tokenSymbol: token?.symbol ?? syncedLink.tokenId.toUpperCase(),
+      });
+    } else {
+      await logPaymentReceivedActivity({
+        workspaceId: syncedLink.workspaceId,
+        amount: syncedLink.amount,
+        tokenSymbol: token?.symbol ?? syncedLink.tokenId.toUpperCase(),
+      });
+    }
 
     if (syncedLink.invoiceId) {
       const invoice = await db.collection<InvoiceDoc>(COLLECTIONS.invoices).findOne({
@@ -447,6 +492,12 @@ export async function markPaymentLinkPaid(input: {
         });
       }
     }
+  }
+
+  if (syncedLink.agentId) {
+    await incrementAgentPaymentStats(syncedLink.agentId, {
+      received: syncedLink.amount,
+    });
   }
 
   const merchant = await db.collection<UserDoc>(COLLECTIONS.users).findOne({
@@ -464,6 +515,14 @@ export async function markPaymentLinkPaid(input: {
       ? `@${merchant.username}`
       : syncedLink.username,
     paymentLinkId: syncedLink._id,
+    payerAttribution:
+      input.paidVia === "agent" && input.payerAgentId
+        ? {
+            source: "agent",
+            agentId: input.payerAgentId,
+            agentPublicId: input.payerAgentPublicId,
+          }
+        : { source: "human" },
   });
 
   const updated = await db.collection<PaymentLinkDoc>(COLLECTIONS.paymentLinks).findOne({
@@ -514,6 +573,7 @@ export async function listPaymentLinksPaginated(
     status?: PaymentLinkStatus | "all" | "failed";
     sort?: "newest" | "oldest";
     query?: string;
+    source?: CommerceSource;
   } = {},
 ) {
   const db = await getDb();
@@ -524,6 +584,7 @@ export async function listPaymentLinksPaginated(
   const filter: Record<string, unknown> = {
     workspaceId,
     invoiceId: { $exists: false },
+    ...buildCommerceSourceFilter(options.source),
   };
 
   if (options.status && options.status !== "all") {
@@ -578,6 +639,8 @@ export type PaymentLinkListItem = {
   networkId: string;
   networkLabel: string;
   status: PaymentLinkStatus;
+  source: CommerceSource;
+  agentPublicId?: string;
   createdAt: string;
   expiresAt: string;
   paidAt?: string;
@@ -604,6 +667,8 @@ export function serializePaymentLinkListItem(
     networkId: link.networkId,
     networkLabel: network?.label ?? link.networkId,
     status,
+    source: link.source ?? "human",
+    agentPublicId: link.agentPublicId,
     createdAt: link.createdAt.toISOString(),
     expiresAt: link.expiresAt.toISOString(),
     paidAt: link.paidAt?.toISOString(),

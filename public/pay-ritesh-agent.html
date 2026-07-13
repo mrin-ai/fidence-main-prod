@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pay Ritesh Agent Link</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 420px;
+        margin: 48px auto;
+        padding: 0 16px;
+        color: #111;
+      }
+      button {
+        width: 100%;
+        padding: 14px;
+        font-size: 16px;
+        border: none;
+        border-radius: 12px;
+        background: #111;
+        color: #fff;
+        cursor: pointer;
+      }
+      button:disabled {
+        opacity: 0.6;
+        cursor: wait;
+      }
+      .muted {
+        color: #666;
+        font-size: 14px;
+      }
+      .log {
+        margin-top: 16px;
+        font-size: 13px;
+        white-space: pre-wrap;
+        background: #f6f6f6;
+        padding: 12px;
+        border-radius: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Pay agent link</h1>
+    <p class="muted">
+      Work profile wallet → Ritesh agent link<br />
+      1 USDC on Sepolia
+    </p>
+    <button id="pay" type="button">Connect wallet &amp; pay</button>
+    <div id="log" class="log">Ready. Click to connect your wallet and pay.</div>
+
+    <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.5/dist/ethers.umd.min.js"></script>
+    <script>
+      const USDC = "0x3402d41AA8e34e0DF605c12109de2f8F4FF33A87";
+      const RECIPIENT = "0xdbe66012ed37caff6663b8db874a810689df6811";
+      const AMOUNT = "1";
+      const USERNAME = "referealtest";
+      const LINK_ID = "16e9de654a5a";
+      const SEPOLIA_CHAIN_ID = "0xaa36a7";
+
+      const logEl = document.getElementById("log");
+      const payBtn = document.getElementById("pay");
+
+      function log(message) {
+        logEl.textContent = message;
+      }
+
+      async function ensureSepolia(provider) {
+        const chainId = await provider.send("eth_chainId", []);
+        if (chainId === SEPOLIA_CHAIN_ID) return;
+        try {
+          await provider.send("wallet_switchEthereumChain", [{ chainId: SEPOLIA_CHAIN_ID }]);
+        } catch (error) {
+          if (error?.code === 4902) {
+            await provider.send("wallet_addEthereumChain", [{
+              chainId: SEPOLIA_CHAIN_ID,
+              chainName: "Sepolia",
+              nativeCurrency: { name: "Sepolia ETH", symbol: "ETH", decimals: 18 },
+              rpcUrls: ["https://rpc.sepolia.org"],
+            }]);
+          } else {
+            throw error;
+          }
+        }
+      }
+
+      async function recordPayment(payerAddress, txHash) {
+        const response = await fetch(`/api/pay/${USERNAME}/${LINK_ID}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ payerAddress, txHash }),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to record payment");
+        }
+        return data;
+      }
+
+      payBtn.addEventListener("click", async () => {
+        if (!window.ethereum) {
+          log("No wallet found. Install MetaMask and refresh.");
+          return;
+        }
+
+        payBtn.disabled = true;
+
+        try {
+          log("Connecting wallet...");
+          const provider = new ethers.BrowserProvider(window.ethereum);
+          await provider.send("eth_requestAccounts", []);
+          await ensureSepolia(provider);
+
+          const signer = await provider.getSigner();
+          const payerAddress = await signer.getAddress();
+          log(`Connected ${payerAddress}\nSending 1 USDC...`);
+
+          const usdc = new ethers.Contract(
+            USDC,
+            ["function transfer(address to, uint256 amount) returns (bool)"],
+            signer,
+          );
+
+          const tx = await usdc.transfer(
+            RECIPIENT,
+            ethers.parseUnits(AMOUNT, 6),
+          );
+
+          log(`Transaction sent: ${tx.hash}\nWaiting for confirmation...`);
+          await tx.wait();
+
+          log(`Confirmed: ${tx.hash}\nRecording payment in Fidence...`);
+          const recorded = await recordPayment(payerAddress, tx.hash);
+
+          log(
+            `Payment complete!\nStatus: ${recorded.status}\nURL: ${recorded.url}`,
+          );
+        } catch (error) {
+          log(
+            error?.message?.includes("user rejected")
+              ? "Transaction cancelled in wallet."
+              : error?.message || String(error),
+          );
+          payBtn.disabled = false;
+        }
+      });
+    </script>
+  </body>
+</html>

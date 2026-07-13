@@ -14,7 +14,9 @@ const RESERVED_PATHS = new Set([
   "activity",
   "payment-links",
   "referrals",
+  "rewards",
   "transactions",
+  "merchant",
   "icon.png",
   "favicon.ico",
 ]);

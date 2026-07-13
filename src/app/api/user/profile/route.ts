@@ -10,6 +10,8 @@ import {
   updateUsername,
   validateUsername,
 } from "@/lib/db/profile";
+import { logWorkspaceSecurityEvent } from "@/lib/security-logging";
+import { extractSecurityContext } from "@/lib/request-security";
 
 export async function PATCH(request: Request) {
   const session = await getSessionFromCookies();
@@ -49,6 +51,16 @@ export async function PATCH(request: Request) {
       });
     }
 
+    await logWorkspaceSecurityEvent({
+      workspaceId: session.workspace._id,
+      actorType: "user",
+      actorId: session.user._id.toString(),
+      action: "human_username_updated",
+      resourceType: "user",
+      resourceId: session.user._id.toString(),
+      security: extractSecurityContext(request),
+    });
+
     return NextResponse.json({
       username: result.user?.username,
       initials: result.user?.initials,
@@ -65,6 +77,16 @@ export async function PATCH(request: Request) {
     });
 
     await logProfileUpdatedActivity(session.workspace._id);
+
+    await logWorkspaceSecurityEvent({
+      workspaceId: session.workspace._id,
+      actorType: "user",
+      actorId: session.user._id.toString(),
+      action: "human_profile_updated",
+      resourceType: "user",
+      resourceId: session.user._id.toString(),
+      security: extractSecurityContext(request),
+    });
 
     return NextResponse.json({
       name: user?.name,

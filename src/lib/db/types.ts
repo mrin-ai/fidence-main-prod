@@ -90,6 +90,9 @@ export type PaymentLinkDoc = {
   networkId: string;
   recipientAddress?: string;
   status: PaymentLinkStatus;
+  source?: import("@/lib/db/merchant-types").CommerceSource;
+  agentId?: ObjectId;
+  agentPublicId?: string;
   expiresAt: Date;
   paidAt?: Date;
   paidBy?: string;
@@ -112,6 +115,9 @@ export type TransactionDoc = {
   recipientUserId?: ObjectId;
   recipientAddress?: string;
   status: "pending" | "confirmed" | "failed";
+  source?: import("@/lib/db/merchant-types").CommerceSource;
+  agentId?: ObjectId;
+  agentPublicId?: string;
   occurredAt: Date;
   createdAt: Date;
 };

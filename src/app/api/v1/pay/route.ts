@@ -1,0 +1,153 @@
+import { NextResponse } from "next/server";
+
+import {
+  recordAgentPaymentLink,
+  recordAgentProfilePayment,
+} from "@/lib/db/agent-payments";
+import {
+  getMerchantApiContext,
+  merchantApiUnauthorized,
+} from "@/lib/db/merchant-api";
+import { supportsOnChainPayment } from "@/lib/payment-contracts";
+
+function mapAgentPayErrorStatus(code?: string) {
+  if (code === "AGENT_INACTIVE" || code === "AGENT_WALLET_MISMATCH") return 403;
+  if (
+    code === "AGENT_NOT_FOUND" ||
+    code === "LINK_NOT_FOUND" ||
+    code === "RECIPIENT_NOT_FOUND"
+  ) {
+    return 404;
+  }
+  return 400;
+}
+
+export async function POST(request: Request) {
+  const context = await getMerchantApiContext(request);
+  if (!context) return merchantApiUnauthorized();
+
+  const body = (await request.json()) as {
+    agentId?: string;
+    payerAddress?: string;
+    txHash?: string;
+    type?: "link" | "profile";
+    linkUsername?: string;
+    linkId?: string;
+    recipientUsername?: string;
+    amount?: number;
+    tokenId?: string;
+    networkId?: string;
+  };
+
+  const externalAgentId = body.agentId?.trim();
+  const payerAddress = body.payerAddress?.trim();
+  const txHash = body.txHash?.trim();
+  const type = body.type;
+
+  if (!externalAgentId || !payerAddress || !txHash || !type) {
+    return NextResponse.json(
+      { error: "agentId, payerAddress, txHash, and type are required" },
+      { status: 400 },
+    );
+  }
+
+  if (type === "link") {
+    const linkUsername = body.linkUsername?.trim();
+    const linkId = body.linkId?.trim();
+
+    if (!linkUsername || !linkId) {
+      return NextResponse.json(
+        { error: "linkUsername and linkId are required for link payments" },
+        { status: 400 },
+      );
+    }
+
+    const result = await recordAgentPaymentLink({
+      context,
+      externalAgentId,
+      payerAddress,
+      txHash,
+      linkUsername,
+      linkPublicId: linkId,
+    });
+
+    if (!result.ok) {
+      const code = "code" in result ? result.code : undefined;
+      const status = mapAgentPayErrorStatus(code);
+
+      return NextResponse.json(
+        { error: result.error, ...(code ? { code } : {}) },
+        { status },
+      );
+    }
+
+    return NextResponse.json({
+      ok: true,
+      type: "link",
+      link: result.link,
+      agent: result.agent,
+    });
+  }
+
+  if (type === "profile") {
+    const recipientUsername = body.recipientUsername?.trim();
+    const amount = Number(body.amount);
+    const tokenId = body.tokenId?.trim();
+    const networkId = body.networkId?.trim();
+
+    if (!recipientUsername || !amount || !tokenId || !networkId) {
+      return NextResponse.json(
+        {
+          error:
+            "recipientUsername, amount, tokenId, and networkId are required for profile payments",
+        },
+        { status: 400 },
+      );
+    }
+
+    if (amount <= 0) {
+      return NextResponse.json({ error: "Amount must be greater than zero" }, { status: 400 });
+    }
+
+    if (!supportsOnChainPayment(networkId, tokenId)) {
+      return NextResponse.json(
+        { error: "This token/network combination is not supported" },
+        { status: 400 },
+      );
+    }
+
+    const result = await recordAgentProfilePayment({
+      context,
+      externalAgentId,
+      payerAddress,
+      txHash,
+      recipientUsername,
+      amount,
+      tokenId,
+      networkId,
+    });
+
+    if (!result.ok) {
+      const code = "code" in result ? result.code : undefined;
+      const status = mapAgentPayErrorStatus(code);
+
+      return NextResponse.json(
+        { error: result.error, ...(code ? { code } : {}) },
+        { status },
+      );
+    }
+
+    return NextResponse.json({
+      ok: true,
+      type: "profile",
+      transactionId: result.transactionId,
+      duplicate: result.duplicate,
+      agent: result.agent,
+    });
+  }
+
+  return NextResponse.json(
+    { error: "type must be 'link' or 'profile'" },
+    { status: 400 },
+  );
+}

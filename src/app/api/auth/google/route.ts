@@ -1,64 +1,66 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { logLoginActivity } from "@/lib/db/activity";
+
 import {
-  createSessionForUser,
-  sessionCookieOptions,
-  upsertGoogleUser,
-} from "@/lib/db/auth";
-import { parseReferralCookie } from "@/lib/referrals";
+  buildGoogleAuthUrl,
+  createGoogleOAuthState,
+  GOOGLE_OAUTH_REDIRECT_COOKIE,
+  GOOGLE_OAUTH_STATE_COOKIE,
+  isGoogleOAuthConfigured,
+} from "@/lib/google-oauth";
 import {
   checkRateLimit,
   getClientIp,
   rateLimitResponse,
 } from "@/lib/rate-limit";
 
-export async function POST(request: Request) {
-  try {
-    const ip = getClientIp(request);
-    const limit = await checkRateLimit(`auth:google:${ip}`, {
-      max: 10,
-      windowMs: 60_000,
-    });
-    if (!limit.allowed) {
-      return rateLimitResponse(limit);
-    }
-
-    const body = (await request.json().catch(() => ({}))) as {
-      referralCode?: string;
-    };
-
-    const user = await upsertGoogleUser({
-      email: "alex.rivera@lcx.ag",
-      name: "Alex Rivera",
-      referralCode:
-        body.referralCode?.trim() || parseReferralCookie(request.headers.get("cookie")),
-    });
-
-    if (!user) {
-      return NextResponse.json({ error: "Failed to create user" }, { status: 500 });
-    }
-
-    const { token, workspace } = await createSessionForUser(user, "google");
-    await logLoginActivity(workspace._id, "google");
-
-    const cookieStore = await cookies();
-    cookieStore.set(sessionCookieOptions(token));
-
-    return NextResponse.json({
-      user: {
-        name: user.name,
-        role: user.role,
-        initials: user.initials,
-        email: user.email,
-      },
-      workspace: {
-        name: workspace.name,
-        slug: workspace.slug,
-      },
-    });
-  } catch (error) {
-    console.error("Google auth failed:", error);
-    return NextResponse.json({ error: "Authentication failed" }, { status: 500 });
+function sanitizeRedirectPath(value: string | null) {
+  if (!value || !value.startsWith("/") || value.startsWith("//")) {
+    return "/dashboard";
   }
+  return value;
+}
+
+export async function GET(request: Request) {
+  if (!isGoogleOAuthConfigured()) {
+    return NextResponse.json(
+      { error: "Google sign-in is not configured" },
+      { status: 503 },
+    );
+  }
+
+  const ip = getClientIp(request);
+  const limit = await checkRateLimit(`auth:google:${ip}`, {
+    max: 10,
+    windowMs: 60_000,
+  });
+  if (!limit.allowed) {
+    return rateLimitResponse(limit);
+  }
+
+  const { searchParams } = new URL(request.url);
+  const redirect = sanitizeRedirectPath(searchParams.get("redirect"));
+  const state = createGoogleOAuthState();
+
+  const cookieStore = await cookies();
+  cookieStore.set({
+    name: GOOGLE_OAUTH_STATE_COOKIE,
+    value: state,
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 60 * 10,
+  });
+  cookieStore.set({
+    name: GOOGLE_OAUTH_REDIRECT_COOKIE,
+    value: redirect,
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 60 * 10,
+  });
+
+  return NextResponse.redirect(buildGoogleAuthUrl(state));
 }

@@ -11,6 +11,8 @@ import { getDb } from "@/lib/db/client";
 import { COLLECTIONS } from "@/lib/db/collections";
 import type { UserDoc } from "@/lib/db/types";
 import { supportsOnChainPayment } from "@/lib/payment-contracts";
+import { logWorkspaceSecurityEvent } from "@/lib/security-logging";
+import { extractSecurityContext } from "@/lib/request-security";
 import {
   checkRateLimit,
   getClientIp,
@@ -119,6 +121,16 @@ export async function POST(request: Request, context: RouteContext) {
     if (!result.ok) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
+
+    await logWorkspaceSecurityEvent({
+      workspaceId: workspace._id,
+      actorType: "user",
+      actorId: payerAddress,
+      action: "human_profile_payment",
+      resourceType: "profile",
+      resourceId: username,
+      security: extractSecurityContext(request),
+    });
 
     return NextResponse.json({
       ok: true,

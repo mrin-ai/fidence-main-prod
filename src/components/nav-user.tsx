@@ -21,11 +21,18 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
+import { Switch } from "@/components/ui/switch"
+import {
+  NOTIFICATIONS_ENABLED_KEY,
+  useLocalPreference,
+} from "@/hooks/use-local-preference"
 import {
   BellIcon,
+  GiftIcon,
   HistoryIcon,
   LogOutIcon,
   SettingsIcon,
+  UsersIcon,
 } from "lucide-react"
 
 export function NavUser({
@@ -40,6 +47,10 @@ export function NavUser({
   const { isMobile } = useSidebar()
   const router = useRouter()
   const { disconnect } = useDisconnect()
+  const [notificationsEnabled, setNotificationsEnabled] = useLocalPreference(
+    NOTIFICATIONS_ENABLED_KEY,
+    true,
+  )
 
   const handleLogOut = async () => {
     await fetch("/api/auth/logout", { method: "POST" })
@@ -98,13 +109,32 @@ export function NavUser({
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem>
-                <BellIcon />
-                Notifications
+              <DropdownMenuItem
+                className="flex items-center justify-between gap-3"
+                onSelect={(event) => event.preventDefault()}
+              >
+                <span className="flex items-center gap-2">
+                  <BellIcon />
+                  Notifications
+                </span>
+                <Switch
+                  checked={notificationsEnabled}
+                  onCheckedChange={setNotificationsEnabled}
+                  aria-label="Toggle notifications"
+                  onClick={(event) => event.stopPropagation()}
+                />
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => router.push("/activity")}>
                 <HistoryIcon />
                 Activity
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push("/referrals")}>
+                <UsersIcon />
+                Referrals
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push("/rewards")}>
+                <GiftIcon />
+                Reward
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => router.push("/settings")}>
                 <SettingsIcon />

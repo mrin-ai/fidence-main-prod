@@ -13,6 +13,7 @@ import {
   metricCardValueClassName,
 } from "@/lib/dashboard-styles"
 import type { DashboardOverview } from "@/lib/db/types"
+import { formatRewardCredits } from "@/lib/reward-config"
 import { cn } from "@/lib/utils"
 
 type Stat = {
@@ -59,7 +60,7 @@ function buildStats(metrics: DashboardOverview["metrics"]): Stat[] {
     },
     {
       label: "Rewards",
-      value: `$${metrics.rewardsAmount.toFixed(2)}`,
+      value: formatRewardCredits(metrics.rewardsAmount),
       icon: <GiftIcon className="size-3" />,
       valueClassName: "text-primary",
       chartKey: "rewards",

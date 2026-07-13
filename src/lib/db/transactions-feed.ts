@@ -4,6 +4,8 @@ import { getTxExplorerUrl } from "@/lib/block-explorer";
 import { getDb } from "@/lib/db/client";
 import { COLLECTIONS } from "@/lib/db/collections";
 import type { TransactionDoc } from "@/lib/db/types";
+import { buildCommerceSourceFilter } from "@/lib/db/commerce-source";
+import type { CommerceSource } from "@/lib/db/merchant-types";
 import { formatPaymentDateTime } from "@/lib/format-date";
 
 export const TRANSACTIONS_PAGE_LIMIT = 20;
@@ -14,6 +16,8 @@ export type TransactionListItem = {
   amount: string;
   direction: "in" | "out";
   date: string;
+  source: CommerceSource;
+  agentPublicId?: string;
   txHash?: string;
   explorerUrl?: string;
 };
@@ -39,6 +43,7 @@ function mapTransactionDoc(tx: TransactionDoc): TransactionListItem {
     amount: `${outgoing ? "-" : "+"}${formatTokenAmount(tx.amount, tx.symbol)}`,
     direction: outgoing ? "out" : "in",
     date: formatPaymentDateTime(tx.occurredAt),
+    source: tx.source ?? "human",
     txHash: tx.txHash,
     explorerUrl,
   };
@@ -46,7 +51,7 @@ function mapTransactionDoc(tx: TransactionDoc): TransactionListItem {
 
 export async function listWorkspaceTransactions(
   workspaceId: ObjectId,
-  options: { page?: number; limit?: number } = {},
+  options: { page?: number; limit?: number; source?: CommerceSource } = {},
 ) {
   const page = Math.max(1, options.page ?? 1);
   const limit = Math.min(
@@ -56,7 +61,11 @@ export async function listWorkspaceTransactions(
   const skip = (page - 1) * limit;
   const db = await getDb();
 
-  const filter = { workspaceId, status: "confirmed" as const };
+  const filter = {
+    workspaceId,
+    status: "confirmed" as const,
+    ...buildCommerceSourceFilter(options.source),
+  };
 
   const [transactions, total] = await Promise.all([
     db

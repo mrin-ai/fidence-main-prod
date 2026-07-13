@@ -36,6 +36,10 @@ export async function recordProfilePayment(input: {
   networkId: string;
   txHash: string;
   username: string;
+  paidVia?: "human" | "agent";
+  payerAgentId?: ObjectId;
+  payerAgentPublicId?: string;
+  payerWorkspaceId?: ObjectId;
 }) {
   const db = await getDb();
   const now = new Date();
@@ -118,6 +122,14 @@ export async function recordProfilePayment(input: {
     networkId: input.networkId,
     txHash: normalizedTxHash,
     merchantLabel: `@${input.username}`,
+    payerAttribution:
+      input.paidVia === "agent" && input.payerAgentId
+        ? {
+            source: "agent",
+            agentId: input.payerAgentId,
+            agentPublicId: input.payerAgentPublicId,
+          }
+        : { source: "human" },
   });
 
   return {

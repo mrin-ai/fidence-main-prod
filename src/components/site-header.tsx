@@ -1,7 +1,9 @@
-import Image from "next/image"
-import { BellIcon, SearchIcon } from "lucide-react"
+"use client"
 
-import { Button } from "@/components/ui/button"
+import Image from "next/image"
+import { SearchIcon } from "lucide-react"
+
+import { NotificationDropdown } from "@/components/notifications/notification-dropdown"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
@@ -37,15 +39,7 @@ export function SiteHeader({ title }: { title: string }) {
               className="h-8 w-44 bg-background pl-8 lg:w-60"
             />
           </div>
-          <Button
-            variant="outline"
-            size="icon"
-            className="relative size-8 shrink-0"
-            aria-label="Notifications"
-          >
-            <BellIcon className="size-4" />
-            <span className="absolute top-1.5 right-1.5 size-2 rounded-full bg-primary ring-2 ring-background" />
-          </Button>
+          <NotificationDropdown />
         </div>
       </div>
     </header>

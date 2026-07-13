@@ -1,0 +1,70 @@
+import type { ObjectId } from "mongodb";
+
+export type SecurityContext = {
+  ip: string;
+  userAgent: string;
+  device: string;
+  browser: string;
+  country?: string;
+  timestamp: Date;
+  date: string;
+};
+
+export type SecurityActorType = "user" | "agent" | "api_key";
+
+export type SecurityAuditDoc = {
+  _id?: ObjectId;
+  workspaceId: ObjectId;
+  actorType: SecurityActorType;
+  actorId?: string;
+  agentId?: ObjectId;
+  action: string;
+  resourceType?: string;
+  resourceId?: string;
+  security: SecurityContext;
+  occurredAt: Date;
+  date: string;
+  createdAt: Date;
+};
+
+export type CommerceSource = "human" | "agent";
+
+export type AgentStatus = "active" | "inactive";
+
+export type AgentWallet = {
+  id: string;
+  networkId: string;
+  address: string;
+  addedAt: Date;
+};
+
+export type AgentDoc = {
+  _id: ObjectId;
+  workspaceId: ObjectId;
+  externalAgentId: string;
+  publicId: string;
+  name?: string;
+  walletAddress?: string;
+  networkId?: string;
+  wallets?: AgentWallet[];
+  status: AgentStatus;
+  linksCreated: number;
+  amountPaid: number;
+  amountReceived: number;
+  registeredAt: Date;
+  lastActiveAt: Date;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type ApiKeyDoc = {
+  _id: ObjectId;
+  workspaceId: ObjectId;
+  createdBy: ObjectId;
+  keyHash: string;
+  keyPrefix: string;
+  keyLast4: string;
+  createdAt: Date;
+  updatedAt: Date;
+  lastUsedAt?: Date;
+};

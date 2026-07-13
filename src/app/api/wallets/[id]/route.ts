@@ -4,10 +4,12 @@ import { getWalletNetworkById } from "@/lib/wallet-networks";
 import { logWalletRemovedActivity } from "@/lib/db/activity";
 import { getSessionFromCookies } from "@/lib/db/auth";
 import { removeVerifiedWallet } from "@/lib/db/wallets";
+import { logWorkspaceSecurityEvent } from "@/lib/security-logging";
+import { extractSecurityContext } from "@/lib/request-security";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
-export async function DELETE(_request: Request, context: RouteContext) {
+export async function DELETE(request: Request, context: RouteContext) {
   const session = await getSessionFromCookies();
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -26,6 +28,16 @@ export async function DELETE(_request: Request, context: RouteContext) {
     workspaceId: session.workspace._id,
     networkLabel: network?.label ?? result.wallet.networkId,
     address: result.wallet.address,
+  });
+
+  await logWorkspaceSecurityEvent({
+    workspaceId: session.workspace._id,
+    actorType: "user",
+    actorId: session.user._id.toString(),
+    action: "human_wallet_removed",
+    resourceType: "wallet",
+    resourceId: result.wallet.id,
+    security: extractSecurityContext(request),
   });
 
   return NextResponse.json({ ok: true });

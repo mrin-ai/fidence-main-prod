@@ -11,6 +11,7 @@ export default async function PaymentLinksPage() {
   const feed = await listPaymentLinksPaginated(session.workspace._id, {
     page: 1,
     limit: 20,
+    source: "human",
   });
 
   return <PaymentLinksPageContent initialLinks={feed.items} />;

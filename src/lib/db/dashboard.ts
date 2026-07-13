@@ -14,8 +14,7 @@ import type {
   UserDoc,
 } from "@/lib/db/types";
 
-/** Creator rewards accrue at 0.6% of confirmed payments received. */
-const CREATOR_REWARD_RATE = 0.006;
+import { calculatePaymentRewardCredits, PAYMENT_REWARD_ELIGIBLE_TYPES } from "@/lib/reward-config";
 
 const standaloneLinkFilter = (workspaceId: ObjectId) => ({
   workspaceId,
@@ -55,7 +54,8 @@ export async function getDashboardOverview(
     pendingLinks,
     paymentLinks,
     sparklines,
-    paymentTransactions,
+    receivedPaymentTransactions,
+    rewardTransactions,
     transactions,
     activityFeed,
     balances,
@@ -92,6 +92,17 @@ export async function getDashboardOverview(
       .toArray(),
     db
       .collection<TransactionDoc>(COLLECTIONS.transactions)
+      .find(
+        {
+          workspaceId,
+          type: { $in: [...PAYMENT_REWARD_ELIGIBLE_TYPES] },
+          status: "confirmed",
+        },
+        { projection: { amount: 1 } },
+      )
+      .toArray(),
+    db
+      .collection<TransactionDoc>(COLLECTIONS.transactions)
       .find({ workspaceId })
       .sort({ occurredAt: -1 })
       .limit(20)
@@ -104,11 +115,15 @@ export async function getDashboardOverview(
       .toArray(),
   ]);
 
-  const receivedAmount = paymentTransactions.reduce(
+  const receivedAmount = receivedPaymentTransactions.reduce(
     (sum, transaction) => sum + transaction.amount,
     0,
   );
-  const rewardsAmount = receivedAmount * CREATOR_REWARD_RATE;
+  const rewardVolume = rewardTransactions.reduce(
+    (sum, transaction) => sum + transaction.amount,
+    0,
+  );
+  const rewardsAmount = calculatePaymentRewardCredits(rewardVolume);
 
   return {
     metrics: {
