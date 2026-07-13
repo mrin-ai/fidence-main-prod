@@ -1,6 +1,23 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import AuthCard from "@/components/auth-card";
 import { ReferralCapture } from "@/components/referrals/referral-capture";
+
+export const metadata: Metadata = {
+  title: "Sign Up",
+  description:
+    "Create your PayAgent account to accept crypto payments, create payment links, and earn rewards.",
+  alternates: {
+    canonical: "/sign-up",
+  },
+  openGraph: {
+    title: "Sign Up · PayAgent",
+    description:
+      "Create your PayAgent account to accept crypto payments, create payment links, and earn rewards.",
+    url: "https://www.payagent.co/sign-up",
+    images: ["https://www.payagent.co/payagent-og.png"],
+  },
+};
 
 function SignUpContent() {
   return (
@@ -9,7 +26,7 @@ function SignUpContent() {
         <ReferralCapture />
       </Suspense>
       <AuthCard
-        title="Create an account"
+        title="Create your account"
         description="Join thousands of merchants using PayAgent to accept payments and grow their business."
         mode="sign-up"
       />

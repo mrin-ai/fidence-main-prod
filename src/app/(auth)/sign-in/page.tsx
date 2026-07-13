@@ -1,6 +1,23 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import AuthCard from "@/components/auth-card";
 import { ReferralCapture } from "@/components/referrals/referral-capture";
+
+export const metadata: Metadata = {
+  title: "Sign In",
+  description:
+    "Sign in to PayAgent to manage payment links, track transactions, and access your merchant dashboard.",
+  alternates: {
+    canonical: "/sign-in",
+  },
+  openGraph: {
+    title: "Sign In · PayAgent",
+    description:
+      "Sign in to PayAgent to manage payment links, track transactions, and access your merchant dashboard.",
+    url: "https://www.payagent.co/sign-in",
+    images: ["https://www.payagent.co/payagent-og.png"],
+  },
+};
 
 function SignInContent() {
   return (
