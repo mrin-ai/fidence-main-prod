@@ -1,6 +1,5 @@
 /**
  * Test Merchant Commerce agent API with two workspace API keys.
- * Usage: npx tsx scripts/test-merchant-agents.ts
  */
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
@@ -35,7 +34,7 @@ async function apiCall(
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
-      "User-Agent": "FidenceAgentTest/1.0",
+      "User-Agent": "PayAgentAgentTest/1.0",
     },
     body: method === "GET" ? undefined : JSON.stringify(body),
   });

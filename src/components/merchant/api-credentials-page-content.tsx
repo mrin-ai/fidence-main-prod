@@ -65,7 +65,7 @@ export function ApiCredentialsPageContent({
         <h2 className="text-lg font-semibold">API Credentials</h2>
         <p className="text-sm text-muted-foreground">
           One API key per workspace. Share it with your agents to connect to
-          Fidence.
+          PayAgent.
         </p>
       </div>
 

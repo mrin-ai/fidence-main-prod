@@ -24,13 +24,54 @@ const instrumentSerif = Instrument_Serif({
 });
 
 export const metadata: Metadata = {
-  title: "Fidence",
-  description: "A dashboard with sidebar, charts and data table",
-  icons: {
-    icon: [{ url: "/icon.png", type: "image/png" }],
-    shortcut: "/favicon.ico",
-    apple: "/icon.png",
+  title: "Instant Crypto Payments – Low Fees + AI Agent Payment API",
+  description:
+    "Accept instant crypto payments with low transaction fees. Simple for humans and merchants, with an AI agent payment API for autonomous commerce.",
+  authors: [{ name: "PayAgent" }],
+  metadataBase: new URL("https://www.payagent.co"),
+  alternates: {
+    canonical: "/",
+    languages: { "en-US": "/", "x-default": "/" },
   },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+    },
+  },
+  openGraph: {
+    title: "Instant Crypto Payments – Low Fees + AI Agent Payment API",
+    description:
+      "Accept instant crypto payments with low transaction fees. Simple for humans and merchants, with an AI agent payment API for autonomous commerce.",
+    url: "https://www.payagent.co",
+    siteName: "PayAgent",
+    type: "website",
+    images: [
+      {
+        url: "/payagent-og.png",
+        width: 1200,
+        height: 630,
+        alt: "PayAgent – Instant Crypto Payments",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    site: "@lcx",
+    creator: "@lcx",
+    title: "Instant Crypto Payments – Low Fees + AI Agent Payment API",
+    description:
+      "Accept instant crypto payments with low transaction fees. Simple for humans and merchants, with an AI agent payment API for autonomous commerce.",
+    images: ["/payagent-og.png"],
+  },
+  icons: {
+    icon: "/favicon/favicon.svg",
+    apple: "/favicon/favicon.svg",
+  },
+  manifest: "/favicon/site.webmanifest",
 };
 
 export default async function RootLayout({

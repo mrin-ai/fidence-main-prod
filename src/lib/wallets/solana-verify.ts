@@ -23,7 +23,7 @@ export function buildSolanaVerifyMessage(
   networkId: string,
   timestamp: number,
 ) {
-  return `Verify wallet for Fidence\n\nNetwork: ${networkId}\nWallet: ${address}\nTimestamp: ${timestamp}`;
+  return `Verify wallet for PayAgent\n\nNetwork: ${networkId}\nWallet: ${address}\nTimestamp: ${timestamp}`;
 }
 
 export function verifySolanaSignature(input: {

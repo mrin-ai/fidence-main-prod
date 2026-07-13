@@ -179,7 +179,7 @@ export function AppSidebar({
               <div className="relative flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border/50 bg-white">
                 <Image
                   src="/logo.png"
-                  alt="Fidence"
+                  alt="PayAgent"
                   width={32}
                   height={32}
                   className="size-8 object-contain"

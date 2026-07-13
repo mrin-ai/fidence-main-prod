@@ -21,13 +21,13 @@ import {
 const testimonials = [
   {
     content:
-      "LCX made it effortless to spin up payment links for our global customer base. Settlement is fast and the dashboard gives us full visibility.",
+      "PayAgent made it effortless to spin up payment links for our global customer base. Settlement is fast and the dashboard gives us full visibility.",
     author: "Sarah Chen",
     role: "Head of Payments, Nova Commerce",
   },
   {
     content:
-      "We replaced three tools with LCX. QR payments, invoicing, and rewards all live in one place — our ops team loves it.",
+      "We replaced three tools with PayAgent. QR payments, invoicing, and rewards all live in one place — our ops team loves it.",
     author: "Marcus Webb",
     role: "COO, Stackline",
   },

@@ -52,7 +52,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
     }
 
-    if (!message.startsWith("Sign in to LCX")) {
+    if (!message.startsWith("Sign in to PayAgent")) {
       return NextResponse.json({ error: "Invalid sign-in message" }, { status: 401 });
     }
 

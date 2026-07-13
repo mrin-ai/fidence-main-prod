@@ -1,6 +1,6 @@
-# Fidence Style Guide
+# PayAgent Style Guide
 
-Brand and UI reference for the Fidence product. Use this document when building new screens, components, or marketing assets so the experience stays consistent.
+Brand and UI reference for the PayAgent product. Use this document when building new screens, components, or marketing assets so the experience stays consistent.
 
 ---
 

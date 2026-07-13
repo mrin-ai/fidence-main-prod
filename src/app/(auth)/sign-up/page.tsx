@@ -10,7 +10,7 @@ function SignUpContent() {
       </Suspense>
       <AuthCard
         title="Create an account"
-        description="Join thousands of merchants using LCX to accept payments and grow their business."
+        description="Join thousands of merchants using PayAgent to accept payments and grow their business."
         mode="sign-up"
       />
     </>

@@ -1,6 +1,6 @@
 # LCX Auth Style Guide
 
-Auth pages (`/sign-in`, `/sign-up`) use a light theme scoped via the `.lcx-auth` class, aligned with the main Fidence dashboard palette and LCX electric blue accents.
+Auth pages (`/sign-in`, `/sign-up`) use a light theme scoped via the `.lcx-auth` class, aligned with the main PayAgent dashboard palette and LCX electric blue accents.
 
 ## Brand colors
 

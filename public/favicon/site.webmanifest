@@ -1,0 +1,16 @@
+{
+  "name": "PayAgent",
+  "short_name": "PayAgent",
+  "icons": [
+    {
+      "src": "/favicon/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "theme_color": "#365EF7",
+  "background_color": "#ffffff",
+  "display": "standalone",
+  "start_url": "/"
+}

@@ -10,7 +10,7 @@ function SignInContent() {
       </Suspense>
       <AuthCard
         title="Welcome back"
-        description="Sign in to manage payment links, track transactions, and access your LCX dashboard."
+        description="Sign in to manage payment links, track transactions, and access your PayAgent dashboard."
         mode="sign-in"
       />
     </>

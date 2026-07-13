@@ -21,7 +21,7 @@ export function SiteHeader({ title }: { title: string }) {
           <div className="flex size-6 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border/50 bg-white">
             <Image
               src="/logo.png"
-              alt="Fidence"
+              alt="PayAgent"
               width={24}
               height={24}
               className="size-6 object-contain"
