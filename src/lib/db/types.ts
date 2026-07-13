@@ -15,13 +15,7 @@ export type UserProfile = {
   company?: string;
 };
 
-export type WalletNetworkId =
-  | "base"
-  | "ethereum"
-  | "arbitrum"
-  | "polygon"
-  | "sepolia"
-  | "solana";
+export type WalletNetworkId = string;
 
 export type VerifiedWallet = {
   id: string;
@@ -43,6 +37,9 @@ export type UserDoc = {
   authProviders: AuthProvider[];
   walletAddresses: string[];
   verifiedWallets?: VerifiedWallet[];
+  referralCode?: string;
+  referredByUserId?: ObjectId;
+  referredAt?: Date;
   lastLoginAt: Date;
   createdAt: Date;
   updatedAt: Date;

@@ -1,8 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { createPublicClient, http, parseEther, parseUnits, type Chain } from "viem";
-import { arbitrum, base, mainnet, polygon, sepolia } from "wagmi/chains";
+import { createPublicClient, http, parseEther, parseUnits } from "viem";
 import {
   useAccount,
   usePublicClient,
@@ -11,6 +10,7 @@ import {
   useWriteContract,
 } from "wagmi";
 
+import { getEvmWalletNetworkById } from "@/lib/evm-networks";
 import {
   erc20TransferAbi,
   getChainIdForNetwork,
@@ -18,18 +18,10 @@ import {
   supportsOnChainPayment,
 } from "@/lib/payment-contracts";
 
-const ERC20_TRANSFER_GAS_MAX = 200_000n;
-
-const chainsByNetworkId: Record<string, Chain> = {
-  ethereum: mainnet,
-  base,
-  arbitrum,
-  polygon,
-  sepolia,
-};
+const ERC20_TRANSFER_GAS_MAX = BigInt(200_000);
 
 function getNetworkPublicClient(networkId: string) {
-  const chain = chainsByNetworkId[networkId];
+  const chain = getEvmWalletNetworkById(networkId)?.chain;
   if (!chain) return null;
 
   return createPublicClient({
@@ -139,7 +131,7 @@ export function useOnchainPayment() {
           txHash = await sendTransactionAsync({
             to: input.recipientAddress as `0x${string}`,
             value,
-            gas: gas + gas / 4n,
+            gas: gas + gas / BigInt(4),
           });
         } else {
           const token = getTokenContract(input.networkId, input.tokenId);
@@ -160,9 +152,9 @@ export function useOnchainPayment() {
             account: address,
           });
           const gasLimit =
-            gas + gas / 4n > ERC20_TRANSFER_GAS_MAX
+            gas + gas / BigInt(4) > ERC20_TRANSFER_GAS_MAX
               ? ERC20_TRANSFER_GAS_MAX
-              : gas + gas / 4n;
+              : gas + gas / BigInt(4);
 
           txHash = await writeContractAsync({
             address: token.address,

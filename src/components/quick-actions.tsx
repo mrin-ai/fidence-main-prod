@@ -138,9 +138,10 @@ export function QuickActions() {
       href: "/payment-links",
     },
     {
-      title: "Rewards",
-      subtitle: "View earned creator rewards",
+      title: "Referrals",
+      subtitle: "Invite merchants and earn LCX",
       icon: <GiftIcon className="size-4" />,
+      href: "/referrals",
     },
     {
       title: "API Documentation",

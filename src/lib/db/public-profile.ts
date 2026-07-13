@@ -2,7 +2,7 @@ import { getDb } from "@/lib/db/client";
 import { COLLECTIONS } from "@/lib/db/collections";
 import { listVerifiedWallets } from "@/lib/db/wallets";
 import { normalizeUsername } from "@/lib/db/profile";
-import { getNetworkById } from "@/lib/create-payment-link-data";
+import { getWalletNetworkById } from "@/lib/wallet-networks";
 import { truncateAddress } from "@/lib/profile-url";
 import type { UserDoc } from "@/lib/db/types";
 
@@ -33,7 +33,7 @@ export async function getPublicProfileByUsername(
   if (!user) return null;
 
   const wallets = listVerifiedWallets(user).map((wallet) => {
-    const network = getNetworkById(wallet.networkId);
+    const network = getWalletNetworkById(wallet.networkId);
     return {
       networkId: wallet.networkId,
       networkLabel: network?.label ?? wallet.networkId,

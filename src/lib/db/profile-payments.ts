@@ -6,13 +6,23 @@ import { COLLECTIONS } from "@/lib/db/collections";
 import { logProfilePaymentReceivedActivity } from "@/lib/db/activity";
 import { recordPaymentSentForPayer } from "@/lib/db/payment-sent";
 import { getSettlementVerifier } from "@/lib/payment/settlement";
+import {
+  normalizePaymentAddress,
+  normalizeTxHash,
+} from "@/lib/payment/normalize";
 import { incrementDailyStat } from "@/lib/db/workspace-stats";
 import type { TransactionDoc } from "@/lib/db/types";
 
-export async function findTransactionByTxHash(txHash: string) {
+export async function findTransactionByTxHash(
+  txHash: string,
+  networkId?: string,
+) {
   const db = await getDb();
+  const normalized = networkId
+    ? normalizeTxHash(txHash, networkId)
+    : txHash.trim();
   return db.collection<TransactionDoc>(COLLECTIONS.transactions).findOne({
-    txHash: txHash.toLowerCase(),
+    txHash: normalized,
   });
 }
 
@@ -29,10 +39,21 @@ export async function recordProfilePayment(input: {
 }) {
   const db = await getDb();
   const now = new Date();
-  const normalizedTxHash = input.txHash.toLowerCase();
+  const normalizedTxHash = normalizeTxHash(input.txHash, input.networkId);
+  const normalizedPayerAddress = normalizePaymentAddress(
+    input.payerAddress,
+    input.networkId,
+  );
+  const normalizedRecipientAddress = normalizePaymentAddress(
+    input.recipientAddress,
+    input.networkId,
+  );
   const token = getTokenById(input.tokenId);
 
-  const existing = await findTransactionByTxHash(normalizedTxHash);
+  const existing = await findTransactionByTxHash(
+    normalizedTxHash,
+    input.networkId,
+  );
   if (existing) {
     return {
       ok: true as const,
@@ -44,11 +65,11 @@ export async function recordProfilePayment(input: {
   const verifier = getSettlementVerifier();
   const verified = await verifier.verifySettlement(
     {
-      recipientAddress: input.recipientAddress,
+      recipientAddress: normalizedRecipientAddress,
       amount: input.amount,
       tokenId: input.tokenId,
       networkId: input.networkId,
-      payerAddress: input.payerAddress,
+      payerAddress: normalizedPayerAddress,
     },
     normalizedTxHash,
   );
@@ -57,7 +78,7 @@ export async function recordProfilePayment(input: {
     return { ok: false as const, error: "Payment verification failed" };
   }
 
-  const label = `Profile payment from ${input.payerAddress.slice(0, 6)}…${input.payerAddress.slice(-4)}`;
+  const label = `Profile payment from ${normalizedPayerAddress.slice(0, 6)}…${normalizedPayerAddress.slice(-4)}`;
 
   const result = await db.collection(COLLECTIONS.transactions).insertOne({
     workspaceId: input.workspaceId,
@@ -67,9 +88,9 @@ export async function recordProfilePayment(input: {
     symbol: token?.symbol?.toLowerCase() ?? input.tokenId,
     networkId: input.networkId,
     txHash: normalizedTxHash,
-    payerAddress: input.payerAddress.toLowerCase(),
+    payerAddress: normalizedPayerAddress,
     recipientUserId: input.recipientUserId,
-    recipientAddress: input.recipientAddress.toLowerCase(),
+    recipientAddress: normalizedRecipientAddress,
     status: "confirmed",
     occurredAt: now,
     createdAt: now,
@@ -90,7 +111,7 @@ export async function recordProfilePayment(input: {
   );
 
   await recordPaymentSentForPayer({
-    payerAddress: input.payerAddress,
+    payerAddress: normalizedPayerAddress,
     merchantWorkspaceId: input.workspaceId,
     amount: input.amount,
     tokenId: input.tokenId,

@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { Web3WalletButton } from "@/components/web3-wallet-button";
+import { getClientReferralCode } from "@/components/referrals/referral-capture";
 
 function GoogleIcon(props: React.ComponentProps<"svg">) {
   return (
@@ -43,13 +44,20 @@ export default function AuthCard({
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirect = searchParams.get("redirect") ?? "/dashboard";
+  const referralCode = getClientReferralCode(searchParams);
 
   const [googleLoading, setGoogleLoading] = useState(false);
 
   const signInWithGoogle = async () => {
     setGoogleLoading(true);
     try {
-      const response = await fetch("/api/auth/google", { method: "POST" });
+      const response = await fetch("/api/auth/google", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...(referralCode ? { referralCode } : {}),
+        }),
+      });
       if (!response.ok) {
         throw new Error("Google sign-in failed");
       }
@@ -62,10 +70,14 @@ export default function AuthCard({
     }
   };
 
-  const redirectQuery =
-    redirect !== "/dashboard"
-      ? `?redirect=${encodeURIComponent(redirect)}`
-      : "";
+  const redirectQuery = new URLSearchParams();
+  if (redirect !== "/dashboard") {
+    redirectQuery.set("redirect", redirect);
+  }
+  if (referralCode) {
+    redirectQuery.set("ref", referralCode);
+  }
+  const authQuery = redirectQuery.toString() ? `?${redirectQuery.toString()}` : "";
 
   return (
     <div className="mx-auto w-full max-w-sm">
@@ -133,8 +145,8 @@ export default function AuthCard({
         <Link
           href={
             mode === "sign-in"
-              ? `/sign-up${redirectQuery}`
-              : `/sign-in${redirectQuery}`
+              ? `/sign-up${authQuery}`
+              : `/sign-in${authQuery}`
           }
           className="text-sm font-medium text-primary transition-colors hover:underline hover:underline-offset-4"
         >

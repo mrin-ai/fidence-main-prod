@@ -1,5 +1,11 @@
 import { arbitrum, base, mainnet, polygon, sepolia } from "wagmi/chains";
 
+import {
+  getEvmChainIdForNetwork,
+  getEvmNetworkIdForChainId,
+} from "@/lib/evm-networks";
+import { supportsSolanaPayment } from "@/lib/payment/solana-contracts";
+
 export const erc20TransferAbi = [
   {
     type: "function",
@@ -61,14 +67,13 @@ const tokenContracts: Record<string, Record<string, TokenContract>> = {
   },
   sepolia: {
     usdc: {
-      // Test USDC on Sepolia (local dev token)
       address: "0x3402d41AA8e34e0DF605c12109de2f8F4FF33A87",
       decimals: 6,
     },
   },
 };
 
-const networkChainIds: Record<string, number> = {
+const legacyPaymentChainIds: Record<string, number> = {
   ethereum: mainnet.id,
   base: base.id,
   arbitrum: arbitrum.id,
@@ -77,11 +82,11 @@ const networkChainIds: Record<string, number> = {
 };
 
 export function getChainIdForNetwork(networkId: string) {
-  return networkChainIds[networkId];
+  return getEvmChainIdForNetwork(networkId) ?? legacyPaymentChainIds[networkId];
 }
 
 export function getNetworkIdForChainId(chainId: number) {
-  return Object.entries(networkChainIds).find(([, id]) => id === chainId)?.[0];
+  return getEvmNetworkIdForChainId(chainId);
 }
 
 export function getTokenContract(networkId: string, tokenId: string) {
@@ -89,7 +94,7 @@ export function getTokenContract(networkId: string, tokenId: string) {
 }
 
 export function supportsOnChainPayment(networkId: string, tokenId: string) {
-  if (networkId === "solana") return false;
-  if (tokenId === "eth") return Boolean(networkChainIds[networkId]);
+  if (networkId === "solana") return supportsSolanaPayment(tokenId);
+  if (tokenId === "eth") return Boolean(getChainIdForNetwork(networkId));
   return Boolean(getTokenContract(networkId, tokenId));
 }

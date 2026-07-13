@@ -1,28 +1,26 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { useConnectModal } from "@rainbow-me/rainbowkit";
-import { useAccount, useSignMessage, useSwitchChain } from "wagmi";
+import { useWallet } from "@solana/wallet-adapter-react";
+import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import bs58 from "bs58";
 import { Loader2Icon, WalletIcon } from "lucide-react";
 import { toast } from "sonner";
 
+import { buildWalletVerifyMessage } from "@/lib/auth-session";
 import { getWalletNetworkById } from "@/lib/wallet-networks";
-import { buildWalletVerifyMessage, normalizeEvmWalletAddress } from "@/lib/auth-session";
-import { getChainIdForNetwork } from "@/lib/payment-contracts";
 import { Button } from "@/components/ui/button";
 import type { WalletNetworkId } from "@/lib/db/types";
 import { cn } from "@/lib/utils";
 
-export function VerifyWalletButton({
+export function VerifySolanaWalletButton({
   networkId,
-  address,
   label,
   onVerified,
   disabled,
   className,
 }: {
   networkId: WalletNetworkId;
-  address: string;
   label?: string;
   onVerified: (wallet: {
     id: string;
@@ -35,49 +33,34 @@ export function VerifyWalletButton({
   disabled?: boolean;
   className?: string;
 }) {
-  const { openConnectModal } = useConnectModal();
-  const { address: connectedAddress, chainId, isConnected } = useAccount();
-  const { signMessageAsync } = useSignMessage();
-  const { switchChainAsync } = useSwitchChain();
+  const { publicKey, connected, signMessage } = useWallet();
+  const { setVisible } = useWalletModal();
   const [loading, setLoading] = useState(false);
 
   const network = getWalletNetworkById(networkId);
-  const requiredChainId = getChainIdForNetwork(networkId);
-  const isWrongNetwork =
-    isConnected && requiredChainId != null && chainId !== requiredChainId;
+  const address = publicKey?.toBase58();
 
   const verifyWallet = useCallback(async () => {
-    const walletAddress = address || connectedAddress;
-    if (!walletAddress) return;
-
-    if (requiredChainId == null) {
-      toast.error("Unsupported network");
-      return;
-    }
-
-    const normalizedAddress = normalizeEvmWalletAddress(
-      walletAddress,
-    ) as `0x${string}`;
+    if (!publicKey || !signMessage) return;
 
     setLoading(true);
     try {
-      if (chainId !== requiredChainId) {
-        await switchChainAsync({ chainId: requiredChainId });
-      }
-
+      const walletAddress = publicKey.toBase58();
       const timestamp = Date.now();
       const message = buildWalletVerifyMessage(
-        normalizedAddress,
+        walletAddress,
         networkId,
         timestamp,
       );
-      const signature = await signMessageAsync({ message });
+      const encodedMessage = new TextEncoder().encode(message);
+      const signatureBytes = await signMessage(encodedMessage);
+      const signature = bs58.encode(signatureBytes);
 
       const response = await fetch("/api/wallets/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          address: normalizedAddress,
+          address: walletAddress,
           networkId,
           label,
           message,
@@ -110,28 +93,18 @@ export function VerifyWalletButton({
     } finally {
       setLoading(false);
     }
-  }, [
-    address,
-    chainId,
-    connectedAddress,
-    label,
-    networkId,
-    onVerified,
-    requiredChainId,
-    signMessageAsync,
-    switchChainAsync,
-  ]);
+  }, [label, networkId, onVerified, publicKey, signMessage]);
 
-  if (!isConnected && !address) {
+  if (!connected || !address) {
     return (
       <Button
         type="button"
         className={cn("h-10 w-full", className)}
-        onClick={() => openConnectModal?.()}
+        onClick={() => setVisible(true)}
         disabled={disabled}
       >
         <WalletIcon className="size-4" />
-        Connect wallet
+        Connect Phantom
       </Button>
     );
   }
@@ -146,14 +119,12 @@ export function VerifyWalletButton({
       {loading ? (
         <>
           <Loader2Icon className="size-4 animate-spin" />
-          {isWrongNetwork ? "Switching…" : "Verifying…"}
+          Verifying…
         </>
       ) : (
         <>
           <WalletIcon className="size-4" />
-          {isWrongNetwork
-            ? `Switch to ${network?.label ?? networkId}`
-            : "Sign to verify"}
+          Sign to verify {network?.label ?? "Solana"}
         </>
       )}
     </Button>

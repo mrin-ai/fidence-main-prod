@@ -109,6 +109,11 @@ const data = {
           url: "/payment-links",
           icon: <Link2Icon />,
         },
+        {
+          title: "Referrals",
+          url: "/referrals",
+          icon: <GiftIcon />,
+        },
       ],
     },
     {

@@ -9,6 +9,10 @@ import {
 } from "@/lib/cache/session-cache";
 import { getDb } from "@/lib/db/client";
 import { COLLECTIONS } from "@/lib/db/collections";
+import {
+  generateUniqueReferralCode,
+  resolveReferrerByCode,
+} from "@/lib/db/referrals";
 import type {
   SessionContext,
   SessionDoc,
@@ -143,6 +147,7 @@ export async function createSessionForUser(
 export async function upsertGoogleUser(input: {
   email: string;
   name: string;
+  referralCode?: string;
 }) {
   const db = await getDb();
   const now = new Date();
@@ -173,6 +178,9 @@ export async function upsertGoogleUser(input: {
     return db.collection<UserDoc>(COLLECTIONS.users).findOne({ _id: existing._id });
   }
 
+  const referralCode = await generateUniqueReferralCode();
+  const referrer = await resolveReferrerByCode(input.referralCode);
+
   const insert = await db.collection(COLLECTIONS.users).insertOne({
     email: input.email,
     name: input.name,
@@ -183,6 +191,10 @@ export async function upsertGoogleUser(input: {
     ],
     walletAddresses: [],
     verifiedWallets: [],
+    referralCode,
+    ...(referrer
+      ? { referredByUserId: referrer._id, referredAt: now }
+      : {}),
     lastLoginAt: now,
     createdAt: now,
     updatedAt: now,
@@ -191,7 +203,10 @@ export async function upsertGoogleUser(input: {
   return db.collection<UserDoc>(COLLECTIONS.users).findOne({ _id: insert.insertedId });
 }
 
-export async function upsertWalletUser(address: string) {
+export async function upsertWalletUser(
+  address: string,
+  referralCode?: string,
+) {
   const db = await getDb();
   const now = new Date();
   const normalized = address.toLowerCase();
@@ -216,6 +231,11 @@ export async function upsertWalletUser(address: string) {
     return db.collection<UserDoc>(COLLECTIONS.users).findOne({ _id: existing._id });
   }
 
+  const ownReferralCode = await generateUniqueReferralCode();
+  const referrer = await resolveReferrerByCode(referralCode, {
+    excludeWalletAddress: normalized,
+  });
+
   const insert = await db.collection(COLLECTIONS.users).insertOne({
     name: shortName,
     initials: normalized.slice(2, 4).toUpperCase(),
@@ -223,6 +243,10 @@ export async function upsertWalletUser(address: string) {
     authProviders: [{ type: "wallet", providerId: normalized }],
     walletAddresses: [normalized],
     verifiedWallets: [],
+    referralCode: ownReferralCode,
+    ...(referrer
+      ? { referredByUserId: referrer._id, referredAt: now }
+      : {}),
     lastLoginAt: now,
     createdAt: now,
     updatedAt: now,

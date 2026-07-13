@@ -7,11 +7,13 @@ import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { useAccount, useSignMessage } from "wagmi";
 import { Loader2 } from "lucide-react";
 import { buildSignInMessage } from "@/lib/auth-session";
+import { getClientReferralCode } from "@/components/referrals/referral-capture";
 
 export function Web3WalletButton() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirect = searchParams.get("redirect") ?? "/dashboard";
+  const referralCode = getClientReferralCode(searchParams);
 
   const { openConnectModal } = useConnectModal();
   const { address, isConnected } = useAccount();
@@ -31,11 +33,12 @@ export function Web3WalletButton() {
         const response = await fetch("/api/auth/wallet", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            address: walletAddress,
-            message,
-            signature,
-          }),
+        body: JSON.stringify({
+          address: walletAddress,
+          message,
+          signature,
+          ...(referralCode ? { referralCode } : {}),
+        }),
         });
 
         if (!response.ok) {
@@ -50,7 +53,7 @@ export function Web3WalletButton() {
         setLoading(false);
       }
     },
-    [redirect, router, signMessageAsync],
+    [redirect, referralCode, router, signMessageAsync],
   );
 
   useEffect(() => {
@@ -73,6 +76,7 @@ export function Web3WalletButton() {
   };
 
   return (
+    <>
     <button
       type="button"
       className="group relative mt-3 flex h-12 w-full items-center justify-center gap-3 rounded-xl border border-border/60 bg-background text-sm transition-all duration-200 hover:border-foreground/15 hover:bg-muted/30 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
@@ -96,5 +100,12 @@ export function Web3WalletButton() {
         Web3 wallet
       </span>
     </button>
+    <p className="mt-2 text-center text-[11px] leading-relaxed text-muted-foreground">
+      Sign-in uses your wallet&apos;s{" "}
+      <span className="font-medium text-foreground/80">Ethereum (EVM)</span>{" "}
+      address — even in Phantom. Solana is added separately under Wallets after
+      you sign in.
+    </p>
+  </>
   );
 }

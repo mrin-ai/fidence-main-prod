@@ -1,4 +1,6 @@
 export const AUTH_COOKIE = "lcx-auth";
+export const REFERRAL_COOKIE = "lcx-ref";
+export const REFERRAL_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
 
 export const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
 
@@ -31,15 +33,24 @@ export function parseWalletVerifyFields(message: string) {
   }
 
   const networkMatch = message.match(/Network:\s*(\S+)/);
-  const walletMatch = message.match(/Wallet:\s*(0x[a-fA-F0-9]{40})/);
   const timestamp = parseWalletVerifyTimestamp(message);
 
-  if (!networkMatch || !walletMatch || timestamp == null) {
+  if (!networkMatch || timestamp == null) {
+    return null;
+  }
+
+  const networkId = networkMatch[1];
+  const walletMatch =
+    networkId === "solana"
+      ? message.match(/Wallet:\s*([1-9A-HJ-NP-Za-km-z]{32,44})/)
+      : message.match(/Wallet:\s*(0x[a-fA-F0-9]{40})/);
+
+  if (!walletMatch) {
     return null;
   }
 
   return {
-    networkId: networkMatch[1],
+    networkId,
     address: walletMatch[1],
     timestamp,
   };

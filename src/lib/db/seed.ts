@@ -150,6 +150,8 @@ export async function ensureDbIndexes() {
     db.collection(COLLECTIONS.users).createIndex({ email: 1 }, { unique: true, sparse: true }),
     db.collection(COLLECTIONS.users).createIndex({ username: 1 }, { unique: true, sparse: true }),
     db.collection(COLLECTIONS.users).createIndex({ walletAddresses: 1 }),
+    db.collection(COLLECTIONS.users).createIndex({ referralCode: 1 }, { unique: true, sparse: true }),
+    db.collection(COLLECTIONS.users).createIndex({ referredByUserId: 1 }),
     db.collection(COLLECTIONS.workspaces).createIndex({ slug: 1 }, { unique: true }),
     db.collection(COLLECTIONS.workspaceMembers).createIndex(
       { workspaceId: 1, userId: 1 },

@@ -7,6 +7,7 @@ import {
   sessionCookieOptions,
   upsertWalletUser,
 } from "@/lib/db/auth";
+import { parseReferralCookie } from "@/lib/referrals";
 import {
   checkRateLimit,
   getClientIp,
@@ -28,9 +29,10 @@ export async function POST(request: Request) {
       address?: string;
       message?: string;
       signature?: string;
+      referralCode?: string;
     };
 
-    const { address, message, signature } = body;
+    const { address, message, signature, referralCode: bodyReferralCode } = body;
 
     if (!address || !message || !signature) {
       return NextResponse.json(
@@ -53,7 +55,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid sign-in message" }, { status: 401 });
     }
 
-    const user = await upsertWalletUser(address);
+    const referralCode =
+      bodyReferralCode?.trim() || parseReferralCookie(request.headers.get("cookie"));
+
+    const user = await upsertWalletUser(address, referralCode);
     if (!user) {
       return NextResponse.json({ error: "Failed to create user" }, { status: 500 });
     }

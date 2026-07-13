@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { getNetworkById } from "@/lib/create-payment-link-data";
+import { getWalletNetworkById } from "@/lib/wallet-networks";
 import { logWalletRemovedActivity } from "@/lib/db/activity";
 import { getSessionFromCookies } from "@/lib/db/auth";
 import { removeVerifiedWallet } from "@/lib/db/wallets";
@@ -21,7 +21,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
     return NextResponse.json({ error: result.error }, { status });
   }
 
-  const network = getNetworkById(result.wallet.networkId);
+  const network = getWalletNetworkById(result.wallet.networkId);
   await logWalletRemovedActivity({
     workspaceId: session.workspace._id,
     networkLabel: network?.label ?? result.wallet.networkId,

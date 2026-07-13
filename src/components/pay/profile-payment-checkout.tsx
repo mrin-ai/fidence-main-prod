@@ -18,14 +18,26 @@ import {
   paymentTokens,
 } from "@/lib/create-payment-link-data";
 import { buildErc681Uri } from "@/lib/payment/erc681";
+import { buildSolanaPayUri } from "@/lib/payment/solana-pay-uri";
 import { buildProfileUrl, truncateAddress } from "@/lib/profile-url";
 import { supportsOnChainPayment } from "@/lib/payment-contracts";
 import { PayPageNavbar } from "@/components/pay/pay-page-navbar";
 import { useOnchainPayment } from "@/components/pay/use-onchain-payment";
+import { useSolanaPayment } from "@/components/pay/use-solana-payment";
 import { PaymentQrCode } from "@/components/payment/payment-qr-code";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+
+const PROFILE_NETWORK_PILL_LIMIT = 4;
 
 export function ProfilePaymentCheckout({
   profile,
@@ -41,8 +53,13 @@ export function ProfilePaymentCheckout({
   const [paidTxHash, setPaidTxHash] = useState<string | null>(null);
 
   const { openConnectModal } = useConnectModal();
-  const { address, isConnected, chainId, isPaying, executePayment, getRequiredChainId } =
-    useOnchainPayment();
+  const evmPayment = useOnchainPayment();
+  const solanaPayment = useSolanaPayment();
+
+  const isSolana = selectedNetworkId === "solana";
+  const address = isSolana ? solanaPayment.address : evmPayment.address;
+  const isConnected = isSolana ? solanaPayment.isConnected : evmPayment.isConnected;
+  const isPaying = isSolana ? solanaPayment.isPaying : evmPayment.isPaying;
 
   const selectedWallet = profile.wallets.find(
     (wallet) => wallet.networkId === selectedNetworkId,
@@ -55,9 +72,14 @@ export function ProfilePaymentCheckout({
     parsedAmount > 0 &&
     supportsOnChainPayment(selectedNetworkId, tokenId);
 
-  const requiredChainId = getRequiredChainId(selectedNetworkId);
+  const requiredChainId = isSolana
+    ? null
+    : evmPayment.getRequiredChainId(selectedNetworkId);
   const isWrongNetwork =
-    isConnected && requiredChainId != null && chainId !== requiredChainId;
+    !isSolana &&
+    isConnected &&
+    requiredChainId != null &&
+    evmPayment.chainId !== requiredChainId;
 
   const availableTokens = useMemo(
     () =>
@@ -76,6 +98,14 @@ export function ProfilePaymentCheckout({
   const qrValue = useMemo(() => {
     if (!selectedWallet || !canPay) return null;
     try {
+      if (selectedNetworkId === "solana") {
+        return buildSolanaPayUri({
+          recipientAddress: selectedWallet.address,
+          tokenId,
+          amount: parsedAmount,
+        });
+      }
+
       return buildErc681Uri({
         networkId: selectedNetworkId,
         tokenId,
@@ -98,12 +128,16 @@ export function ProfilePaymentCheckout({
     if (!selectedWallet || !canPay || !address) return;
 
     try {
-      const { txHash } = await executePayment({
+      const paymentInput = {
         recipientAddress: selectedWallet.address,
         amount: parsedAmount,
         tokenId,
         networkId: selectedNetworkId,
-      });
+      };
+
+      const { txHash, payerAddress } = isSolana
+        ? await solanaPayment.executePayment(paymentInput)
+        : await evmPayment.executePayment(paymentInput);
 
       const response = await fetch(`/api/public/users/${profile.username}/pay`, {
         method: "POST",
@@ -112,7 +146,7 @@ export function ProfilePaymentCheckout({
           amount: parsedAmount,
           tokenId,
           networkId: selectedNetworkId,
-          payerAddress: address,
+          payerAddress,
           txHash,
         }),
       });
@@ -163,26 +197,60 @@ export function ProfilePaymentCheckout({
               </p>
             ) : (
               <>
-                <div className="flex flex-wrap justify-center gap-1.5">
-                  {profile.wallets.map((wallet) => {
-                    const isSelected = wallet.networkId === selectedNetworkId;
-                    return (
-                      <button
-                        key={wallet.networkId}
-                        type="button"
-                        onClick={() => setSelectedNetworkId(wallet.networkId)}
-                        className={cn(
-                          "rounded-full px-3 py-1 text-xs font-medium transition-colors",
-                          isSelected
-                            ? "bg-foreground text-background"
-                            : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
-                        )}
-                      >
-                        {wallet.networkLabel}
-                      </button>
-                    );
-                  })}
-                </div>
+                {profile.wallets.length > PROFILE_NETWORK_PILL_LIMIT ? (
+                  <div className="flex justify-center">
+                    <Select
+                      value={selectedNetworkId}
+                      onValueChange={(value) => {
+                        if (!value) return;
+                        setSelectedNetworkId(value);
+                      }}
+                      items={profile.wallets.map((wallet) => ({
+                        label: wallet.networkLabel,
+                        value: wallet.networkId,
+                      }))}
+                    >
+                      <SelectTrigger className="h-9 w-full max-w-[260px] rounded-full border-border/60 bg-muted/40 font-medium shadow-none">
+                        <SelectValue placeholder="Select network" />
+                      </SelectTrigger>
+                      <SelectContent align="center">
+                        <SelectGroup>
+                          {profile.wallets.map((wallet) => (
+                            <SelectItem
+                              key={wallet.networkId}
+                              value={wallet.networkId}
+                            >
+                              {wallet.networkLabel}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : (
+                  <div className="-mx-6 overflow-x-auto px-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    <div className="flex w-max min-w-full justify-center gap-1.5">
+                      {profile.wallets.map((wallet) => {
+                        const isSelected = wallet.networkId === selectedNetworkId;
+                        return (
+                          <button
+                            key={wallet.networkId}
+                            type="button"
+                            onClick={() => setSelectedNetworkId(wallet.networkId)}
+                            className={cn(
+                              "shrink-0 rounded-full px-3 py-1 text-xs font-medium whitespace-nowrap transition-colors",
+                              isSelected
+                                ? "bg-foreground text-background"
+                                : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+                            )}
+                          >
+                            {wallet.networkLabel}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 <div className="space-y-3">
                   <input
@@ -251,10 +319,14 @@ export function ProfilePaymentCheckout({
                   <Button
                     type="button"
                     className="h-10 w-full rounded-xl"
-                    onClick={() => openConnectModal?.()}
+                    onClick={() =>
+                      isSolana
+                        ? solanaPayment.openWalletModal()
+                        : openConnectModal?.()
+                    }
                   >
                     <WalletIcon className="size-4" />
-                    Connect wallet
+                    {isSolana ? "Connect Phantom" : "Connect wallet"}
                   </Button>
                 ) : (
                   <div className="space-y-2">

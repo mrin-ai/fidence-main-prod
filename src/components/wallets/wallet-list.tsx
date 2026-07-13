@@ -5,7 +5,7 @@ import Link from "next/link";
 import { PlusIcon, Trash2Icon } from "lucide-react";
 import { toast } from "sonner";
 
-import { getNetworkById } from "@/lib/create-payment-link-data";
+import { getWalletNetworkById } from "@/lib/wallet-networks";
 import { truncateAddress } from "@/lib/profile-url";
 import { AddWalletDialog } from "@/components/wallets/add-wallet-dialog";
 import { WalletQrButton, WalletQrDialog } from "@/components/wallets/wallet-qr-dialog";
@@ -131,7 +131,7 @@ export function WalletList({
               </TableHeader>
               <TableBody>
                 {wallets.map((wallet) => {
-                  const network = getNetworkById(wallet.networkId);
+                  const network = getWalletNetworkById(wallet.networkId);
                   return (
                     <TableRow key={wallet.id}>
                       <TableCell>

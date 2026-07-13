@@ -2,7 +2,7 @@
 
 import { QrCodeIcon } from "lucide-react";
 
-import { getNetworkById } from "@/lib/create-payment-link-data";
+import { getWalletNetworkById } from "@/lib/wallet-networks";
 import { buildWalletReceiveUri } from "@/lib/payment/erc681";
 import { truncateAddress } from "@/lib/profile-url";
 import { PaymentQrCode } from "@/components/payment/payment-qr-code";
@@ -28,7 +28,7 @@ export function WalletQrDialog({
 }) {
   if (!wallet) return null;
 
-  const network = getNetworkById(wallet.networkId);
+  const network = getWalletNetworkById(wallet.networkId);
   const qrValue = buildWalletReceiveUri({
     networkId: wallet.networkId,
     recipientAddress: wallet.address,

@@ -1,13 +1,20 @@
-const txExplorerBases: Record<string, string> = {
-  ethereum: "https://etherscan.io/tx/",
-  base: "https://basescan.org/tx/",
-  arbitrum: "https://arbiscan.io/tx/",
-  polygon: "https://polygonscan.com/tx/",
-  sepolia: "https://sepolia.etherscan.io/tx/",
+import { getEvmWalletNetworkById } from "@/lib/evm-networks";
+
+const legacyExplorerBases: Record<string, string> = {
+  solana: "https://solscan.io/tx/",
 };
 
 export function getTxExplorerUrl(networkId: string, txHash: string) {
-  const base = txExplorerBases[networkId];
-  if (!base || !txHash) return null;
-  return `${base}${txHash}`;
+  if (!txHash) return null;
+
+  const legacyBase = legacyExplorerBases[networkId];
+  if (legacyBase) {
+    return `${legacyBase}${txHash}`;
+  }
+
+  const network = getEvmWalletNetworkById(networkId);
+  const base = network?.chain.blockExplorers?.default?.url;
+  if (!base) return null;
+
+  return `${base}/tx/${txHash}`;
 }

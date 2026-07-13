@@ -17,7 +17,9 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith("/invoice") ||
     pathname.startsWith("/manage-invoices") ||
     pathname.startsWith("/activity") ||
-    pathname.startsWith("/payment-links");
+    pathname.startsWith("/payment-links") ||
+    pathname.startsWith("/referrals") ||
+    pathname.startsWith("/transactions");
 
   if (isProtected && !hasValidSession) {
     if (!token) {
@@ -55,6 +57,10 @@ export const config = {
     "/activity/:path*",
     "/payment-links",
     "/payment-links/:path*",
+    "/referrals",
+    "/referrals/:path*",
+    "/transactions",
+    "/transactions/:path*",
     "/wallets",
     "/wallets/:path*",
     "/sign-in",

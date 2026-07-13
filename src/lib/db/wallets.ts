@@ -1,7 +1,8 @@
 import { randomUUID } from "crypto";
 import type { ObjectId } from "mongodb";
 
-import { paymentNetworks, getNetworkById } from "@/lib/create-payment-link-data";
+import { getEvmWalletNetworkIds } from "@/lib/evm-networks";
+import { getWalletNetworkById, getWalletNetworkLabel } from "@/lib/wallet-networks";
 import { getDb } from "@/lib/db/client";
 import { COLLECTIONS } from "@/lib/db/collections";
 import type {
@@ -12,9 +13,7 @@ import type {
 
 const EVM_ADDRESS_REGEX = /^0x[a-fA-F0-9]{40}$/;
 
-const EVM_NETWORK_IDS = paymentNetworks
-  .map((network) => network.id)
-  .filter((id): id is WalletNetworkId => id !== "solana");
+const EVM_NETWORK_IDS = getEvmWalletNetworkIds();
 
 export function isEvmAddress(address: string) {
   return EVM_ADDRESS_REGEX.test(address);
@@ -86,7 +85,7 @@ export async function addVerifiedWallet(
   if (duplicateNetwork) {
     return {
       ok: false as const,
-      error: `You already have a verified wallet for ${input.networkId}`,
+      error: `You already have a verified wallet for ${getWalletNetworkLabel(input.networkId)}`,
     };
   }
 
@@ -152,7 +151,7 @@ export async function removeVerifiedWallet(userId: ObjectId, walletId: string) {
 export function requireRecipientAddress(user: UserDoc, networkId: string) {
   const recipientAddress = resolveRecipientAddress(user, networkId);
   if (!recipientAddress) {
-    const network = getNetworkById(networkId);
+    const network = getWalletNetworkById(networkId);
     return {
       ok: false as const,
       error: `Add and verify a wallet for ${network?.label ?? networkId} in Wallets`,

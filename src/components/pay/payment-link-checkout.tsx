@@ -16,6 +16,7 @@ import type { PublicPaymentLink } from "@/lib/payment-link-types";
 import { getTxExplorerUrl } from "@/lib/block-explorer";
 import { PayPageNavbar } from "@/components/pay/pay-page-navbar";
 import { useOnchainPayment } from "@/components/pay/use-onchain-payment";
+import { useSolanaPayment } from "@/components/pay/use-solana-payment";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -136,24 +137,35 @@ export function PaymentLinkCheckout({
       ? getTxExplorerUrl(link.networkId, displayTxHash)
       : null;
 
-  const { openConnectModal } = useConnectModal();
-  const { address, isConnected, chainId, isPaying, executePayment } =
-    useOnchainPayment();
+  const isSolana = link.networkId === "solana";
 
-  const requiredChainId = getChainIdForNetwork(link.networkId);
+  const { openConnectModal } = useConnectModal();
+  const evmPayment = useOnchainPayment();
+  const solanaPayment = useSolanaPayment();
+
+  const address = isSolana ? solanaPayment.address : evmPayment.address;
+  const isConnected = isSolana ? solanaPayment.isConnected : evmPayment.isConnected;
+  const isPaying = isSolana ? solanaPayment.isPaying : evmPayment.isPaying;
+
+  const requiredChainId = isSolana
+    ? null
+    : getChainIdForNetwork(link.networkId);
   const isWrongNetwork =
-    isConnected && requiredChainId != null && chainId !== requiredChainId;
+    !isSolana &&
+    isConnected &&
+    requiredChainId != null &&
+    evmPayment.chainId !== requiredChainId;
 
   const showPayActions = link.status === "pending" && link.canPay;
 
-  async function recordPayment(txHash: string) {
+  async function recordPayment(txHash: string, payerAddress?: string) {
     const response = await fetch(
       `/api/pay/${link.username}/${link.publicId}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          payerAddress: address,
+          payerAddress: payerAddress ?? address,
           txHash,
         }),
       },
@@ -177,21 +189,25 @@ export function PaymentLinkCheckout({
       return;
     }
 
-    if (requiredChainId == null) {
+    if (!isSolana && requiredChainId == null) {
       toast.error("Unsupported network");
       return;
     }
 
     try {
-      const { txHash } = await executePayment({
+      const paymentInput = {
         recipientAddress: link.recipientAddress,
         amount: link.amount,
         tokenId: link.tokenId,
         networkId: link.networkId,
-      });
+      };
+
+      const { txHash, payerAddress } = isSolana
+        ? await solanaPayment.executePayment(paymentInput)
+        : await evmPayment.executePayment(paymentInput);
 
       setConfirmedTxHash(txHash);
-      await recordPayment(txHash);
+      await recordPayment(txHash, payerAddress);
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Payment failed. Try again.",
@@ -276,10 +292,14 @@ export function PaymentLinkCheckout({
                       <Button
                         type="button"
                         className="h-11 w-full rounded-xl"
-                        onClick={() => openConnectModal?.()}
+                        onClick={() =>
+                          isSolana
+                            ? solanaPayment.openWalletModal()
+                            : openConnectModal?.()
+                        }
                       >
                         <WalletIcon className="size-4" />
-                        Connect wallet
+                        {isSolana ? "Connect Phantom" : "Connect wallet"}
                       </Button>
                     ) : (
                       <>
@@ -314,14 +334,6 @@ export function PaymentLinkCheckout({
                       </>
                     )}
                   </div>
-                ) : null}
-
-                {link.status === "pending" &&
-                !link.canPay &&
-                link.networkId === "solana" ? (
-                  <p className="text-center text-sm text-muted-foreground">
-                    Solana payments are not supported yet.
-                  </p>
                 ) : null}
               </div>
             )}

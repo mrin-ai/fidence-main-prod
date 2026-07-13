@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RainbowKitProvider, lightTheme } from "@rainbow-me/rainbowkit";
 import { WagmiProvider, cookieToInitialState, type State } from "wagmi";
 import { wagmiConfig } from "@/lib/wagmi-config";
+import { SolanaWalletProvider } from "@/components/providers/solana-wallet-provider";
 
 export function Web3Providers({
   children,
@@ -26,7 +27,7 @@ export function Web3Providers({
             borderRadius: "large",
           })}
         >
-          {children}
+          <SolanaWalletProvider>{children}</SolanaWalletProvider>
         </RainbowKitProvider>
       </QueryClientProvider>
     </WagmiProvider>

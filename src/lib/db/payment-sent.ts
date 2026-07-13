@@ -5,11 +5,21 @@ import { logPaymentSentActivity } from "@/lib/db/activity";
 import { getWorkspaceForUser } from "@/lib/db/auth";
 import { getDb } from "@/lib/db/client";
 import { COLLECTIONS } from "@/lib/db/collections";
+import {
+  normalizePaymentAddress,
+  normalizeTxHash,
+} from "@/lib/payment/normalize";
 import type { TransactionDoc, UserDoc } from "@/lib/db/types";
 
-export async function getWorkspaceForWalletAddress(address: string) {
+export async function getWorkspaceForWalletAddress(
+  address: string,
+  networkId?: string,
+) {
   const db = await getDb();
-  const normalized = address.toLowerCase();
+  const normalized = networkId
+    ? normalizePaymentAddress(address, networkId)
+    : address.trim();
+
   const user = await db.collection<UserDoc>(COLLECTIONS.users).findOne({
     walletAddresses: normalized,
   });
@@ -28,7 +38,10 @@ export async function recordPaymentSentForPayer(input: {
   merchantLabel: string;
   paymentLinkId?: ObjectId;
 }) {
-  const payerWorkspace = await getWorkspaceForWalletAddress(input.payerAddress);
+  const payerWorkspace = await getWorkspaceForWalletAddress(
+    input.payerAddress,
+    input.networkId,
+  );
   if (!payerWorkspace) {
     return { recorded: false as const, reason: "payer_not_registered" as const };
   }
@@ -39,7 +52,7 @@ export async function recordPaymentSentForPayer(input: {
 
   const db = await getDb();
   const now = new Date();
-  const normalizedTxHash = input.txHash.toLowerCase();
+  const normalizedTxHash = normalizeTxHash(input.txHash, input.networkId);
   const token = getTokenById(input.tokenId);
 
   const existing = await db.collection<TransactionDoc>(COLLECTIONS.transactions).findOne({

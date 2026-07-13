@@ -5,7 +5,7 @@ import {
   parseWalletVerifyFields,
   WALLET_VERIFY_MAX_AGE_MS,
 } from "@/lib/auth-session";
-import { getNetworkById, paymentNetworks } from "@/lib/create-payment-link-data";
+import { getWalletNetworkById, isSupportedWalletNetworkId } from "@/lib/wallet-networks";
 import { logWalletVerifiedActivity } from "@/lib/db/activity";
 import { getSessionFromCookies } from "@/lib/db/auth";
 import {
@@ -17,9 +17,11 @@ import {
   isEvmAddress,
   normalizeWalletAddress,
 } from "@/lib/db/wallets";
+import {
+  isValidSolanaAddress,
+  verifySolanaSignature,
+} from "@/lib/wallets/solana-verify";
 import type { WalletNetworkId } from "@/lib/db/types";
-
-const WALLET_NETWORK_IDS = new Set(paymentNetworks.map((network) => network.id));
 
 export async function POST(request: Request) {
   try {
@@ -63,25 +65,19 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!WALLET_NETWORK_IDS.has(networkId)) {
+    if (!isSupportedWalletNetworkId(networkId)) {
       return NextResponse.json({ error: "Unsupported network" }, { status: 400 });
     }
 
     const typedNetworkId = networkId as WalletNetworkId;
-
-    if (typedNetworkId === "solana") {
-      return NextResponse.json(
-        {
-          error: "Solana wallet verification is coming soon",
-          code: "SOLANA_NOT_SUPPORTED",
-        },
-        { status: 400 },
-      );
-    }
-
+    const isSolana = typedNetworkId === "solana";
     const normalizedAddress = normalizeWalletAddress(address, typedNetworkId);
 
-    if (!isEvmAddress(normalizedAddress)) {
+    if (isSolana) {
+      if (!isValidSolanaAddress(normalizedAddress)) {
+        return NextResponse.json({ error: "Invalid Solana address" }, { status: 400 });
+      }
+    } else if (!isEvmAddress(normalizedAddress)) {
       return NextResponse.json({ error: "Invalid EVM address" }, { status: 400 });
     }
 
@@ -113,28 +109,43 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid verification message" }, { status: 400 });
     }
 
-    const valid = await verifyMessage({
-      address: normalizedAddress as `0x${string}`,
-      message,
-      signature: signature as `0x${string}`,
-    });
+    if (isSolana) {
+      const solanaResult = verifySolanaSignature({
+        address: normalizedAddress,
+        message,
+        signature,
+      });
 
-    if (!valid) {
-      return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+      if (!solanaResult.ok) {
+        return NextResponse.json(
+          { error: solanaResult.error },
+          { status: 401 },
+        );
+      }
+    } else {
+      const valid = await verifyMessage({
+        address: normalizedAddress as `0x${string}`,
+        message,
+        signature: signature as `0x${string}`,
+      });
+
+      if (!valid) {
+        return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+      }
     }
 
     const result = await addVerifiedWallet(session.user._id, {
       networkId: typedNetworkId,
       address: normalizedAddress,
       label,
-      verificationMethod: "eip191",
+      verificationMethod: isSolana ? "solana" : "eip191",
     });
 
     if (!result.ok) {
       return NextResponse.json({ error: result.error }, { status: 409 });
     }
 
-    const network = getNetworkById(typedNetworkId);
+    const network = getWalletNetworkById(typedNetworkId);
 
     await logWalletVerifiedActivity({
       workspaceId: session.workspace._id,

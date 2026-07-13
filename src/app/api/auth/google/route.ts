@@ -6,6 +6,7 @@ import {
   sessionCookieOptions,
   upsertGoogleUser,
 } from "@/lib/db/auth";
+import { parseReferralCookie } from "@/lib/referrals";
 import {
   checkRateLimit,
   getClientIp,
@@ -23,9 +24,15 @@ export async function POST(request: Request) {
       return rateLimitResponse(limit);
     }
 
+    const body = (await request.json().catch(() => ({}))) as {
+      referralCode?: string;
+    };
+
     const user = await upsertGoogleUser({
       email: "alex.rivera@lcx.ag",
       name: "Alex Rivera",
+      referralCode:
+        body.referralCode?.trim() || parseReferralCookie(request.headers.get("cookie")),
     });
 
     if (!user) {

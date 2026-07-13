@@ -1,11 +1,19 @@
 import { parseEther, parseUnits } from "viem";
 
 import { getChainIdForNetwork, getTokenContract } from "@/lib/payment-contracts";
+import { buildSolanaPayUri } from "@/lib/payment/solana-pay-uri";
 
 export function buildWalletReceiveUri(input: {
   networkId: string;
   recipientAddress: string;
 }) {
+  if (input.networkId === "solana") {
+    return buildSolanaPayUri({
+      recipientAddress: input.recipientAddress,
+      tokenId: "sol",
+    });
+  }
+
   const chainId = getChainIdForNetwork(input.networkId);
   if (!chainId) {
     return input.recipientAddress;

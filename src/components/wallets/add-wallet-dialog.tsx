@@ -1,15 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  AlertCircleIcon,
-  ArrowRightIcon,
   CheckCircle2Icon,
+  SearchIcon,
   WalletIcon,
 } from "lucide-react";
+import { useWallet } from "@solana/wallet-adapter-react";
 import { useAccount } from "wagmi";
 
 import { VerifyWalletButton } from "@/components/wallets/verify-wallet-button";
+import { VerifySolanaWalletButton } from "@/components/wallets/verify-solana-wallet-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,13 +23,16 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { getNetworkById, paymentNetworks } from "@/lib/create-payment-link-data";
 import {
   getChainIdForNetwork,
   getNetworkIdForChainId,
 } from "@/lib/payment-contracts";
 import type { WalletNetworkId } from "@/lib/db/types";
-import { truncateAddress } from "@/lib/profile-url";
+import {
+  getWalletNetworkByChainId,
+  getWalletNetworkById,
+  walletNetworks,
+} from "@/lib/wallet-networks";
 import { cn } from "@/lib/utils";
 
 type VerifiedWalletPayload = {
@@ -39,32 +43,6 @@ type VerifiedWalletPayload = {
   label?: string;
   verifiedAt: string;
 };
-
-function NetworkStatusRow({
-  label,
-  value,
-  highlight,
-}: {
-  label: string;
-  value: string;
-  highlight?: boolean;
-}) {
-  return (
-    <div className="min-w-0 flex-1 space-y-0.5">
-      <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-        {label}
-      </p>
-      <p
-        className={cn(
-          "truncate text-sm font-medium",
-          highlight ? "text-foreground" : "text-muted-foreground",
-        )}
-      >
-        {value}
-      </p>
-    </div>
-  );
-}
 
 export function AddWalletDialog({
   open,
@@ -78,49 +56,111 @@ export function AddWalletDialog({
   onAdded: (wallet: VerifiedWalletPayload) => void;
 }) {
   const { address, chainId } = useAccount();
-  const [networkId, setNetworkId] = useState<WalletNetworkId>("base");
+  const { publicKey: solanaPublicKey, connected: solanaConnected } = useWallet();
+  const [networkId, setNetworkId] = useState<WalletNetworkId>("ethereum");
   const [label, setLabel] = useState("");
+  const [search, setSearch] = useState("");
+  const userPickedNetworkRef = useRef(false);
+  const selectedNetworkButtonRef = useRef<HTMLButtonElement>(null);
 
   const availableNetworks = useMemo(
     () =>
-      paymentNetworks.filter(
+      walletNetworks.filter(
         (network) => !verifiedNetworkIds.includes(network.id),
       ),
     [verifiedNetworkIds],
   );
 
-  const selectedNetwork = getNetworkById(networkId);
+  const filteredNetworks = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return availableNetworks;
+
+    return availableNetworks.filter(
+      (network) =>
+        network.label.toLowerCase().includes(query) ||
+        network.id.toLowerCase().includes(query),
+    );
+  }, [availableNetworks, search]);
+
+  const selectedNetwork = getWalletNetworkById(networkId);
   const requiredChainId = getChainIdForNetwork(networkId);
-  const connectedNetworkId = chainId
-    ? getNetworkIdForChainId(chainId)
-    : undefined;
-  const connectedNetwork = connectedNetworkId
-    ? getNetworkById(connectedNetworkId)
+  const connectedNetwork = chainId
+    ? getWalletNetworkByChainId(chainId) ??
+      (getNetworkIdForChainId(chainId)
+        ? getWalletNetworkById(getNetworkIdForChainId(chainId)!)
+        : undefined)
     : undefined;
   const isSolana = networkId === "solana";
-  const isConnected = Boolean(address);
+  const isConnected = isSolana ? solanaConnected : Boolean(address);
+  const solanaAddress = solanaPublicKey?.toBase58();
   const networksAligned =
     isConnected && requiredChainId != null && chainId === requiredChainId;
-  const needsNetworkSwitch =
-    isConnected && requiredChainId != null && chainId !== requiredChainId;
 
-  const currentStep = !isConnected ? 1 : networksAligned ? 3 : 2;
+  const currentStep = isSolana
+    ? !isConnected
+      ? 1
+      : 3
+    : !isConnected
+      ? 1
+      : networksAligned
+        ? 3
+        : 2;
+
+  useEffect(() => {
+    if (!open) {
+      userPickedNetworkRef.current = false;
+      return;
+    }
+
+    setLabel("");
+    setSearch("");
+
+    if (availableNetworks.length === 0 || userPickedNetworkRef.current) {
+      return;
+    }
+
+    const walletNetwork = chainId
+      ? getWalletNetworkByChainId(chainId)
+      : undefined;
+
+    if (
+      walletNetwork &&
+      availableNetworks.some((network) => network.id === walletNetwork.id)
+    ) {
+      setNetworkId(walletNetwork.id);
+      return;
+    }
+
+    setNetworkId((current) =>
+      availableNetworks.some((network) => network.id === current)
+        ? current
+        : availableNetworks[0].id,
+    );
+  }, [open, availableNetworks, chainId]);
 
   useEffect(() => {
     if (!open) return;
+    selectedNetworkButtonRef.current?.scrollIntoView({
+      block: "nearest",
+      behavior: "smooth",
+    });
+  }, [networkId, open, filteredNetworks]);
 
-    setLabel("");
-    if (availableNetworks.length === 0) return;
-
-    if (!availableNetworks.some((network) => network.id === networkId)) {
-      setNetworkId(availableNetworks[0].id as WalletNetworkId);
-    }
-  }, [open, availableNetworks, networkId]);
+  function selectNetwork(id: WalletNetworkId) {
+    userPickedNetworkRef.current = true;
+    setNetworkId(id);
+  }
 
   function handleVerified(wallet: VerifiedWalletPayload) {
     onAdded(wallet);
     setLabel("");
     onOpenChange(false);
+  }
+
+  function useConnectedNetwork() {
+    if (!connectedNetwork) return;
+    if (verifiedNetworkIds.includes(connectedNetwork.id)) return;
+    selectNetwork(connectedNetwork.id);
   }
 
   return (
@@ -134,12 +174,13 @@ export function AddWalletDialog({
             <div className="min-w-0 space-y-1">
               <DialogTitle className="text-base">Add wallet</DialogTitle>
               <DialogDescription className="text-pretty">
-                Verify a wallet for each network you want to receive payments on.
+                Connect a wallet, pick a network, and sign to verify your
+                address.
               </DialogDescription>
             </div>
           </div>
 
-          {!isSolana && availableNetworks.length > 0 ? (
+          {availableNetworks.length > 0 ? (
             <div className="flex items-center gap-2 pt-1">
               {[
                 { step: 1, label: "Connect" },
@@ -193,42 +234,148 @@ export function AddWalletDialog({
             <div className="space-y-5 px-6 py-5">
               <div className="space-y-2.5">
                 <Label className="text-xs text-muted-foreground">Network</Label>
-                <div className="flex flex-wrap gap-2">
-                  {availableNetworks.map((network) => {
-                    const isSelected = network.id === networkId;
-                    return (
-                      <button
-                        key={network.id}
-                        type="button"
-                        onClick={() =>
-                          setNetworkId(network.id as WalletNetworkId)
-                        }
-                        className={cn(
-                          "inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors",
-                          isSelected
-                            ? "border-primary bg-primary/5 text-foreground"
-                            : "border-border/60 bg-background text-muted-foreground hover:border-border hover:text-foreground",
-                        )}
-                      >
-                        {network.label}
-                        {network.testnet ? (
-                          <Badge
-                            variant="secondary"
-                            className="h-4 px-1.5 text-[10px] font-normal"
-                          >
-                            Test
-                          </Badge>
-                        ) : null}
-                      </button>
-                    );
-                  })}
+                {selectedNetwork ? (
+                  <p className="text-sm font-medium">
+                    {selectedNetwork.label}
+                    {selectedNetwork.paymentEnabled ? (
+                      <span className="ml-2 text-xs font-normal text-muted-foreground">
+                        · Payments enabled
+                      </span>
+                    ) : null}
+                  </p>
+                ) : null}
+                <div className="relative">
+                  <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                    placeholder="Search networks..."
+                    className="h-9 pl-9"
+                  />
+                </div>
+
+                {!isSolana &&
+                isConnected &&
+                connectedNetwork &&
+                !verifiedNetworkIds.includes(connectedNetwork.id) &&
+                connectedNetwork.id !== networkId ? (
+                  <button
+                    type="button"
+                    onClick={useConnectedNetwork}
+                    className="flex w-full items-center justify-between gap-2 rounded-lg border border-dashed border-primary/40 bg-primary/5 px-3 py-2 text-left text-xs transition-colors hover:border-primary/60 hover:bg-primary/10"
+                  >
+                    <span className="text-muted-foreground">
+                      Wallet is on{" "}
+                      <span className="font-medium text-foreground">
+                        {connectedNetwork.label}
+                      </span>
+                    </span>
+                    <span className="shrink-0 font-medium text-primary">Use this</span>
+                  </button>
+                ) : null}
+
+                <div className="max-h-40 space-y-0.5 overflow-y-auto rounded-xl border border-border/60 p-1">
+                  {filteredNetworks.length === 0 ? (
+                    <p className="px-2 py-6 text-center text-xs text-muted-foreground">
+                      No networks match your search.
+                    </p>
+                  ) : (
+                    filteredNetworks.map((network) => {
+                      const isSelected = network.id === networkId;
+                      return (
+                        <button
+                          key={network.id}
+                          ref={isSelected ? selectedNetworkButtonRef : undefined}
+                          type="button"
+                          onClick={() => selectNetwork(network.id)}
+                          className={cn(
+                            "flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2.5 text-left text-xs transition-colors",
+                            isSelected
+                              ? "bg-primary text-primary-foreground"
+                              : "text-foreground hover:bg-muted/60",
+                          )}
+                        >
+                          <span className="flex items-center gap-2">
+                            {isSelected ? (
+                              <CheckCircle2Icon className="size-3.5 shrink-0" />
+                            ) : (
+                              <span className="size-3.5 shrink-0" />
+                            )}
+                            <span className="font-medium">{network.label}</span>
+                          </span>
+                          <span className="flex items-center gap-1.5">
+                            {network.paymentEnabled ? (
+                              <Badge
+                                variant="secondary"
+                                className={cn(
+                                  "h-4 px-1.5 text-[10px] font-normal",
+                                  isSelected && "bg-primary-foreground/15 text-primary-foreground",
+                                )}
+                              >
+                                Payments
+                              </Badge>
+                            ) : null}
+                            {network.testnet ? (
+                              <Badge
+                                variant="secondary"
+                                className={cn(
+                                  "h-4 px-1.5 text-[10px] font-normal",
+                                  isSelected && "bg-primary-foreground/15 text-primary-foreground",
+                                )}
+                              >
+                                Test
+                              </Badge>
+                            ) : null}
+                          </span>
+                        </button>
+                      );
+                    })
+                  )}
                 </div>
                 {selectedNetwork?.testnet ? (
                   <p className="text-xs text-muted-foreground">
-                    Use Sepolia test ETH or USDC from a faucet — no real funds.
+                    Use test ETH or USDC from a faucet — no real funds.
                   </p>
                 ) : null}
               </div>
+
+              {isSolana ? (
+                !isConnected ? (
+                  <div className="flex items-start gap-3 rounded-xl border border-dashed border-border/70 bg-muted/15 px-4 py-4">
+                    <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted">
+                      <WalletIcon className="size-4 text-muted-foreground" />
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium">Connect Phantom</p>
+                      <p className="text-xs text-muted-foreground">
+                        Use the button below to connect your Solana wallet.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-1 text-center">
+                    <p className="font-mono text-xs text-muted-foreground">
+                      {solanaAddress}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      This is your Solana address — separate from the Ethereum
+                      address used to sign in.
+                    </p>
+                  </div>
+                )
+              ) : !isConnected ? (
+                <div className="flex items-start gap-3 rounded-xl border border-dashed border-border/70 bg-muted/15 px-4 py-4">
+                  <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted">
+                    <WalletIcon className="size-4 text-muted-foreground" />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Connect your wallet</p>
+                    <p className="text-xs text-muted-foreground">
+                      Use the button below to connect MetaMask or another wallet.
+                    </p>
+                  </div>
+                </div>
+              ) : null}
 
               <div className="space-y-2">
                 <Label htmlFor="wallet-label" className="text-xs text-muted-foreground">
@@ -245,104 +392,26 @@ export function AddWalletDialog({
                   className="h-9"
                 />
               </div>
-
-              {isSolana ? (
-                <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-4 py-6 text-center">
-                  <p className="text-sm font-medium">Solana coming soon</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    EVM networks are available for verification today.
-                  </p>
-                </div>
-              ) : (
-                <div
-                  className={cn(
-                    "rounded-xl border px-4 py-3.5",
-                    !isConnected && "border-dashed border-border/70 bg-muted/15",
-                    needsNetworkSwitch &&
-                      "border-amber-500/30 bg-amber-500/5",
-                    networksAligned && "border-emerald-500/30 bg-emerald-500/5",
-                  )}
-                >
-                  {!isConnected ? (
-                    <div className="flex items-start gap-3">
-                      <AlertCircleIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium">Wallet not connected</p>
-                        <p className="text-xs text-muted-foreground">
-                          Connect MetaMask or another wallet to continue.
-                        </p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-2">
-                        <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                          Connected address
-                        </p>
-                        {networksAligned ? (
-                          <Badge
-                            variant="secondary"
-                            className="h-5 gap-1 px-1.5 text-[10px] text-emerald-700 dark:text-emerald-400"
-                          >
-                            <CheckCircle2Icon className="size-3" />
-                            Ready
-                          </Badge>
-                        ) : null}
-                      </div>
-                      <p className="font-mono text-sm text-foreground">
-                        {truncateAddress(address!, 8)}
-                      </p>
-
-                      <div className="flex items-center gap-2 rounded-lg bg-background/80 p-2.5">
-                        <NetworkStatusRow
-                          label="Receiving on"
-                          value={selectedNetwork?.label ?? networkId}
-                          highlight
-                        />
-                        <ArrowRightIcon className="size-3.5 shrink-0 text-muted-foreground" />
-                        <NetworkStatusRow
-                          label="Wallet on"
-                          value={
-                            connectedNetwork?.label ??
-                            (chainId ? `Chain ${chainId}` : "Unknown")
-                          }
-                          highlight={networksAligned}
-                        />
-                      </div>
-
-                      {needsNetworkSwitch ? (
-                        <p className="flex items-start gap-2 text-xs text-amber-800 dark:text-amber-300">
-                          <AlertCircleIcon className="mt-0.5 size-3.5 shrink-0" />
-                          Your wallet must be on{" "}
-                          <span className="font-medium">
-                            {selectedNetwork?.label}
-                          </span>{" "}
-                          before you sign. The button below will switch networks
-                          for you.
-                        </p>
-                      ) : (
-                        <p className="text-xs text-muted-foreground">
-                          Sign a short message to prove you own this address. No
-                          transaction or gas spent for verification.
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
 
             <DialogFooter className="border-t border-border/50 bg-muted/20 px-6 py-4">
-              {!isSolana ? (
-                <div className="flex w-full flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="sm:min-w-24"
-                    onClick={() => onOpenChange(false)}
-                  >
-                    Cancel
-                  </Button>
+              <div className="flex w-full flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="sm:min-w-24"
+                  onClick={() => onOpenChange(false)}
+                >
+                  Cancel
+                </Button>
+                {isSolana ? (
+                  <VerifySolanaWalletButton
+                    networkId={networkId}
+                    label={label || undefined}
+                    onVerified={handleVerified}
+                    className="sm:min-w-40 sm:flex-1"
+                  />
+                ) : (
                   <VerifyWalletButton
                     networkId={networkId}
                     address={address ?? ""}
@@ -350,17 +419,8 @@ export function AddWalletDialog({
                     onVerified={handleVerified}
                     className="sm:min-w-40 sm:flex-1"
                   />
-                </div>
-              ) : (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full sm:ml-auto sm:w-auto"
-                  onClick={() => onOpenChange(false)}
-                >
-                  Close
-                </Button>
-              )}
+                )}
+              </div>
             </DialogFooter>
           </>
         )}

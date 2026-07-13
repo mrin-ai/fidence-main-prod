@@ -21,6 +21,11 @@ import { incrementDailyStat } from "@/lib/db/workspace-stats";
 import type { PaymentLinkDoc, PaymentLinkStatus, UserDoc, InvoiceDoc } from "@/lib/db/types";
 import type { PublicPaymentLink } from "@/lib/payment-link-types";
 import { formatPaymentDateTime } from "@/lib/format-date";
+import { supportsOnChainPayment } from "@/lib/payment-contracts";
+import {
+  normalizePaymentAddress,
+  normalizeTxHash,
+} from "@/lib/payment/normalize";
 
 export type { PublicPaymentLink };
 
@@ -82,7 +87,7 @@ function toPublicPaymentLink(
     canPay:
       status === "pending" &&
       Boolean(link.recipientAddress) &&
-      link.networkId !== "solana",
+      supportsOnChainPayment(link.networkId, link.tokenId),
     invoiceReference,
   };
 }
@@ -337,7 +342,6 @@ export async function markPaymentLinkPaid(input: {
   const db = await getDb();
   const now = new Date();
   const normalizedUsername = input.username.trim().toLowerCase();
-  const payerAddress = input.payerAddress.toLowerCase();
 
   const link = await db.collection<PaymentLinkDoc>(COLLECTIONS.paymentLinks).findOne({
     username: normalizedUsername,
@@ -347,6 +351,12 @@ export async function markPaymentLinkPaid(input: {
   if (!link) {
     return { ok: false as const, error: "Payment link not found" };
   }
+
+  const payerAddress = normalizePaymentAddress(
+    input.payerAddress,
+    link.networkId,
+  );
+  const normalizedTxHash = normalizeTxHash(input.txHash, link.networkId);
 
   const syncedLink = await syncExpiredStatus(link);
   const status = resolveStatus(syncedLink, now);
@@ -372,7 +382,7 @@ export async function markPaymentLinkPaid(input: {
         status: "paid",
         paidAt: now,
         paidBy: payerAddress,
-        paidTxHash: input.txHash,
+        paidTxHash: normalizedTxHash,
         updatedAt: now,
       },
     },
@@ -388,7 +398,7 @@ export async function markPaymentLinkPaid(input: {
     amount: syncedLink.amount,
     symbol: token?.symbol?.toLowerCase() ?? syncedLink.tokenId,
     networkId: syncedLink.networkId,
-    txHash: input.txHash.toLowerCase(),
+    txHash: normalizedTxHash,
     status: "confirmed",
     occurredAt: now,
     createdAt: now,
@@ -449,7 +459,7 @@ export async function markPaymentLinkPaid(input: {
     amount: syncedLink.amount,
     tokenId: syncedLink.tokenId,
     networkId: syncedLink.networkId,
-    txHash: input.txHash,
+    txHash: normalizedTxHash,
     merchantLabel: merchant?.username
       ? `@${merchant.username}`
       : syncedLink.username,
