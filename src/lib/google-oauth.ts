@@ -38,8 +38,8 @@ function getAuthSecret() {
   return secret;
 }
 
-export function getGoogleRedirectUri() {
-  return `${getPaymentBaseUrl()}/api/auth/google/callback`;
+export function getGoogleRedirectUri(requestOrigin?: string) {
+  return `${getPaymentBaseUrl(requestOrigin)}/api/auth/google/callback`;
 }
 
 export function isGoogleOAuthConfigured() {
@@ -76,10 +76,10 @@ export function verifyGoogleOAuthState(state: string) {
   }
 }
 
-export function buildGoogleAuthUrl(state: string) {
+export function buildGoogleAuthUrl(state: string, requestOrigin?: string) {
   const params = new URLSearchParams({
     client_id: getGoogleClientId(),
-    redirect_uri: getGoogleRedirectUri(),
+    redirect_uri: getGoogleRedirectUri(requestOrigin),
     response_type: "code",
     scope: "openid email profile",
     state,
@@ -90,7 +90,10 @@ export function buildGoogleAuthUrl(state: string) {
   return `${GOOGLE_AUTH_URL}?${params.toString()}`;
 }
 
-export async function exchangeGoogleAuthCode(code: string) {
+export async function exchangeGoogleAuthCode(
+  code: string,
+  requestOrigin?: string,
+) {
   const response = await fetch(GOOGLE_TOKEN_URL, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -98,7 +101,7 @@ export async function exchangeGoogleAuthCode(code: string) {
       code,
       client_id: getGoogleClientId(),
       client_secret: getGoogleClientSecret(),
-      redirect_uri: getGoogleRedirectUri(),
+      redirect_uri: getGoogleRedirectUri(requestOrigin),
       grant_type: "authorization_code",
     }),
   });

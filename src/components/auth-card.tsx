@@ -30,6 +30,14 @@ function GoogleIcon(props: React.ComponentProps<"svg">) {
   );
 }
 
+const AUTH_ERROR_MESSAGES: Record<string, string> = {
+  google_auth_invalid:
+    "Google sign-in expired or was interrupted. Please try again.",
+  google_auth_denied: "Google sign-in was cancelled.",
+  google_auth_failed: "Google sign-in failed. Please try again.",
+  google_not_configured: "Google sign-in is not configured on this deployment.",
+};
+
 interface AuthCardProps {
   title: string;
   description: string;
@@ -44,6 +52,10 @@ export default function AuthCard({
   const searchParams = useSearchParams();
   const redirect = searchParams.get("redirect") ?? "/dashboard";
   const referralCode = getClientReferralCode(searchParams);
+  const authError = searchParams.get("error");
+  const authErrorMessage = authError
+    ? (AUTH_ERROR_MESSAGES[authError] ?? "Sign-in failed. Please try again.")
+    : null;
 
   const [googleLoading, setGoogleLoading] = useState(false);
 
@@ -89,6 +101,12 @@ export default function AuthCard({
           ))}
         </div>
       )}
+
+      {authErrorMessage ? (
+        <div className="mb-4 rounded-xl border border-destructive/30 bg-destructive/5 px-3.5 py-3 text-sm text-destructive">
+          {authErrorMessage}
+        </div>
+      ) : null}
 
       <button
         type="button"

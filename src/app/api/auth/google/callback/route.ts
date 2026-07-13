@@ -76,8 +76,10 @@ export async function GET(request: Request) {
     return redirectToSignIn(request, "google_auth_invalid");
   }
 
+  const origin = new URL(request.url).origin;
+
   try {
-    const accessToken = await exchangeGoogleAuthCode(code);
+    const accessToken = await exchangeGoogleAuthCode(code, origin);
     const profile = await fetchGoogleUserProfile(accessToken);
 
     const user = await upsertGoogleUser({

@@ -25,13 +25,25 @@ export function generatePublicId() {
   return randomBytes(6).toString("hex");
 }
 
-export function getPaymentBaseUrl() {
+export function getPaymentBaseUrl(requestOrigin?: string) {
   const configured =
     process.env.NEXT_PUBLIC_PAYMENT_DOMAIN ??
-    process.env.NEXT_PUBLIC_APP_URL ??
-    "http://localhost:3000";
+    process.env.NEXT_PUBLIC_APP_URL;
 
-  return configured.replace(/\/$/, "");
+  if (configured) {
+    return configured.replace(/\/$/, "");
+  }
+
+  if (requestOrigin) {
+    return requestOrigin.replace(/\/$/, "");
+  }
+
+  const vercelUrl = process.env.VERCEL_URL?.trim();
+  if (vercelUrl) {
+    return `https://${vercelUrl.replace(/\/$/, "")}`;
+  }
+
+  return "http://localhost:3000";
 }
 
 export function buildPaymentLinkPath(username: string, publicId: string) {

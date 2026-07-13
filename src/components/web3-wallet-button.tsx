@@ -20,11 +20,13 @@ export function Web3WalletButton() {
   const { signMessageAsync } = useSignMessage();
 
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const pendingConnect = useRef(false);
 
   const verifyWallet = useCallback(
     async (walletAddress: string) => {
       setLoading(true);
+      setError(null);
       try {
         const timestamp = Date.now();
         const message = buildSignInMessage(walletAddress, timestamp);
@@ -42,13 +44,21 @@ export function Web3WalletButton() {
         });
 
         if (!response.ok) {
-          throw new Error("Wallet sign-in failed");
+          const data = (await response.json().catch(() => null)) as {
+            error?: string;
+          } | null;
+          throw new Error(data?.error ?? "Wallet sign-in failed");
         }
 
         router.push(redirect);
         router.refresh();
-      } catch {
+      } catch (walletError) {
         pendingConnect.current = false;
+        setError(
+          walletError instanceof Error
+            ? walletError.message
+            : "Wallet sign-in failed",
+        );
       } finally {
         setLoading(false);
       }
@@ -65,6 +75,7 @@ export function Web3WalletButton() {
 
   const handleClick = () => {
     if (loading) return;
+    setError(null);
 
     if (isConnected && address) {
       verifyWallet(address);
@@ -100,6 +111,9 @@ export function Web3WalletButton() {
         Web3 wallet
       </span>
     </button>
+    {error ? (
+      <p className="mt-2 text-center text-sm text-destructive">{error}</p>
+    ) : null}
     <p className="mt-2 text-center text-[11px] leading-relaxed text-muted-foreground">
       Sign-in uses your wallet&apos;s{" "}
       <span className="font-medium text-foreground/80">Ethereum (EVM)</span>{" "}

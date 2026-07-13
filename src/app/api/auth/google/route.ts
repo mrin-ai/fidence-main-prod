@@ -62,5 +62,6 @@ export async function GET(request: Request) {
     maxAge: 60 * 10,
   });
 
-  return NextResponse.redirect(buildGoogleAuthUrl(state));
+  const origin = new URL(request.url).origin;
+  return NextResponse.redirect(buildGoogleAuthUrl(state, origin));
 }
