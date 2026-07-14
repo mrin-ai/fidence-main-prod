@@ -5,6 +5,13 @@ const readUri = process.env.MONGODB_READ_URI;
 const dbName = process.env.MONGODB_DB ?? "fidence";
 const maxPoolSize = Number(process.env.MONGODB_MAX_POOL_SIZE ?? 35);
 
+function isLocalMongoUri(connectionUri: string) {
+  return /mongodb(\+srv)?:\/\/(127\.0\.0\.1|localhost)(:|\/)/.test(connectionUri);
+}
+
+/** Skip remote read replica when primary is local dev Mongo. */
+const useReadReplica = Boolean(readUri) && !isLocalMongoUri(uri);
+
 const clientOptions = {
   maxPoolSize,
   serverSelectionTimeoutMS: 5000,
@@ -40,8 +47,8 @@ function connectClient(
 }
 
 const clientPromise = connectClient(uri, clientOptions, "__mongoClientPromise");
-const readClientPromise = readUri
-  ? connectClient(readUri, readClientOptions, "__mongoReadClientPromise")
+const readClientPromise = useReadReplica
+  ? connectClient(readUri!, readClientOptions, "__mongoReadClientPromise")
   : null;
 
 export async function getDb(): Promise<Db> {
