@@ -1,6 +1,10 @@
 import type { ObjectId } from "mongodb";
 
-import { extractBearerToken, resolveApiKey } from "@/lib/db/api-keys";
+import {
+  getCachedMerchantContext,
+  setCachedMerchantContext,
+} from "@/lib/cache/merchant-context-cache";
+import { extractBearerToken, hashApiKey, resolveApiKey } from "@/lib/db/api-keys";
 import { getDb } from "@/lib/db/client";
 import { COLLECTIONS } from "@/lib/db/collections";
 import type { SecurityContext } from "@/lib/db/merchant-types";
@@ -19,6 +23,15 @@ export async function getMerchantApiContext(
   const rawKey = extractBearerToken(request);
   if (!rawKey) return null;
 
+  const keyHash = hashApiKey(rawKey);
+  const cached = await getCachedMerchantContext(keyHash);
+  if (cached?.owner.username) {
+    return {
+      ...cached,
+      security: extractSecurityContext(request),
+    };
+  }
+
   const apiKey = await resolveApiKey(rawKey);
   if (!apiKey) return null;
 
@@ -35,9 +48,11 @@ export async function getMerchantApiContext(
 
   if (!owner?.username) return null;
 
+  const context = { workspace, owner };
+  await setCachedMerchantContext(keyHash, context);
+
   return {
-    workspace,
-    owner,
+    ...context,
     security: extractSecurityContext(request),
   };
 }

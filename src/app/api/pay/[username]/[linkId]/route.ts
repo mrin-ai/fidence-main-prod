@@ -12,6 +12,8 @@ import { isReservedPaymentPathSegment } from "@/lib/payment-link-url";
 import { logWorkspaceSecurityEvent } from "@/lib/security-logging";
 import { extractSecurityContext } from "@/lib/request-security";
 
+const PUBLIC_PAY_CACHE_CONTROL = "public, s-maxage=45, stale-while-revalidate=120";
+
 type RouteContext = {
   params: Promise<{ username: string; linkId: string }>;
 };
@@ -29,7 +31,11 @@ export async function GET(_request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Payment link not found" }, { status: 404 });
   }
 
-  return NextResponse.json(link);
+  return NextResponse.json(link, {
+    headers: {
+      "Cache-Control": PUBLIC_PAY_CACHE_CONTROL,
+    },
+  });
 }
 
 export async function POST(request: Request, context: RouteContext) {

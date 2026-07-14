@@ -6,8 +6,10 @@ import {
 } from "@/lib/db/agent-payments";
 import {
   getMerchantApiContext,
+  getWorkspaceId,
   merchantApiUnauthorized,
 } from "@/lib/db/merchant-api";
+import { enforceMerchantApiRateLimit } from "@/lib/merchant-api/rate-limit";
 import { supportsOnChainPayment } from "@/lib/payment-contracts";
 
 function mapAgentPayErrorStatus(code?: string) {
@@ -25,6 +27,9 @@ function mapAgentPayErrorStatus(code?: string) {
 export async function POST(request: Request) {
   const context = await getMerchantApiContext(request);
   if (!context) return merchantApiUnauthorized();
+
+  const rateLimited = await enforceMerchantApiRateLimit(getWorkspaceId(context));
+  if (rateLimited) return rateLimited;
 
   const body = (await request.json()) as {
     agentId?: string;

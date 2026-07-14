@@ -4,6 +4,8 @@ import { CreatePaymentLinkProvider } from "@/components/create-payment-link-shee
 import { PaymentLinkCheckout } from "@/components/pay/payment-link-checkout";
 import { getPaymentLinkByUsernameAndPublicId } from "@/lib/db/payment-links";
 import { isReservedPaymentPathSegment } from "@/lib/payment-link-url";
+
+export const revalidate = 60;
 export default async function PublicPaymentLinkPage({
   params,
 }: {

@@ -15,7 +15,7 @@ import {
   logPaymentLinkCreatedActivity,
   logPaymentReceivedActivity,
 } from "@/lib/db/activity";
-import { getDb } from "@/lib/db/client";
+import { getDb, getReadDb } from "@/lib/db/client";
 import { COLLECTIONS } from "@/lib/db/collections";
 import { buildCommerceSourceFilter } from "@/lib/db/commerce-source";
 import type { CommerceSource } from "@/lib/db/merchant-types";
@@ -37,6 +37,12 @@ import {
   normalizeTxHash,
 } from "@/lib/payment/normalize";
 import { getSettlementVerifier } from "@/lib/payment/settlement";
+import {
+  getCachedPaymentLink,
+  invalidatePaymentLinkCache,
+  setCachedPaymentLink,
+} from "@/lib/cache/payment-link-cache";
+import { logActivity } from "@/lib/db/activity";
 
 export type { PublicPaymentLink };
 
@@ -218,6 +224,96 @@ export async function createPaymentLink(input: {
   };
 }
 
+export async function createPaymentLinksBatch(input: {
+  workspaceId: ObjectId;
+  userId: ObjectId;
+  username: string;
+  agentId: ObjectId;
+  agentPublicId: string;
+  links: Array<{
+    amount: number;
+    tokenId: string;
+    networkId: string;
+    expiresAt: Date;
+    recipientAddress: string;
+  }>;
+}) {
+  const db = await getDb();
+  const now = new Date();
+  const normalizedUsername = input.username.trim().toLowerCase();
+  const count = input.links.length;
+
+  const docs: Omit<PaymentLinkDoc, "_id">[] = [];
+  const created: Array<{
+    id: string;
+    publicId: string;
+    url: string;
+    status: PaymentLinkStatus;
+    amount: number;
+    tokenId: string;
+    networkId: string;
+  }> = [];
+  let pendingCount = 0;
+
+  for (const linkInput of input.links) {
+    const publicId = generatePublicId();
+    const url = buildPaymentLinkUrl(normalizedUsername, publicId);
+    const status: PaymentLinkStatus =
+      linkInput.expiresAt.getTime() < now.getTime() ? "expired" : "pending";
+    if (status === "pending") pendingCount += 1;
+
+    docs.push({
+      workspaceId: input.workspaceId,
+      createdBy: input.userId,
+      source: "agent",
+      agentId: input.agentId,
+      agentPublicId: input.agentPublicId,
+      username: normalizedUsername,
+      publicId,
+      slug: publicId,
+      url,
+      amount: linkInput.amount,
+      tokenId: linkInput.tokenId,
+      networkId: linkInput.networkId,
+      recipientAddress: linkInput.recipientAddress.toLowerCase(),
+      status,
+      expiresAt: linkInput.expiresAt,
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+
+  const result = await db.collection(COLLECTIONS.paymentLinks).insertMany(docs);
+
+  const insertedIds = Object.values(result.insertedIds);
+  insertedIds.forEach((insertedId, index) => {
+    const doc = docs[index];
+    created.push({
+      id: insertedId.toString(),
+      publicId: doc.publicId,
+      url: doc.url,
+      status: doc.status,
+      amount: doc.amount,
+      tokenId: doc.tokenId,
+      networkId: doc.networkId,
+    });
+  });
+
+  await incrementAgentLinkCount(input.agentId, count);
+  await incrementDailyStat(input.workspaceId, "linksCreated", count, now);
+  if (pendingCount > 0) {
+    await incrementDailyStat(input.workspaceId, "linksPending", pendingCount, now);
+  }
+
+  await logActivity({
+    workspaceId: input.workspaceId,
+    type: "agent_link_created",
+    summary: `Agent batch · ${input.agentPublicId} · ${count} links`,
+  });
+
+  return created;
+}
+
 export async function upsertInvoicePaymentLink(input: {
   workspaceId: ObjectId;
   userId: ObjectId;
@@ -366,8 +462,11 @@ export async function getPaymentLinkByUsernameAndPublicId(
   username: string,
   publicId: string,
 ) {
-  const db = await getDb();
   const normalizedUsername = username.trim().toLowerCase();
+  const cached = await getCachedPaymentLink(normalizedUsername, publicId);
+  if (cached) return cached;
+
+  const db = await getReadDb();
 
   const link = await db.collection<PaymentLinkDoc>(COLLECTIONS.paymentLinks).findOne({
     username: normalizedUsername,
@@ -391,7 +490,9 @@ export async function getPaymentLinkByUsernameAndPublicId(
     invoiceReference = invoice?.reference;
   }
 
-  return toPublicPaymentLink(syncedLink, merchant, invoiceReference);
+  const publicLink = toPublicPaymentLink(syncedLink, merchant, invoiceReference);
+  await setCachedPaymentLink(normalizedUsername, publicId, publicLink);
+  return publicLink;
 }
 
 export async function markPaymentLinkPaid(input: {
@@ -589,6 +690,8 @@ export async function markPaymentLinkPaid(input: {
   if (!merchant) {
     return { ok: false as const, error: "Merchant not found" };
   }
+
+  await invalidatePaymentLinkCache(normalizedUsername, input.publicId);
 
   let invoiceReference: string | undefined;
   if (updated.invoiceId) {

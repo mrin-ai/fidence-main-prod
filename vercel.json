@@ -5,6 +5,10 @@
       "schedule": "*/5 * * * *"
     },
     {
+      "path": "/api/internal/jobs/drain-security-audit",
+      "schedule": "* * * * *"
+    },
+    {
       "path": "/api/internal/jobs/archive-activity",
       "schedule": "0 3 * * *"
     }

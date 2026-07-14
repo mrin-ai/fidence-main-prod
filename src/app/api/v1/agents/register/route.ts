@@ -3,12 +3,17 @@ import { NextResponse } from "next/server";
 import { registerAgent } from "@/lib/db/agents";
 import {
   getMerchantApiContext,
+  getWorkspaceId,
   merchantApiUnauthorized,
 } from "@/lib/db/merchant-api";
+import { enforceMerchantApiRateLimit } from "@/lib/merchant-api/rate-limit";
 
 export async function POST(request: Request) {
   const context = await getMerchantApiContext(request);
   if (!context) return merchantApiUnauthorized();
+
+  const rateLimited = await enforceMerchantApiRateLimit(getWorkspaceId(context));
+  if (rateLimited) return rateLimited;
 
   const body = (await request.json()) as {
     agentId?: string;

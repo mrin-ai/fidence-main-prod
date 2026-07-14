@@ -4,15 +4,20 @@ import { requireActiveAgent } from "@/lib/db/agents";
 import { createPaymentLink } from "@/lib/db/payment-links";
 import {
   getMerchantApiContext,
+  getWorkspaceId,
   merchantApiUnauthorized,
 } from "@/lib/db/merchant-api";
 import { requireRecipientAddress } from "@/lib/db/wallets";
 import { logSecurityEvent } from "@/lib/db/security-audit";
+import { enforceMerchantApiRateLimit } from "@/lib/merchant-api/rate-limit";
 import { supportsOnChainPayment } from "@/lib/payment-contracts";
 
 export async function POST(request: Request) {
   const context = await getMerchantApiContext(request);
   if (!context) return merchantApiUnauthorized();
+
+  const rateLimited = await enforceMerchantApiRateLimit(getWorkspaceId(context));
+  if (rateLimited) return rateLimited;
 
   const body = (await request.json()) as {
     agentId?: string;

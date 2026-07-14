@@ -9,7 +9,7 @@ import type { SecurityContext } from "@/lib/db/merchant-types";
 
 const API_KEY_PREFIX = "fid_live_";
 
-function hashApiKey(rawKey: string) {
+export function hashApiKey(rawKey: string) {
   return createHash("sha256").update(rawKey).digest("hex");
 }
 
@@ -104,11 +104,6 @@ export async function resolveApiKey(rawKey: string) {
   });
 
   if (!doc) return null;
-
-  await db.collection<ApiKeyDoc>(COLLECTIONS.apiKeys).updateOne(
-    { _id: doc._id },
-    { $set: { lastUsedAt: new Date() } },
-  );
 
   return doc;
 }

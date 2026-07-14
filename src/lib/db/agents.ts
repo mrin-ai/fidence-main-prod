@@ -359,14 +359,14 @@ export async function setAgentStatus(input: {
   return { ok: true as const, agent: result };
 }
 
-export async function incrementAgentLinkCount(agentId: ObjectId) {
+export async function incrementAgentLinkCount(agentId: ObjectId, count = 1) {
   const db = await getDb();
   const now = new Date();
 
   await db.collection<AgentDoc>(COLLECTIONS.agents).updateOne(
     { _id: agentId },
     {
-      $inc: { linksCreated: 1 },
+      $inc: { linksCreated: count },
       $set: { lastActiveAt: now, updatedAt: now },
     },
   );
