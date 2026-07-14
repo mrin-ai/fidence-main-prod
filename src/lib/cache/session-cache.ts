@@ -1,35 +1,23 @@
 import { ObjectId } from "mongodb";
 
 import { cacheDel, cacheGet, cacheSet, parseStoredJson } from "@/lib/cache/redis";
-import type {
-  SessionContext,
-  SessionDoc,
-  UserDoc,
-  WorkspaceDoc,
-} from "@/lib/db/types";
+import type { SessionDoc } from "@/lib/db/types";
 
 const SESSION_KEY_PREFIX = "session:";
 
-type SerializedSessionContext = {
-  session: Omit<SessionDoc, "_id" | "userId" | "workspaceId" | "expiresAt" | "createdAt"> & {
-    _id: string;
-    userId: string;
-    workspaceId: string;
-    expiresAt: string;
-    createdAt: string;
-  };
-  user: Omit<UserDoc, "_id" | "lastLoginAt" | "createdAt" | "updatedAt"> & {
-    _id: string;
-    lastLoginAt: string;
-    createdAt: string;
-    updatedAt: string;
-  };
-  workspace: Omit<WorkspaceDoc, "_id" | "ownerId" | "createdAt" | "updatedAt"> & {
-    _id: string;
-    ownerId: string;
-    createdAt: string;
-    updatedAt: string;
-  };
+type SerializedSessionDoc = Omit<
+  SessionDoc,
+  "_id" | "userId" | "workspaceId" | "expiresAt" | "createdAt"
+> & {
+  _id: string;
+  userId: string;
+  workspaceId: string;
+  expiresAt: string;
+  createdAt: string;
+};
+
+type LegacySerializedSessionContext = {
+  session: SerializedSessionDoc;
 };
 
 function isSessionCacheEnabled() {
@@ -45,86 +33,64 @@ function ttlSecondsUntil(expiresAt: Date) {
   return Math.max(1, Math.min(seconds, 60 * 60 * 24 * 7));
 }
 
-function serializeSessionContext(context: SessionContext): SerializedSessionContext {
+function serializeSessionDoc(session: SessionDoc): SerializedSessionDoc {
   return {
-    session: {
-      ...context.session,
-      _id: context.session._id.toString(),
-      userId: context.session.userId.toString(),
-      workspaceId: context.session.workspaceId.toString(),
-      expiresAt: context.session.expiresAt.toISOString(),
-      createdAt: context.session.createdAt.toISOString(),
-    },
-    user: {
-      ...context.user,
-      _id: context.user._id.toString(),
-      lastLoginAt: context.user.lastLoginAt.toISOString(),
-      createdAt: context.user.createdAt.toISOString(),
-      updatedAt: context.user.updatedAt.toISOString(),
-    },
-    workspace: {
-      ...context.workspace,
-      _id: context.workspace._id.toString(),
-      ownerId: context.workspace.ownerId.toString(),
-      createdAt: context.workspace.createdAt.toISOString(),
-      updatedAt: context.workspace.updatedAt.toISOString(),
-    },
+    ...session,
+    _id: session._id.toString(),
+    userId: session.userId.toString(),
+    workspaceId: session.workspaceId.toString(),
+    expiresAt: session.expiresAt.toISOString(),
+    createdAt: session.createdAt.toISOString(),
   };
 }
 
-function deserializeSessionContext(payload: SerializedSessionContext): SessionContext {
+function deserializeSessionDoc(payload: SerializedSessionDoc): SessionDoc {
   return {
-    session: {
-      ...payload.session,
-      _id: new ObjectId(payload.session._id),
-      userId: new ObjectId(payload.session.userId),
-      workspaceId: new ObjectId(payload.session.workspaceId),
-      expiresAt: new Date(payload.session.expiresAt),
-      createdAt: new Date(payload.session.createdAt),
-    },
-    user: {
-      ...payload.user,
-      _id: new ObjectId(payload.user._id),
-      lastLoginAt: new Date(payload.user.lastLoginAt),
-      createdAt: new Date(payload.user.createdAt),
-      updatedAt: new Date(payload.user.updatedAt),
-      referredAt: payload.user.referredAt
-        ? new Date(payload.user.referredAt)
-        : undefined,
-      verifiedWallets: payload.user.verifiedWallets?.map((wallet) => ({
-        ...wallet,
-        verifiedAt: new Date(wallet.verifiedAt),
-      })),
-    },
-    workspace: {
-      ...payload.workspace,
-      _id: new ObjectId(payload.workspace._id),
-      ownerId: new ObjectId(payload.workspace.ownerId),
-      createdAt: new Date(payload.workspace.createdAt),
-      updatedAt: new Date(payload.workspace.updatedAt),
-    },
+    ...payload,
+    _id: new ObjectId(payload._id),
+    userId: new ObjectId(payload.userId),
+    workspaceId: new ObjectId(payload.workspaceId),
+    expiresAt: new Date(payload.expiresAt),
+    createdAt: new Date(payload.createdAt),
   };
 }
 
-export async function getCachedSession(token: string) {
+function parseCachedSessionPayload(raw: unknown): SessionDoc | null {
+  const parsed = parseStoredJson<SerializedSessionDoc | LegacySerializedSessionContext>(
+    raw,
+  );
+  if (!parsed) return null;
+
+  if ("session" in parsed && parsed.session) {
+    return deserializeSessionDoc(parsed.session);
+  }
+
+  if ("token" in parsed && "userId" in parsed && "workspaceId" in parsed) {
+    return deserializeSessionDoc(parsed as SerializedSessionDoc);
+  }
+
+  return null;
+}
+
+export async function getCachedSessionDoc(token: string) {
   if (!isSessionCacheEnabled()) return null;
 
   try {
     const raw = await cacheGet(sessionKey(token));
     if (!raw) return null;
 
-    const parsed = parseStoredJson<SerializedSessionContext>(raw);
-    if (!parsed) {
+    const session = parseCachedSessionPayload(raw);
+    if (!session) {
       await invalidateSession(token);
       return null;
     }
 
-    const context = deserializeSessionContext(parsed);
-    if (context.session.expiresAt <= new Date()) {
+    if (session.expiresAt <= new Date()) {
       await invalidateSession(token);
       return null;
     }
-    return context;
+
+    return session;
   } catch (error) {
     console.error("Session cache read failed:", error);
     try {
@@ -137,17 +103,17 @@ export async function getCachedSession(token: string) {
 }
 
 export async function hasCachedSession(token: string) {
-  return Boolean(await getCachedSession(token));
+  return Boolean(await getCachedSessionDoc(token));
 }
 
-export async function setCachedSession(token: string, context: SessionContext) {
+export async function setCachedSessionDoc(token: string, session: SessionDoc) {
   if (!isSessionCacheEnabled()) return;
 
   try {
-    const ttl = ttlSecondsUntil(context.session.expiresAt);
+    const ttl = ttlSecondsUntil(session.expiresAt);
     await cacheSet(
       sessionKey(token),
-      JSON.stringify(serializeSessionContext(context)),
+      JSON.stringify(serializeSessionDoc(session)),
       ttl,
     );
   } catch (error) {

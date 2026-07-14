@@ -2,6 +2,7 @@ import { ObjectId } from "mongodb";
 import { getInitials } from "@/lib/auth-session";
 import { getDb } from "@/lib/db/client";
 import { COLLECTIONS } from "@/lib/db/collections";
+import { syncPaymentLinksForUserUsername } from "@/lib/db/payment-links";
 import type { UserDoc, UserProfile } from "@/lib/db/types";
 
 const RESERVED_USERNAMES = new Set([
@@ -106,6 +107,14 @@ export async function updateUsername(userId: ObjectId, rawUsername: string) {
     return { ok: false as const, error: "This username is already taken" };
   }
 
+  const currentUser = await db.collection<UserDoc>(COLLECTIONS.users).findOne({
+    _id: userId,
+  });
+
+  if (currentUser?.username === validation.username) {
+    return { ok: true as const, user: currentUser };
+  }
+
   await db.collection<UserDoc>(COLLECTIONS.users).updateOne(
     { _id: userId },
     {
@@ -115,6 +124,8 @@ export async function updateUsername(userId: ObjectId, rawUsername: string) {
       },
     },
   );
+
+  await syncPaymentLinksForUserUsername(userId, validation.username);
 
   const user = await db.collection<UserDoc>(COLLECTIONS.users).findOne({
     _id: userId,

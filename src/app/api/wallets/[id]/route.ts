@@ -1,13 +1,8 @@
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
-import { AUTH_COOKIE } from "@/lib/auth-session";
 import { getWalletNetworkById } from "@/lib/wallet-networks";
 import { logWalletRemovedActivity } from "@/lib/db/activity";
-import {
-  getSessionFromCookies,
-  refreshSessionFromDatabase,
-} from "@/lib/db/auth";
+import { getSessionFromCookies } from "@/lib/db/auth";
 import { removeVerifiedWallet } from "@/lib/db/wallets";
 import { logWorkspaceSecurityEvent } from "@/lib/security-logging";
 import { extractSecurityContext } from "@/lib/request-security";
@@ -26,11 +21,6 @@ export async function DELETE(request: Request, context: RouteContext) {
   if (!result.ok) {
     const status = result.error === "Wallet not found" ? 404 : 400;
     return NextResponse.json({ error: result.error }, { status });
-  }
-
-  const token = (await cookies()).get(AUTH_COOKIE)?.value;
-  if (token) {
-    await refreshSessionFromDatabase(token);
   }
 
   const network = getWalletNetworkById(result.wallet.networkId);

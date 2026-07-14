@@ -4,9 +4,9 @@ import { randomUUID } from "crypto";
 import { ObjectId } from "mongodb";
 import { AUTH_COOKIE, SESSION_MAX_AGE_SECONDS, getInitials, slugify } from "@/lib/auth-session";
 import {
-  getCachedSession,
+  getCachedSessionDoc,
   invalidateSession,
-  setCachedSession,
+  setCachedSessionDoc,
 } from "@/lib/cache/session-cache";
 import { getDb } from "@/lib/db/client";
 import { COLLECTIONS } from "@/lib/db/collections";
@@ -136,11 +136,7 @@ export async function createSessionForUser(
     { $set: { lastLoginAt: now, updatedAt: now } },
   );
 
-  await setCachedSession(token, {
-    session: sessionDoc,
-    user,
-    workspace,
-  });
+  await setCachedSessionDoc(token, sessionDoc);
 
   return { token, user, workspace };
 }
@@ -256,26 +252,8 @@ export async function upsertWalletUser(
   return db.collection<UserDoc>(COLLECTIONS.users).findOne({ _id: insert.insertedId });
 }
 
-export async function getSessionByToken(token: string) {
-  let cached: SessionContext | null = null;
-  try {
-    cached = await getCachedSession(token);
-  } catch (error) {
-    console.error("Session cache lookup failed:", error);
-  }
-
-  if (cached) {
-    return cached;
-  }
-
+async function hydrateSessionContext(session: SessionDoc) {
   const db = await getDb();
-  const session = await db.collection<SessionDoc>(COLLECTIONS.sessions).findOne({
-    token,
-    expiresAt: { $gt: new Date() },
-  });
-
-  if (!session) return null;
-
   const [user, workspace] = await Promise.all([
     db.collection<UserDoc>(COLLECTIONS.users).findOne({ _id: session.userId }),
     db.collection<WorkspaceDoc>(COLLECTIONS.workspaces).findOne({
@@ -285,9 +263,31 @@ export async function getSessionByToken(token: string) {
 
   if (!user || !workspace) return null;
 
-  const context = { session, user, workspace } satisfies SessionContext;
-  await setCachedSession(token, context);
-  return context;
+  return { session, user, workspace } satisfies SessionContext;
+}
+
+export async function getSessionByToken(token: string) {
+  let session: SessionDoc | null = null;
+
+  try {
+    session = await getCachedSessionDoc(token);
+  } catch (error) {
+    console.error("Session cache lookup failed:", error);
+  }
+
+  if (!session) {
+    const db = await getDb();
+    session = await db.collection<SessionDoc>(COLLECTIONS.sessions).findOne({
+      token,
+      expiresAt: { $gt: new Date() },
+    });
+
+    if (!session) return null;
+
+    await setCachedSessionDoc(token, session);
+  }
+
+  return hydrateSessionContext(session);
 }
 
 export const getSessionFromCookies = cache(async () => {

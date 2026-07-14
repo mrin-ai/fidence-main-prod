@@ -40,6 +40,38 @@ import { getSettlementVerifier } from "@/lib/payment/settlement";
 
 export type { PublicPaymentLink };
 
+export async function syncPaymentLinksForUserUsername(
+  userId: ObjectId,
+  username: string,
+) {
+  const db = await getDb();
+  const normalizedUsername = username.trim().toLowerCase();
+  const now = new Date();
+
+  const links = await db
+    .collection<PaymentLinkDoc>(COLLECTIONS.paymentLinks)
+    .find({ createdBy: userId })
+    .project({ _id: 1, publicId: 1 })
+    .toArray();
+
+  if (links.length === 0) return;
+
+  await db.collection<PaymentLinkDoc>(COLLECTIONS.paymentLinks).bulkWrite(
+    links.map((link) => ({
+      updateOne: {
+        filter: { _id: link._id },
+        update: {
+          $set: {
+            username: normalizedUsername,
+            url: buildPaymentLinkUrl(normalizedUsername, link.publicId),
+            updatedAt: now,
+          },
+        },
+      },
+    })),
+  );
+}
+
 function resolveStatus(link: PaymentLinkDoc, now = new Date()): PaymentLinkStatus {
   if (link.status === "paid" || link.status === "cancelled") {
     return link.status;
