@@ -1,15 +1,14 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { createPublicClient, http, parseEther, parseUnits } from "viem";
+import { BaseError, createPublicClient, http, parseEther, parseUnits } from "viem";
 import {
   useAccount,
-  usePublicClient,
   useSendTransaction,
-  useSwitchChain,
   useWriteContract,
 } from "wagmi";
 
+import { getEvmRpcUrl } from "@/lib/evm-rpc";
 import { getEvmWalletNetworkById } from "@/lib/evm-networks";
 import {
   erc20TransferAbi,
@@ -17,29 +16,34 @@ import {
   getTokenContract,
   supportsOnChainPayment,
 } from "@/lib/payment-contracts";
-import { ensureWalletChain } from "@/lib/evm-switch-chain";
-
-const ERC20_TRANSFER_GAS_MAX = BigInt(200_000);
+import { switchWalletChainForNetwork } from "@/lib/evm-switch-chain";
 
 function getNetworkPublicClient(networkId: string) {
   const chain = getEvmWalletNetworkById(networkId)?.chain;
   if (!chain) return null;
 
+  const rpcUrl = getEvmRpcUrl(networkId);
   return createPublicClient({
     chain,
-    transport: http(),
+    transport: http(rpcUrl),
   });
+}
+
+function getErrorMessage(error: unknown) {
+  if (error instanceof BaseError) {
+    return error.shortMessage || error.message;
+  }
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return "Payment failed. Try again.";
 }
 
 function formatOnchainError(
   error: unknown,
   input?: OnchainPaymentInput,
 ): string {
-  if (!(error instanceof Error)) {
-    return "Payment failed. Try again.";
-  }
-
-  const message = error.message;
+  const message = getErrorMessage(error);
 
   if (message.includes("User rejected") || message.includes("user rejected")) {
     return "Transaction cancelled.";
@@ -54,22 +58,21 @@ function formatOnchainError(
     message.includes("exceeds balance") ||
     message.includes("ERC20: transfer amount exceeds balance")
   ) {
-    if (input?.networkId === "sepolia" && (input.tokenId === "usdc" || input.tokenId === "usdt")) {
+    if (
+      input?.networkId === "sepolia" &&
+      (input.tokenId === "usdc" || input.tokenId === "usdt")
+    ) {
       return "Not enough token balance on Sepolia for this payment. Make sure your wallet holds the same test token this app uses.";
     }
     return "Not enough token balance in your wallet for this payment.";
   }
 
-  if (message.includes("gas limit too high")) {
-    return "Transaction gas limit was rejected by the network. Check your wallet balance and try again.";
+  if (message.includes("Network switch cancelled")) {
+    return "Network switch cancelled.";
   }
 
   if (message.includes("does not match the connection's chain")) {
     return "Wallet network is out of sync. Switch to the correct network in MetaMask, then try again.";
-  }
-
-  if (message.includes("Network switch cancelled")) {
-    return "Network switch cancelled.";
   }
 
   const revertMatch = message.match(
@@ -94,8 +97,6 @@ export type OnchainPaymentInput = {
 export function useOnchainPayment() {
   const [isPaying, setIsPaying] = useState(false);
   const { address, isConnected, chainId } = useAccount();
-  const publicClient = usePublicClient();
-  const { switchChainAsync } = useSwitchChain();
   const { sendTransactionAsync } = useSendTransaction();
   const { writeContractAsync } = useWriteContract();
 
@@ -118,29 +119,18 @@ export function useOnchainPayment() {
 
       try {
         if (chainId !== requiredChainId) {
-          await ensureWalletChain(requiredChainId, switchChainAsync);
-        }
-
-        const networkClient =
-          getNetworkPublicClient(input.networkId) ?? publicClient;
-        if (!networkClient) {
-          throw new Error("Unable to connect to network");
+          await switchWalletChainForNetwork(input.networkId);
         }
 
         let txHash: `0x${string}`;
 
         if (input.tokenId === "eth") {
           const value = parseEther(input.amount.toString());
-          const gas = await networkClient.estimateGas({
-            account: address,
-            to: input.recipientAddress as `0x${string}`,
-            value,
-          });
 
           txHash = await sendTransactionAsync({
+            chainId: requiredChainId,
             to: input.recipientAddress as `0x${string}`,
             value,
-            gas: gas + gas / BigInt(4),
           });
         } else {
           const token = getTokenContract(input.networkId, input.tokenId);
@@ -153,29 +143,16 @@ export function useOnchainPayment() {
             parseUnits(input.amount.toString(), token.decimals),
           ] as const;
 
-          const gas = await networkClient.estimateContractGas({
-            address: token.address,
-            abi: erc20TransferAbi,
-            functionName: "transfer",
-            args,
-            account: address,
-          });
-          const gasLimit =
-            gas + gas / BigInt(4) > ERC20_TRANSFER_GAS_MAX
-              ? ERC20_TRANSFER_GAS_MAX
-              : gas + gas / BigInt(4);
-
           txHash = await writeContractAsync({
+            chainId: requiredChainId,
             address: token.address,
             abi: erc20TransferAbi,
             functionName: "transfer",
             args,
-            gas: gasLimit,
           });
         }
 
-        const receiptClient =
-          getNetworkPublicClient(input.networkId) ?? publicClient;
+        const receiptClient = getNetworkPublicClient(input.networkId);
         if (receiptClient) {
           await receiptClient.waitForTransactionReceipt({ hash: txHash });
         }
@@ -187,14 +164,7 @@ export function useOnchainPayment() {
         setIsPaying(false);
       }
     },
-    [
-      address,
-      chainId,
-      publicClient,
-      sendTransactionAsync,
-      switchChainAsync,
-      writeContractAsync,
-    ],
+    [address, chainId, sendTransactionAsync, writeContractAsync],
   );
 
   return {
