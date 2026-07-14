@@ -22,8 +22,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   getChainIdForNetwork,
+  getTokenContract,
   supportsOnChainPayment,
 } from "@/lib/payment-contracts";
+import {
+  formatAtomicTokenAmount,
+  shouldShowMetamaskAtomicAmountHint,
+} from "@/lib/payment/register-wallet-token";
 import { truncateAddress } from "@/lib/profile-url";
 import { cn } from "@/lib/utils";
 
@@ -157,6 +162,13 @@ export function PaymentLinkCheckout({
     evmPayment.chainId !== requiredChainId;
 
   const showPayActions = link.status === "pending" && link.canPay;
+
+  const showMetamaskAmountHint =
+    !isSolana &&
+    shouldShowMetamaskAtomicAmountHint(link.networkId, link.tokenId);
+  const tokenContract = showMetamaskAmountHint
+    ? getTokenContract(link.networkId, link.tokenId)
+    : null;
 
   async function recordPayment(txHash: string, payerAddress?: string) {
     const response = await fetch(
@@ -331,6 +343,20 @@ export function PaymentLinkCheckout({
                             </>
                           )}
                         </Button>
+                        {showMetamaskAmountHint && tokenContract ? (
+                          <p className="text-center text-[11px] leading-relaxed text-muted-foreground">
+                            MetaMask may show{" "}
+                            <span className="font-mono">
+                              {formatAtomicTokenAmount(
+                                link.amount,
+                                tokenContract.decimals,
+                              )}
+                            </span>{" "}
+                            instead of {link.amount} {link.tokenSymbol}. That is
+                            the same amount in smallest units (6 decimals) — not
+                            1 million tokens.
+                          </p>
+                        ) : null}
                       </>
                     )}
                   </div>

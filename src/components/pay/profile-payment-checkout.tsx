@@ -17,10 +17,14 @@ import {
   getTokenById,
   getTokensForNetwork,
 } from "@/lib/create-payment-link-data";
+import { getTokenContract, supportsOnChainPayment } from "@/lib/payment-contracts";
 import { buildErc681Uri } from "@/lib/payment/erc681";
 import { buildSolanaPayUri } from "@/lib/payment/solana-pay-uri";
 import { buildProfileUrl, truncateAddress } from "@/lib/profile-url";
-import { supportsOnChainPayment } from "@/lib/payment-contracts";
+import {
+  formatAtomicTokenAmount,
+  shouldShowMetamaskAtomicAmountHint,
+} from "@/lib/payment/register-wallet-token";
 import { PayPageNavbar } from "@/components/pay/pay-page-navbar";
 import { useOnchainPayment } from "@/components/pay/use-onchain-payment";
 import { useSolanaPayment } from "@/components/pay/use-solana-payment";
@@ -71,6 +75,13 @@ export function ProfilePaymentCheckout({
     Boolean(selectedWallet) &&
     parsedAmount > 0 &&
     supportsOnChainPayment(selectedNetworkId, tokenId);
+  const showMetamaskAmountHint =
+    !isSolana &&
+    parsedAmount > 0 &&
+    shouldShowMetamaskAtomicAmountHint(selectedNetworkId, tokenId);
+  const tokenContract = showMetamaskAmountHint
+    ? getTokenContract(selectedNetworkId, tokenId)
+    : null;
 
   const requiredChainId = isSolana
     ? null
@@ -355,6 +366,19 @@ export function ProfilePaymentCheckout({
                         </>
                       )}
                     </Button>
+                    {showMetamaskAmountHint && tokenContract ? (
+                      <p className="text-center text-[11px] leading-relaxed text-muted-foreground">
+                        MetaMask may show{" "}
+                        <span className="font-mono">
+                          {formatAtomicTokenAmount(
+                            parsedAmount,
+                            tokenContract.decimals,
+                          )}
+                        </span>{" "}
+                        instead of {parsedAmount} {token?.symbol ?? tokenId.toUpperCase()}.
+                        That is the same amount in smallest units (6 decimals).
+                      </p>
+                    ) : null}
                   </div>
                 )}
               </>

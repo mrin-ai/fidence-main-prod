@@ -11,12 +11,14 @@ import {
 } from "wagmi";
 
 import { getEvmWalletNetworkById } from "@/lib/evm-networks";
+import { getTokenById } from "@/lib/create-payment-link-data";
 import {
   erc20TransferAbi,
   getChainIdForNetwork,
   getTokenContract,
   supportsOnChainPayment,
 } from "@/lib/payment-contracts";
+import { tryRegisterWalletToken } from "@/lib/payment/register-wallet-token";
 
 const ERC20_TRANSFER_GAS_MAX = BigInt(200_000);
 
@@ -138,6 +140,14 @@ export function useOnchainPayment() {
           if (!token) {
             throw new Error("Token contract not configured for this network");
           }
+
+          const tokenMeta = getTokenById(input.tokenId);
+          await tryRegisterWalletToken({
+            address: token.address,
+            symbol: tokenMeta?.symbol ?? input.tokenId.toUpperCase(),
+            decimals: token.decimals,
+            cacheKey: `${input.networkId}:${input.tokenId}`,
+          });
 
           const args = [
             input.recipientAddress as `0x${string}`,
