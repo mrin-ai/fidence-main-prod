@@ -70,6 +70,10 @@ const tokenContracts: Record<string, Record<string, TokenContract>> = {
       address: "0x3402d41AA8e34e0DF605c12109de2f8F4FF33A87",
       decimals: 6,
     },
+    usdt: {
+      address: "0x7169d38820dfd117c3Fa1f22a697dBA58d90BA06",
+      decimals: 6,
+    },
   },
 };
 

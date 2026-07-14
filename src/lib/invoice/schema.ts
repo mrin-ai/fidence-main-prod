@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { getNetworksForToken } from "@/lib/create-payment-link-data";
+import { isPaymentTokenNetworkSupported } from "@/lib/create-payment-link-data";
 
 export const valueTypeSchema = z.enum(["percentage", "fixed"]);
 
@@ -77,8 +77,12 @@ export const invoiceFormSchema = invoiceFormBaseSchema
     }),
   })
   .superRefine((data, context) => {
-  const networks = getNetworksForToken(data.paymentLink.tokenId);
-  if (!networks.some((network) => network.id === data.paymentLink.networkId)) {
+  if (
+    !isPaymentTokenNetworkSupported(
+      data.paymentLink.tokenId,
+      data.paymentLink.networkId,
+    )
+  ) {
     context.addIssue({
       code: z.ZodIssueCode.custom,
       message: "Selected network does not support this token",

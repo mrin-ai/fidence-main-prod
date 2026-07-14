@@ -29,8 +29,8 @@ import {
   getDefaultExpirationValue,
   getNetworkById,
   getNetworksForToken,
+  getSupportedPaymentTokens,
   getTokenById,
-  paymentTokens,
 } from "@/lib/create-payment-link-data"
 import { cn } from "@/lib/utils"
 
@@ -140,6 +140,8 @@ function CreatePaymentLinkModal({
     ? verifiedNetworkIds.includes(draft.networkId)
     : true
 
+  const supportedTokens = React.useMemo(() => getSupportedPaymentTokens(), [])
+
   const availableNetworks = React.useMemo(
     () => getNetworksForToken(draft.tokenId),
     [draft.tokenId]
@@ -156,6 +158,19 @@ function CreatePaymentLinkModal({
     setCreatedLink(null)
     setCopied(false)
   }, [open])
+
+  React.useEffect(() => {
+    if (
+      draft.tokenId &&
+      !supportedTokens.some((token) => token.id === draft.tokenId)
+    ) {
+      setDraft((current) => ({
+        ...current,
+        tokenId: supportedTokens[0]?.id ?? "usdc",
+        networkId: "",
+      }))
+    }
+  }, [draft.tokenId, supportedTokens])
 
   React.useEffect(() => {
     if (
@@ -287,7 +302,7 @@ function CreatePaymentLinkModal({
                   onValueChange={(value) =>
                     updateDraft({ tokenId: value ?? "usdc", networkId: "" })
                   }
-                  items={paymentTokens.map((token) => ({
+                  items={supportedTokens.map((token) => ({
                     label: token.symbol,
                     value: token.id,
                   }))}
@@ -297,7 +312,7 @@ function CreatePaymentLinkModal({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectGroup>
-                      {paymentTokens.map((token) => (
+                      {supportedTokens.map((token) => (
                         <SelectItem key={token.id} value={token.id}>
                           {token.symbol} · {token.label}
                         </SelectItem>

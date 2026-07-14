@@ -1,3 +1,4 @@
+import { supportsOnChainPayment } from "@/lib/payment-contracts"
 import { testnetsEnabled } from "@/lib/testnets"
 
 export type PaymentToken = {
@@ -31,7 +32,7 @@ const productionPaymentNetworks: PaymentNetwork[] = [
 const sepoliaPaymentNetwork: PaymentNetwork = {
   id: "sepolia",
   label: "Sepolia (testnet)",
-  tokenIds: ["usdc", "eth"],
+  tokenIds: ["usdc", "usdt", "eth"],
   testnet: true,
 }
 
@@ -49,6 +50,34 @@ export function getNetworkById(id: string) {
 
 export function getNetworksForToken(tokenId: string) {
   return paymentNetworks.filter((network) => network.tokenIds.includes(tokenId))
+}
+
+export function getTokensForNetwork(networkId: string) {
+  const network = getNetworkById(networkId)
+  if (!network) return []
+
+  return paymentTokens.filter(
+    (token) =>
+      network.tokenIds.includes(token.id) &&
+      supportsOnChainPayment(networkId, token.id),
+  )
+}
+
+export function isPaymentTokenNetworkSupported(
+  tokenId: string,
+  networkId: string,
+) {
+  const network = getNetworkById(networkId)
+  if (!network?.tokenIds.includes(tokenId)) return false
+  return supportsOnChainPayment(networkId, tokenId)
+}
+
+export function getSupportedPaymentTokens() {
+  return paymentTokens.filter((token) =>
+    paymentNetworks.some((network) =>
+      isPaymentTokenNetworkSupported(token.id, network.id),
+    ),
+  )
 }
 
 export function getDefaultExpirationValue() {

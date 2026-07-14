@@ -22,8 +22,8 @@ import { calculateInvoiceTotal } from "@/lib/invoice/calculate-totals";
 import {
   getNetworkById,
   getNetworksForToken,
+  getSupportedPaymentTokens,
   getTokenById,
-  paymentTokens,
 } from "@/lib/create-payment-link-data";
 import { formatCurrency } from "@/lib/invoice/currency";
 import type { InvoiceFormData } from "@/lib/invoice/schema";
@@ -41,6 +41,8 @@ export function InvoicePaymentLinkSection({
   const currency = form.watch("invoiceDetails.currency");
   const items = form.watch("items");
   const billingDetails = form.watch("invoiceDetails.billingDetails");
+
+  const supportedTokens = React.useMemo(() => getSupportedPaymentTokens(), []);
 
   const availableNetworks = React.useMemo(
     () => getNetworksForToken(tokenId),
@@ -113,7 +115,7 @@ export function InvoicePaymentLinkSection({
               form.setValue("paymentLink.tokenId", value, { shouldDirty: true });
               form.setValue("paymentLink.networkId", "", { shouldDirty: true });
             }}
-            items={paymentTokens.map((token) => ({
+            items={supportedTokens.map((token) => ({
               label: token.symbol,
               value: token.id,
             }))}
@@ -123,7 +125,7 @@ export function InvoicePaymentLinkSection({
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                {paymentTokens.map((token) => (
+                {supportedTokens.map((token) => (
                   <SelectItem key={token.id} value={token.id}>
                     {token.symbol} · {token.label}
                   </SelectItem>

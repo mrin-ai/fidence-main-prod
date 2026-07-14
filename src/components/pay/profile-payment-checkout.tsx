@@ -15,7 +15,7 @@ import type { PublicProfile } from "@/lib/db/public-profile";
 import {
   getNetworkById,
   getTokenById,
-  paymentTokens,
+  getTokensForNetwork,
 } from "@/lib/create-payment-link-data";
 import { buildErc681Uri } from "@/lib/payment/erc681";
 import { buildSolanaPayUri } from "@/lib/payment/solana-pay-uri";
@@ -82,11 +82,8 @@ export function ProfilePaymentCheckout({
     evmPayment.chainId !== requiredChainId;
 
   const availableTokens = useMemo(
-    () =>
-      paymentTokens.filter((entry) =>
-        network?.tokenIds.includes(entry.id),
-      ),
-    [network],
+    () => (selectedNetworkId ? getTokensForNetwork(selectedNetworkId) : []),
+    [selectedNetworkId],
   );
 
   useEffect(() => {

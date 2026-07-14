@@ -53,8 +53,8 @@ function formatOnchainError(
     message.includes("exceeds balance") ||
     message.includes("ERC20: transfer amount exceeds balance")
   ) {
-    if (input?.networkId === "sepolia" && input.tokenId === "usdc") {
-      return "Not enough USDC on Sepolia for this payment. Make sure your wallet holds the same test USDC token this app uses.";
+    if (input?.networkId === "sepolia" && (input.tokenId === "usdc" || input.tokenId === "usdt")) {
+      return "Not enough token balance on Sepolia for this payment. Make sure your wallet holds the same test token this app uses.";
     }
     return "Not enough token balance in your wallet for this payment.";
   }

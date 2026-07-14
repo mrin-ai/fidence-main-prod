@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { isPaymentTokenNetworkSupported } from "@/lib/create-payment-link-data";
 import { getSessionFromCookies } from "@/lib/db/auth";
 import { createPaymentLink, listPaymentLinksPaginated } from "@/lib/db/payment-links";
 import { requireRecipientAddress } from "@/lib/db/wallets";
@@ -72,6 +73,16 @@ export async function POST(request: Request) {
 
   if (!amount || amount <= 0 || !tokenId || !networkId || !expiresAt) {
     return NextResponse.json({ error: "Invalid payment link payload" }, { status: 400 });
+  }
+
+  if (!isPaymentTokenNetworkSupported(tokenId, networkId)) {
+    return NextResponse.json(
+      {
+        error: "This token/network combination is not supported",
+        code: "TOKEN_NETWORK_UNSUPPORTED",
+      },
+      { status: 400 },
+    );
   }
 
   const recipient = requireRecipientAddress(session.user, networkId);
