@@ -19,6 +19,7 @@ import {
   supportsOnChainPayment,
 } from "@/lib/payment-contracts";
 import { tryRegisterWalletToken } from "@/lib/payment/register-wallet-token";
+import { ensureWalletChain } from "@/lib/evm-switch-chain";
 
 const ERC20_TRANSFER_GAS_MAX = BigInt(200_000);
 
@@ -63,6 +64,10 @@ function formatOnchainError(
 
   if (message.includes("gas limit too high")) {
     return "Transaction gas limit was rejected by the network. Check your wallet balance and try again.";
+  }
+
+  if (message.includes("does not match the connection's chain")) {
+    return "Wallet network is out of sync. Switch to the correct network in MetaMask, then try again.";
   }
 
   const revertMatch = message.match(
@@ -111,7 +116,7 @@ export function useOnchainPayment() {
 
       try {
         if (chainId !== requiredChainId) {
-          await switchChainAsync({ chainId: requiredChainId });
+          await ensureWalletChain(requiredChainId, switchChainAsync);
         }
 
         const networkClient =

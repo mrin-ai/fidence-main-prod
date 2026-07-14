@@ -23,9 +23,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  getChainIdForNetwork,
-} from "@/lib/payment-contracts";
 import type { WalletNetworkId } from "@/lib/db/types";
 import {
   getWalletNetworkByChainId,
@@ -82,15 +79,12 @@ export function AddWalletDialog({
   }, [availableNetworks, search]);
 
   const selectedNetwork = getWalletNetworkById(networkId);
-  const requiredChainId = getChainIdForNetwork(networkId);
-  const connectedNetwork = chainId
-    ? getWalletNetworkByChainId(chainId)
-    : undefined;
   const isSolana = networkId === "solana";
   const isConnected = isSolana ? solanaConnected : Boolean(address);
   const solanaAddress = solanaPublicKey?.toBase58();
-  const networksAligned =
-    isConnected && requiredChainId != null && chainId === requiredChainId;
+  const connectedNetwork = chainId
+    ? getWalletNetworkByChainId(chainId)
+    : undefined;
 
   const currentStep = isSolana
     ? !isConnected
@@ -98,9 +92,7 @@ export function AddWalletDialog({
       : 3
     : !isConnected
       ? 1
-      : networksAligned
-        ? 3
-        : 2;
+      : 3;
 
   useEffect(() => {
     if (!open) {
@@ -331,6 +323,12 @@ export function AddWalletDialog({
                 {selectedNetwork?.testnet ? (
                   <p className="text-xs text-muted-foreground">
                     Use test ETH or USDC from a faucet — no real funds.
+                  </p>
+                ) : null}
+                {!isSolana && isConnected ? (
+                  <p className="text-xs text-muted-foreground">
+                    Your wallet can stay on any network. Verification only
+                    requires a signature — no network switch needed.
                   </p>
                 ) : null}
               </div>

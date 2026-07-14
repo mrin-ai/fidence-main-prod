@@ -2,13 +2,12 @@
 
 import { useCallback, useState } from "react";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
-import { useAccount, useSignMessage, useSwitchChain } from "wagmi";
+import { useAccount, useSignMessage } from "wagmi";
 import { Loader2Icon, WalletIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { getWalletNetworkById } from "@/lib/wallet-networks";
 import { buildWalletVerifyMessage, normalizeEvmWalletAddress } from "@/lib/auth-session";
-import { getChainIdForNetwork } from "@/lib/payment-contracts";
 import { Button } from "@/components/ui/button";
 import type { WalletNetworkId } from "@/lib/db/types";
 import { cn } from "@/lib/utils";
@@ -36,24 +35,15 @@ export function VerifyWalletButton({
   className?: string;
 }) {
   const { openConnectModal } = useConnectModal();
-  const { address: connectedAddress, chainId, isConnected } = useAccount();
+  const { address: connectedAddress, isConnected } = useAccount();
   const { signMessageAsync } = useSignMessage();
-  const { switchChainAsync } = useSwitchChain();
   const [loading, setLoading] = useState(false);
 
   const network = getWalletNetworkById(networkId);
-  const requiredChainId = getChainIdForNetwork(networkId);
-  const isWrongNetwork =
-    isConnected && requiredChainId != null && chainId !== requiredChainId;
 
   const verifyWallet = useCallback(async () => {
     const walletAddress = address || connectedAddress;
     if (!walletAddress) return;
-
-    if (requiredChainId == null) {
-      toast.error("Unsupported network");
-      return;
-    }
 
     const normalizedAddress = normalizeEvmWalletAddress(
       walletAddress,
@@ -61,10 +51,6 @@ export function VerifyWalletButton({
 
     setLoading(true);
     try {
-      if (chainId !== requiredChainId) {
-        await switchChainAsync({ chainId: requiredChainId });
-      }
-
       const timestamp = Date.now();
       const message = buildWalletVerifyMessage(
         normalizedAddress,
@@ -112,14 +98,11 @@ export function VerifyWalletButton({
     }
   }, [
     address,
-    chainId,
     connectedAddress,
     label,
     networkId,
     onVerified,
-    requiredChainId,
     signMessageAsync,
-    switchChainAsync,
   ]);
 
   if (!isConnected && !address) {
@@ -146,14 +129,12 @@ export function VerifyWalletButton({
       {loading ? (
         <>
           <Loader2Icon className="size-4 animate-spin" />
-          {isWrongNetwork ? "Switching…" : "Verifying…"}
+          Verifying…
         </>
       ) : (
         <>
           <WalletIcon className="size-4" />
-          {isWrongNetwork
-            ? `Switch to ${network?.label ?? networkId}`
-            : "Sign to verify"}
+          Sign to verify {network?.label ?? networkId}
         </>
       )}
     </Button>
