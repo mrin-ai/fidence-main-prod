@@ -9,6 +9,7 @@ import {
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useAccount } from "wagmi";
 
+import { formatWalletVerifyPreview } from "@/lib/auth-session";
 import { VerifyWalletButton } from "@/components/wallets/verify-wallet-button";
 import { VerifySolanaWalletButton } from "@/components/wallets/verify-solana-wallet-button";
 import { Badge } from "@/components/ui/badge";
@@ -85,6 +86,10 @@ export function AddWalletDialog({
   const connectedNetwork = chainId
     ? getWalletNetworkByChainId(chainId)
     : undefined;
+  const verifyMessagePreview =
+    !isSolana && isConnected && address
+      ? formatWalletVerifyPreview(address, networkId)
+      : null;
 
   const currentStep = isSolana
     ? !isConnected
@@ -326,10 +331,52 @@ export function AddWalletDialog({
                   </p>
                 ) : null}
                 {!isSolana && isConnected ? (
-                  <p className="text-xs text-muted-foreground">
-                    Your wallet can stay on any network. Verification only
-                    requires a signature — no network switch needed.
-                  </p>
+                  <div className="space-y-3">
+                    {address ? (
+                      <p className="text-center font-mono text-xs text-muted-foreground">
+                        {address}
+                      </p>
+                    ) : null}
+                    {verifyMessagePreview ? (
+                      <div className="rounded-xl border border-border/60 bg-muted/20 px-3 py-3">
+                        <p className="text-[11px] font-medium text-foreground">
+                          You are verifying for{" "}
+                          <span className="text-primary">
+                            {selectedNetwork?.label ?? networkId}
+                          </span>
+                        </p>
+                        <pre className="mt-2 max-h-28 overflow-auto whitespace-pre-wrap font-mono text-[10px] leading-relaxed text-muted-foreground">
+                          {verifyMessagePreview}
+                        </pre>
+                        {connectedNetwork &&
+                        connectedNetwork.id !== networkId ? (
+                          <p className="mt-2 text-[11px] leading-relaxed text-amber-800">
+                            MetaMask may show{" "}
+                            <span className="font-medium">
+                              {connectedNetwork.label}
+                            </span>{" "}
+                            at the top — that is only your wallet&apos;s current
+                            chain. In the message, confirm{" "}
+                            <span className="font-mono font-medium">
+                              Network: {networkId}
+                            </span>{" "}
+                            matches{" "}
+                            <span className="font-medium">
+                              {selectedNetwork?.label ?? networkId}
+                            </span>
+                            .
+                          </p>
+                        ) : (
+                          <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+                            MetaMask&apos;s network header shows your
+                            wallet&apos;s current chain. The{" "}
+                            <span className="font-mono">Network:</span> line in
+                            the message is what PayAgent uses for verification.
+                          </p>
+                        )}
+                      </div>
+                    ) : null}
+                  </div>
                 ) : null}
               </div>
 

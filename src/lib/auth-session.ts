@@ -20,6 +20,10 @@ export function buildWalletVerifyMessage(
   return `Verify wallet for PayAgent\n\nNetwork: ${networkId}\nWallet: ${address}\nTimestamp: ${timestamp}`;
 }
 
+export function formatWalletVerifyPreview(address: string, networkId: string) {
+  return `Verify wallet for PayAgent\n\nNetwork: ${networkId}\nWallet: ${address}\nTimestamp: (generated when you sign)`;
+}
+
 export function parseWalletVerifyTimestamp(message: string): number | null {
   const match = message.match(/Timestamp:\s*(\d+)/);
   if (!match) return null;
