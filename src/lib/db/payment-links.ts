@@ -36,6 +36,7 @@ import {
   normalizePaymentAddress,
   normalizeTxHash,
 } from "@/lib/payment/normalize";
+import { getSettlementVerifier } from "@/lib/payment/settlement";
 
 export type { PublicPaymentLink };
 
@@ -403,6 +404,26 @@ export async function markPaymentLinkPaid(input: {
 
   if (status === "cancelled") {
     return { ok: false as const, error: "This payment link is no longer active" };
+  }
+
+  if (!syncedLink.recipientAddress) {
+    return { ok: false as const, error: "Payment link has no recipient address" };
+  }
+
+  const verifier = getSettlementVerifier();
+  const verified = await verifier.verifySettlement(
+    {
+      recipientAddress: syncedLink.recipientAddress,
+      amount: syncedLink.amount,
+      tokenId: syncedLink.tokenId,
+      networkId: syncedLink.networkId,
+      payerAddress,
+    },
+    normalizedTxHash,
+  );
+
+  if (!verified) {
+    return { ok: false as const, error: "Payment verification failed" };
   }
 
   const token = getTokenById(syncedLink.tokenId);

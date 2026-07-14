@@ -17,7 +17,6 @@ import { recordProfilePayment } from "@/lib/db/profile-payments";
 import { recordPaymentSentForPayer } from "@/lib/db/payment-sent";
 import { resolveRecipientAddress } from "@/lib/db/wallets";
 import { normalizeUsername } from "@/lib/db/profile";
-import { getSettlementVerifier } from "@/lib/payment/settlement";
 import { normalizePaymentAddress, normalizeTxHash } from "@/lib/payment/normalize";
 import { supportsOnChainPayment } from "@/lib/payment-contracts";
 import { logSecurityEvent } from "@/lib/db/security-audit";
@@ -85,22 +84,6 @@ export async function recordAgentPaymentLink(input: {
     link.networkId,
   );
   const normalizedTxHash = normalizeTxHash(input.txHash, link.networkId);
-
-  const verifier = getSettlementVerifier();
-  const verified = await verifier.verifySettlement(
-    {
-      recipientAddress: link.recipientAddress!,
-      amount: link.amount,
-      tokenId: link.tokenId,
-      networkId: link.networkId,
-      payerAddress: normalizedPayerAddress,
-    },
-    normalizedTxHash,
-  );
-
-  if (!verified) {
-    return { ok: false as const, error: "Payment verification failed" };
-  }
 
   const result = await markPaymentLinkPaid({
     username: input.linkUsername,

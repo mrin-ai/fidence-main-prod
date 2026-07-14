@@ -2,6 +2,8 @@ import { Connection, PublicKey } from "@solana/web3.js";
 
 import { getSolanaRpcUrl } from "@/lib/solana-config";
 import { getSolanaTokenMint } from "@/lib/payment/solana-contracts";
+
+import { isFormatOnlySettlementVerification } from "./mode";
 import type { PaymentSettlementVerifier, SettlementIntent } from "./types";
 
 const SOLANA_TX_SIGNATURE_REGEX = /^[1-9A-HJ-NP-Za-km-z]{80,90}$/;
@@ -88,8 +90,7 @@ export const solanaSettlementVerifier: PaymentSettlementVerifier = {
       return false;
     }
 
-    const mode = process.env.PAYMENT_SETTLEMENT_VERIFY_MODE ?? "wagmi";
-    if (mode === "wagmi") {
+    if (isFormatOnlySettlementVerification()) {
       return true;
     }
 
