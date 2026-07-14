@@ -1,7 +1,8 @@
-/** Sepolia and other testnets — enabled in dev or via NEXT_PUBLIC_ENABLE_TESTNETS=true */
+/**
+ * Sepolia testnet support.
+ * Enabled by default so wallets, payment links, and checkout detect Sepolia.
+ * Set NEXT_PUBLIC_ENABLE_TESTNETS=false to hide testnets in production.
+ */
 export function testnetsEnabled() {
-  return (
-    process.env.NEXT_PUBLIC_ENABLE_TESTNETS === "true" ||
-    process.env.NODE_ENV === "development"
-  );
+  return process.env.NEXT_PUBLIC_ENABLE_TESTNETS !== "false";
 }

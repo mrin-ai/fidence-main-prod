@@ -25,7 +25,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   getChainIdForNetwork,
-  getNetworkIdForChainId,
 } from "@/lib/payment-contracts";
 import type { WalletNetworkId } from "@/lib/db/types";
 import {
@@ -85,10 +84,7 @@ export function AddWalletDialog({
   const selectedNetwork = getWalletNetworkById(networkId);
   const requiredChainId = getChainIdForNetwork(networkId);
   const connectedNetwork = chainId
-    ? getWalletNetworkByChainId(chainId) ??
-      (getNetworkIdForChainId(chainId)
-        ? getWalletNetworkById(getNetworkIdForChainId(chainId)!)
-        : undefined)
+    ? getWalletNetworkByChainId(chainId)
     : undefined;
   const isSolana = networkId === "solana";
   const isConnected = isSolana ? solanaConnected : Boolean(address);

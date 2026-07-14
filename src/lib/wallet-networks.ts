@@ -1,6 +1,7 @@
 import { paymentNetworks, type PaymentNetwork } from "@/lib/create-payment-link-data";
 import {
   evmWalletNetworks,
+  getEvmNetworkIdForChainId,
   getEvmWalletNetworkByChainId,
   getEvmWalletNetworkById,
   isSupportedEvmWalletNetworkId,
@@ -46,7 +47,12 @@ export function getWalletNetworkById(id: string) {
 
 export function getWalletNetworkByChainId(chainId: number) {
   const evm = getEvmWalletNetworkByChainId(chainId);
-  return evm ? toWalletNetwork(evm) : undefined;
+  if (evm) return toWalletNetwork(evm);
+
+  const networkId = getEvmNetworkIdForChainId(chainId);
+  if (networkId) return getWalletNetworkById(networkId);
+
+  return undefined;
 }
 
 export function isSupportedWalletNetworkId(id: string) {

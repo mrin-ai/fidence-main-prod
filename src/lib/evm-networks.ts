@@ -112,5 +112,11 @@ export function getEvmChainIdForNetwork(networkId: string) {
 }
 
 export function getEvmNetworkIdForChainId(chainId: number) {
-  return networkByChainId.get(chainId)?.id;
+  const fromList = networkByChainId.get(chainId)?.id;
+  if (fromList) return fromList;
+
+  // Sepolia chain id — keep wallet detection working if lists are stale.
+  if (chainId === 11155111) return "sepolia";
+
+  return undefined;
 }
