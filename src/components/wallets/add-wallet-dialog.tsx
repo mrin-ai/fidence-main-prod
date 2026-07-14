@@ -350,28 +350,22 @@ export function AddWalletDialog({
                         </pre>
                         {connectedNetwork &&
                         connectedNetwork.id !== networkId ? (
-                          <p className="mt-2 text-[11px] leading-relaxed text-amber-800">
-                            MetaMask may show{" "}
+                          <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+                            MetaMask is on{" "}
                             <span className="font-medium">
                               {connectedNetwork.label}
-                            </span>{" "}
-                            at the top — that is only your wallet&apos;s current
-                            chain. In the message, confirm{" "}
-                            <span className="font-mono font-medium">
-                              Network: {networkId}
-                            </span>{" "}
-                            matches{" "}
+                            </span>
+                            . We&apos;ll ask to switch to{" "}
                             <span className="font-medium">
                               {selectedNetwork?.label ?? networkId}
-                            </span>
-                            .
+                            </span>{" "}
+                            before you sign, so the network in MetaMask matches
+                            your selection.
                           </p>
                         ) : (
                           <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
-                            MetaMask&apos;s network header shows your
-                            wallet&apos;s current chain. The{" "}
-                            <span className="font-mono">Network:</span> line in
-                            the message is what PayAgent uses for verification.
+                            MetaMask should show the same network at the top
+                            and in the message before you confirm.
                           </p>
                         )}
                       </div>

@@ -1,6 +1,6 @@
 import {
+  evmWalletNetworks,
   getEvmWalletNetworkByChainId,
-  getEvmWalletNetworkById,
 } from "@/lib/evm-networks";
 import { getChainIdForNetwork } from "@/lib/payment-contracts";
 
@@ -36,22 +36,7 @@ export function isConnectorChainMismatch(error: unknown) {
 function getChainConfig(chainId: number) {
   return (
     getEvmWalletNetworkByChainId(chainId)?.chain ??
-    (() => {
-      for (const network of [
-        "ethereum",
-        "base",
-        "arbitrum",
-        "polygon",
-        "optimism",
-        "sepolia",
-      ] as const) {
-        const chainIdForNetwork = getChainIdForNetwork(network);
-        if (chainIdForNetwork === chainId) {
-          return getEvmWalletNetworkById(network)?.chain;
-        }
-      }
-      return undefined;
-    })()
+    evmWalletNetworks.find((network) => network.chain.id === chainId)?.chain
   );
 }
 
