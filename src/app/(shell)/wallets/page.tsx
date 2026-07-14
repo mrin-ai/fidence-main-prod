@@ -1,14 +1,15 @@
 import { WalletsPageContent } from "@/components/wallets/wallets-page-content";
 import { requireShellSession } from "@/lib/shell-session";
 import {
-  listVerifiedWallets,
+  listVerifiedWalletsForUser,
   verifiedWalletVerifiedAtIso,
 } from "@/lib/db/wallets";
 
 export default async function WalletsPage() {
   const { session } = await requireShellSession("/wallets");
+  const wallets = await listVerifiedWalletsForUser(session.user._id);
 
-  const wallets = listVerifiedWallets(session.user).map((wallet) => ({
+  const walletItems = wallets.map((wallet) => ({
     id: wallet.id,
     networkId: wallet.networkId,
     address: wallet.address,
@@ -24,7 +25,7 @@ export default async function WalletsPage() {
 
   return (
     <WalletsPageContent
-      initialWallets={wallets}
+      initialWallets={walletItems}
       username={session.user.username}
       sessionWallet={sessionWallet}
     />

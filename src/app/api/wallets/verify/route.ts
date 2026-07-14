@@ -1,13 +1,18 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { verifyMessage } from "viem";
 
+import { AUTH_COOKIE } from "@/lib/auth-session";
 import {
   parseWalletVerifyFields,
   WALLET_VERIFY_MAX_AGE_MS,
 } from "@/lib/auth-session";
 import { getWalletNetworkById, isSupportedWalletNetworkId } from "@/lib/wallet-networks";
 import { logWalletVerifiedActivity } from "@/lib/db/activity";
-import { getSessionFromCookies } from "@/lib/db/auth";
+import {
+  getSessionFromCookies,
+  refreshSessionFromDatabase,
+} from "@/lib/db/auth";
 import { logWorkspaceSecurityEvent } from "@/lib/security-logging";
 import { extractSecurityContext } from "@/lib/request-security";
 import {
@@ -145,6 +150,11 @@ export async function POST(request: Request) {
 
     if (!result.ok) {
       return NextResponse.json({ error: result.error }, { status: 409 });
+    }
+
+    const token = (await cookies()).get(AUTH_COOKIE)?.value;
+    if (token) {
+      await refreshSessionFromDatabase(token);
     }
 
     const network = getWalletNetworkById(typedNetworkId);

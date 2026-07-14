@@ -5,7 +5,7 @@ import Link from "next/link";
 import { PlusIcon, Trash2Icon } from "lucide-react";
 import { toast } from "sonner";
 
-import { getWalletNetworkById } from "@/lib/wallet-networks";
+import { getWalletNetworkLabel } from "@/lib/wallet-networks";
 import { truncateAddress } from "@/lib/profile-url";
 import { AddWalletDialog } from "@/components/wallets/add-wallet-dialog";
 import { WalletQrButton, WalletQrDialog } from "@/components/wallets/wallet-qr-dialog";
@@ -55,6 +55,11 @@ export function WalletList({
       const response = await fetch(`/api/wallets/${id}`, { method: "DELETE" });
       const data = (await response.json()) as { error?: string };
       if (!response.ok) {
+        if (response.status === 404) {
+          onWalletRemoved(id);
+          toast.success("Wallet removed");
+          return;
+        }
         throw new Error(data.error ?? "Failed to remove wallet");
       }
       onWalletRemoved(id);
@@ -131,12 +136,12 @@ export function WalletList({
               </TableHeader>
               <TableBody>
                 {wallets.map((wallet) => {
-                  const network = getWalletNetworkById(wallet.networkId);
+                  const networkLabel = getWalletNetworkLabel(wallet.networkId);
                   return (
                     <TableRow key={wallet.id}>
                       <TableCell>
                         <Badge variant="secondary" className="rounded-lg">
-                          {network?.label ?? wallet.networkId}
+                          {networkLabel}
                         </Badge>
                       </TableCell>
                       <TableCell className="font-mono text-xs">

@@ -54,5 +54,8 @@ export function isSupportedWalletNetworkId(id: string) {
 }
 
 export function getWalletNetworkLabel(id: string) {
-  return getWalletNetworkById(id)?.label ?? id;
+  return (
+    getWalletNetworkById(id)?.label ??
+    (id === "sepolia" ? "Sepolia (testnet)" : id)
+  );
 }

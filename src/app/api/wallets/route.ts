@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 
 import { getSessionFromCookies } from "@/lib/db/auth";
 import {
-  listVerifiedWallets,
   listVerifiedWalletsForUser,
 } from "@/lib/db/wallets";
 
@@ -30,8 +29,6 @@ export async function GET() {
     sessionWallet: sessionWallet ?? null,
     username: session.user.username ?? null,
     hasUsername: Boolean(session.user.username),
-    verifiedNetworkIds: listVerifiedWallets(session.user).map(
-      (wallet) => wallet.networkId,
-    ),
+    verifiedNetworkIds: wallets.map((wallet) => wallet.networkId),
   });
 }

@@ -297,6 +297,11 @@ export const getSessionFromCookies = cache(async () => {
   return getSessionByToken(token);
 });
 
+export async function refreshSessionFromDatabase(token: string) {
+  await invalidateSession(token);
+  return getSessionByToken(token);
+}
+
 export async function deleteSessionByToken(token: string) {
   const db = await getDb();
   await db.collection(COLLECTIONS.sessions).deleteOne({ token });
