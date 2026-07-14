@@ -53,9 +53,13 @@ async function memoryIncr(key: string) {
   const current = Number((await memoryGet(key)) ?? "0");
   const next = current + 1;
   const entry = purgeExpiredMemory(key);
-  await memorySet(key, String(next), entry?.expiresAt
-    ? Math.max(1, Math.floor((entry.expiresAt - Date.now()) / 1000))
-    : undefined);
+  await memorySet(
+    key,
+    String(next),
+    entry?.expiresAt
+      ? Math.max(1, Math.floor((entry.expiresAt - Date.now()) / 1000))
+      : undefined,
+  );
   return next;
 }
 
@@ -87,82 +91,128 @@ async function memoryLlen(key: string) {
   return list.length;
 }
 
+async function withRedisFallback<T>(
+  fallback: () => Promise<T>,
+  operation: (redis: Redis) => Promise<T>,
+): Promise<T> {
+  const redis = getRedisClient();
+  if (!redis) {
+    return fallback();
+  }
+
+  try {
+    return await operation(redis);
+  } catch (error) {
+    console.error("Redis operation failed, using memory fallback:", error);
+    return fallback();
+  }
+}
+
 export function isCacheAvailable() {
   return isRedisConfigured() || process.env.NODE_ENV === "development";
 }
 
-export async function cacheGet(key: string) {
-  const redis = getRedisClient();
-  if (redis) {
-    const value = await redis.get<string>(key);
-    return value ?? null;
+function normalizeCacheValue(value: unknown): string | null {
+  if (value == null) return null;
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
   }
-  return memoryGet(key);
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return null;
+  }
+}
+
+export function parseStoredJson<T>(raw: unknown): T | null {
+  if (raw == null) return null;
+
+  if (typeof raw === "string") {
+    try {
+      return JSON.parse(raw) as T;
+    } catch {
+      return null;
+    }
+  }
+
+  if (typeof raw === "object") {
+    return raw as T;
+  }
+
+  return null;
+}
+
+export async function cacheGet(key: string) {
+  return withRedisFallback(
+    () => memoryGet(key),
+    async (redis) => normalizeCacheValue(await redis.get(key)),
+  );
 }
 
 export async function cacheSet(key: string, value: string, exSeconds?: number) {
-  const redis = getRedisClient();
-  if (redis) {
-    if (exSeconds) {
-      await redis.set(key, value, { ex: exSeconds });
-    } else {
-      await redis.set(key, value);
-    }
-    return;
-  }
-  await memorySet(key, value, exSeconds);
+  return withRedisFallback(
+    () => memorySet(key, value, exSeconds),
+    async (redis) => {
+      if (exSeconds) {
+        await redis.set(key, value, { ex: exSeconds });
+      } else {
+        await redis.set(key, value);
+      }
+    },
+  );
 }
 
 export async function cacheDel(key: string) {
-  const redis = getRedisClient();
-  if (redis) {
-    await redis.del(key);
-    return;
-  }
-  await memoryDel(key);
+  return withRedisFallback(
+    () => memoryDel(key),
+    async (redis) => {
+      await redis.del(key);
+    },
+  );
 }
 
 export async function cacheIncr(key: string) {
-  const redis = getRedisClient();
-  if (redis) {
-    return redis.incr(key);
-  }
-  return memoryIncr(key);
+  return withRedisFallback(
+    () => memoryIncr(key),
+    (redis) => redis.incr(key),
+  );
 }
 
 export async function cacheExpire(key: string, exSeconds: number) {
-  const redis = getRedisClient();
-  if (redis) {
-    await redis.expire(key, exSeconds);
-    return;
-  }
-  const value = await memoryGet(key);
-  if (value != null) {
-    await memorySet(key, value, exSeconds);
-  }
+  return withRedisFallback(
+    async () => {
+      const value = await memoryGet(key);
+      if (value != null) {
+        await memorySet(key, value, exSeconds);
+      }
+    },
+    async (redis) => {
+      await redis.expire(key, exSeconds);
+    },
+  );
 }
 
 export async function cacheRpush(key: string, value: string) {
-  const redis = getRedisClient();
-  if (redis) {
-    return redis.rpush(key, value);
-  }
-  return memoryRpush(key, value);
+  return withRedisFallback(
+    () => memoryRpush(key, value),
+    (redis) => redis.rpush(key, value),
+  );
 }
 
 export async function cacheLpop(key: string) {
-  const redis = getRedisClient();
-  if (redis) {
-    const value = await redis.lpop<string>(key);
-    return value ?? null;
-  }
-  return memoryLpop(key);
+  return withRedisFallback(
+    () => memoryLpop(key),
+    async (redis) => {
+      const value = await redis.lpop<string>(key);
+      return value ?? null;
+    },
+  );
 }
 
 export async function cacheLlen(key: string) {
-  const redis = getRedisClient();
-  if (redis) {
-    return redis.llen(key);
-  }
-  return memoryLlen(key);
+  return withRedisFallback(
+    () => memoryLlen(key),
+    (redis) => redis.llen(key),
+  );
 }

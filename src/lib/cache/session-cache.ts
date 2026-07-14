@@ -1,6 +1,6 @@
 import { ObjectId } from "mongodb";
 
-import { cacheDel, cacheGet, cacheSet } from "@/lib/cache/redis";
+import { cacheDel, cacheGet, cacheSet, parseStoredJson } from "@/lib/cache/redis";
 import type {
   SessionContext,
   SessionDoc,
@@ -102,19 +102,29 @@ function deserializeSessionContext(payload: SerializedSessionContext): SessionCo
 export async function getCachedSession(token: string) {
   if (!isSessionCacheEnabled()) return null;
 
-  const raw = await cacheGet(sessionKey(token));
-  if (!raw) return null;
-
   try {
-    const parsed = JSON.parse(raw) as SerializedSessionContext;
+    const raw = await cacheGet(sessionKey(token));
+    if (!raw) return null;
+
+    const parsed = parseStoredJson<SerializedSessionContext>(raw);
+    if (!parsed) {
+      await invalidateSession(token);
+      return null;
+    }
+
     const context = deserializeSessionContext(parsed);
     if (context.session.expiresAt <= new Date()) {
       await invalidateSession(token);
       return null;
     }
     return context;
-  } catch {
-    await invalidateSession(token);
+  } catch (error) {
+    console.error("Session cache read failed:", error);
+    try {
+      await invalidateSession(token);
+    } catch {
+      // Ignore cache invalidation failures.
+    }
     return null;
   }
 }

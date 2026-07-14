@@ -256,7 +256,13 @@ export async function upsertWalletUser(
 }
 
 export async function getSessionByToken(token: string) {
-  const cached = await getCachedSession(token);
+  let cached: SessionContext | null = null;
+  try {
+    cached = await getCachedSession(token);
+  } catch (error) {
+    console.error("Session cache lookup failed:", error);
+  }
+
   if (cached) {
     return cached;
   }

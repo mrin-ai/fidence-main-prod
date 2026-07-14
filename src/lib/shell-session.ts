@@ -15,9 +15,10 @@ export async function requireShellSession(redirectPath?: string) {
     session,
     user: {
       name: session.user.name,
-      role:
-        session.user.role.charAt(0).toUpperCase() +
-        session.user.role.slice(1),
+      role: session.user.role
+        ? session.user.role.charAt(0).toUpperCase() +
+          session.user.role.slice(1)
+        : "Owner",
       initials: session.user.initials,
     },
     workspace: {

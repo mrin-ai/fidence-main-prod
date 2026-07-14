@@ -94,15 +94,20 @@ export async function GET(request: Request) {
     }
 
     const { token, workspace } = await createSessionForUser(user, "google");
-    await logLoginActivity(workspace._id, "google");
-    await logSecurityEvent({
-      workspaceId: workspace._id,
-      actorType: "user",
-      actorId: user._id.toString(),
-      action: "human_login_google",
-      resourceType: "session",
-      security: extractSecurityContext(request),
-    });
+
+    try {
+      await logLoginActivity(workspace._id, "google");
+      await logSecurityEvent({
+        workspaceId: workspace._id,
+        actorType: "user",
+        actorId: user._id.toString(),
+        action: "human_login_google",
+        resourceType: "session",
+        security: extractSecurityContext(request),
+      });
+    } catch (logError) {
+      console.error("Google auth audit logging failed:", logError);
+    }
 
     cookieStore.set(sessionCookieOptions(token));
     clearOAuthCookies(cookieStore);

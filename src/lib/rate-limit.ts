@@ -77,13 +77,17 @@ export async function checkRateLimit(
   options: RateLimitOptions,
 ): Promise<RateLimitResult> {
   if (isRedisConfigured()) {
-    const limiter = getRateLimiter(options);
-    const result = await limiter.limit(key);
-    return {
-      allowed: result.success,
-      remaining: result.remaining,
-      resetAt: result.reset,
-    };
+    try {
+      const limiter = getRateLimiter(options);
+      const result = await limiter.limit(key);
+      return {
+        allowed: result.success,
+        remaining: result.remaining,
+        resetAt: result.reset,
+      };
+    } catch (error) {
+      console.error("Rate limit Redis failed, using memory fallback:", error);
+    }
   }
 
   return checkMemoryRateLimit(key, options);

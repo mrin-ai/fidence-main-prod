@@ -18,20 +18,24 @@ export async function logSecurityEvent(input: {
   resourceId?: string;
   security: SecurityContext;
 }) {
-  const db = await getDb();
-  const now = input.security.timestamp;
+  try {
+    const db = await getDb();
+    const now = input.security.timestamp;
 
-  await db.collection<SecurityAuditDoc>(COLLECTIONS.securityAudit).insertOne({
-    workspaceId: input.workspaceId,
-    actorType: input.actorType,
-    actorId: input.actorId,
-    agentId: input.agentId,
-    action: input.action,
-    resourceType: input.resourceType,
-    resourceId: input.resourceId,
-    security: input.security,
-    occurredAt: now,
-    date: input.security.date,
-    createdAt: now,
-  });
+    await db.collection<SecurityAuditDoc>(COLLECTIONS.securityAudit).insertOne({
+      workspaceId: input.workspaceId,
+      actorType: input.actorType,
+      actorId: input.actorId,
+      agentId: input.agentId,
+      action: input.action,
+      resourceType: input.resourceType,
+      resourceId: input.resourceId,
+      security: input.security,
+      occurredAt: now,
+      date: input.security.date,
+      createdAt: now,
+    });
+  } catch (error) {
+    console.error("Security audit logging failed:", error);
+  }
 }
