@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { cache } from "react";
 import { randomUUID } from "crypto";
 import { ObjectId } from "mongodb";
 import { AUTH_COOKIE, SESSION_MAX_AGE_SECONDS, getInitials, slugify } from "@/lib/auth-session";
@@ -289,12 +290,12 @@ export async function getSessionByToken(token: string) {
   return context;
 }
 
-export async function getSessionFromCookies() {
+export const getSessionFromCookies = cache(async () => {
   const cookieStore = await cookies();
   const token = cookieStore.get(AUTH_COOKIE)?.value;
   if (!token) return null;
   return getSessionByToken(token);
-}
+});
 
 export async function deleteSessionByToken(token: string) {
   const db = await getDb();

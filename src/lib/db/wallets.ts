@@ -30,6 +30,14 @@ export function listVerifiedWallets(user: UserDoc): VerifiedWallet[] {
   return user.verifiedWallets ?? [];
 }
 
+export function verifiedWalletVerifiedAtIso(wallet: VerifiedWallet) {
+  const value = wallet.verifiedAt;
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+  return new Date(value).toISOString();
+}
+
 export function getVerifiedWalletForNetwork(
   user: UserDoc,
   networkId: string,

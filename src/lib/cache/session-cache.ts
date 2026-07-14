@@ -88,6 +88,13 @@ function deserializeSessionContext(payload: SerializedSessionContext): SessionCo
       lastLoginAt: new Date(payload.user.lastLoginAt),
       createdAt: new Date(payload.user.createdAt),
       updatedAt: new Date(payload.user.updatedAt),
+      referredAt: payload.user.referredAt
+        ? new Date(payload.user.referredAt)
+        : undefined,
+      verifiedWallets: payload.user.verifiedWallets?.map((wallet) => ({
+        ...wallet,
+        verifiedAt: new Date(wallet.verifiedAt),
+      })),
     },
     workspace: {
       ...payload.workspace,
