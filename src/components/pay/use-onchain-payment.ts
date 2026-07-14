@@ -11,14 +11,12 @@ import {
 } from "wagmi";
 
 import { getEvmWalletNetworkById } from "@/lib/evm-networks";
-import { getTokenById } from "@/lib/create-payment-link-data";
 import {
   erc20TransferAbi,
   getChainIdForNetwork,
   getTokenContract,
   supportsOnChainPayment,
 } from "@/lib/payment-contracts";
-import { tryRegisterWalletToken } from "@/lib/payment/register-wallet-token";
 import { ensureWalletChain } from "@/lib/evm-switch-chain";
 
 const ERC20_TRANSFER_GAS_MAX = BigInt(200_000);
@@ -68,6 +66,10 @@ function formatOnchainError(
 
   if (message.includes("does not match the connection's chain")) {
     return "Wallet network is out of sync. Switch to the correct network in MetaMask, then try again.";
+  }
+
+  if (message.includes("Network switch cancelled")) {
+    return "Network switch cancelled.";
   }
 
   const revertMatch = message.match(
@@ -145,14 +147,6 @@ export function useOnchainPayment() {
           if (!token) {
             throw new Error("Token contract not configured for this network");
           }
-
-          const tokenMeta = getTokenById(input.tokenId);
-          await tryRegisterWalletToken({
-            address: token.address,
-            symbol: tokenMeta?.symbol ?? input.tokenId.toUpperCase(),
-            decimals: token.decimals,
-            cacheKey: `${input.networkId}:${input.tokenId}`,
-          });
 
           const args = [
             input.recipientAddress as `0x${string}`,
