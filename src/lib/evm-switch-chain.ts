@@ -1,14 +1,18 @@
+import { createWalletClient, custom, type Chain } from "viem";
+
 import {
   evmWalletNetworks,
+  getEvmNetworkIdForChainId,
   getEvmWalletNetworkByChainId,
 } from "@/lib/evm-networks";
+import { getEvmRpcUrl } from "@/lib/evm-rpc";
 import { getChainIdForNetwork } from "@/lib/payment-contracts";
 
 type EthereumProvider = {
   request: (args: { method: string; params?: unknown }) => Promise<unknown>;
 };
 
-function getEthereumProvider() {
+export function getEthereumProvider() {
   if (typeof window === "undefined") return null;
 
   const provider = (window as Window & { ethereum?: EthereumProvider }).ethereum;
@@ -33,11 +37,25 @@ export function isConnectorChainMismatch(error: unknown) {
   );
 }
 
-function getChainConfig(chainId: number) {
+function getChainConfig(chainId: number): Chain | undefined {
   return (
     getEvmWalletNetworkByChainId(chainId)?.chain ??
     evmWalletNetworks.find((network) => network.chain.id === chainId)?.chain
   );
+}
+
+function getRpcUrlsForChain(chainId: number, chain: Chain) {
+  const networkId = getEvmNetworkIdForChainId(chainId);
+  const customRpc = networkId ? getEvmRpcUrl(networkId) : undefined;
+  if (customRpc) return [customRpc];
+  return [...chain.rpcUrls.default.http];
+}
+
+export async function getProviderChainId(provider = getEthereumProvider()) {
+  if (!provider) return null;
+
+  const chainIdHex = (await provider.request({ method: "eth_chainId" })) as string;
+  return Number.parseInt(chainIdHex, 16);
 }
 
 export async function switchWalletChain(chainId: number) {
@@ -76,14 +94,66 @@ export async function switchWalletChain(chainId: number) {
           chainId: chainIdHex,
           chainName: chain.name,
           nativeCurrency: chain.nativeCurrency,
-          rpcUrls: [...chain.rpcUrls.default.http],
+          rpcUrls: getRpcUrlsForChain(chainId, chain),
           blockExplorerUrls: chain.blockExplorers?.default?.url
             ? [chain.blockExplorers.default.url]
             : undefined,
         },
       ],
     });
+
+    await provider.request({
+      method: "wallet_switchEthereumChain",
+      params: [{ chainId: chainIdHex }],
+    });
   }
+}
+
+export async function ensureProviderOnChain(chainId: number) {
+  const provider = getEthereumProvider();
+  if (!provider) {
+    throw new Error("Wallet provider not found. Connect your wallet and try again.");
+  }
+
+  const currentChainId = await getProviderChainId(provider);
+  if (currentChainId === chainId) {
+    return;
+  }
+
+  await switchWalletChain(chainId);
+
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const nextChainId = await getProviderChainId(provider);
+    if (nextChainId === chainId) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+
+  throw new Error(
+    "MetaMask did not switch networks in time. Open MetaMask, switch manually, then try again.",
+  );
+}
+
+export function createPaymentWalletClient(input: {
+  account: `0x${string}`;
+  chainId: number;
+}) {
+  const provider = getEthereumProvider();
+  if (!provider) {
+    throw new Error("Wallet provider not found. Connect your wallet and try again.");
+  }
+
+  const chain = getChainConfig(input.chainId);
+  if (!chain) {
+    throw new Error("This network is not configured in PayAgent.");
+  }
+
+  return createWalletClient({
+    account: input.account,
+    chain,
+    transport: custom(provider),
+  });
 }
 
 export async function ensureWalletChain(
@@ -93,7 +163,6 @@ export async function ensureWalletChain(
   try {
     if (switchChainAsync) {
       await switchChainAsync({ chainId: requiredChainId });
-      return;
     }
   } catch (error) {
     if (!isConnectorChainMismatch(error) && !isUserRejected(error)) {
@@ -104,7 +173,7 @@ export async function ensureWalletChain(
     }
   }
 
-  await switchWalletChain(requiredChainId);
+  await ensureProviderOnChain(requiredChainId);
 }
 
 export async function switchWalletChainForNetwork(networkId: string) {
@@ -112,5 +181,5 @@ export async function switchWalletChainForNetwork(networkId: string) {
   if (chainId == null) {
     throw new Error("Unsupported network");
   }
-  await switchWalletChain(chainId);
+  await ensureProviderOnChain(chainId);
 }

@@ -1,3 +1,4 @@
+import { getAddress } from "viem";
 import { arbitrum, base, mainnet, polygon, sepolia } from "wagmi/chains";
 
 import {
@@ -31,7 +32,7 @@ const tokenContracts: Record<string, Record<string, TokenContract>> = {
       decimals: 6,
     },
     usdt: {
-      address: "0xfde4C96c8593ccC8a38670E7C458b6d9d10ad",
+      address: "0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2",
       decimals: 6,
     },
   },
@@ -71,7 +72,7 @@ const tokenContracts: Record<string, Record<string, TokenContract>> = {
       decimals: 6,
     },
     usdt: {
-      address: "0x7169d38820dfd117c3Fa1f22a697dBA58d90BA06",
+      address: "0xF9E0643Ba46eeaf4e1059775567f67F5c867bbfc",
       decimals: 6,
     },
   },
@@ -94,7 +95,13 @@ export function getNetworkIdForChainId(chainId: number) {
 }
 
 export function getTokenContract(networkId: string, tokenId: string) {
-  return tokenContracts[networkId]?.[tokenId] ?? null;
+  const contract = tokenContracts[networkId]?.[tokenId];
+  if (!contract) return null;
+
+  return {
+    ...contract,
+    address: getAddress(contract.address),
+  };
 }
 
 export function supportsOnChainPayment(networkId: string, tokenId: string) {

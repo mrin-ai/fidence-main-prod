@@ -83,15 +83,6 @@ export function ProfilePaymentCheckout({
     ? getTokenContract(selectedNetworkId, tokenId)
     : null;
 
-  const requiredChainId = isSolana
-    ? null
-    : evmPayment.getRequiredChainId(selectedNetworkId);
-  const isWrongNetwork =
-    !isSolana &&
-    isConnected &&
-    requiredChainId != null &&
-    evmPayment.chainId !== requiredChainId;
-
   const availableTokens = useMemo(
     () => (selectedNetworkId ? getTokensForNetwork(selectedNetworkId) : []),
     [selectedNetworkId],
@@ -338,15 +329,9 @@ export function ProfilePaymentCheckout({
                   </Button>
                 ) : (
                   <div className="space-y-2">
-                    {isWrongNetwork ? (
-                      <p className="text-center text-xs text-amber-700">
-                        Switch to {network?.label} to pay
-                      </p>
-                    ) : (
-                      <p className="text-center font-mono text-[11px] text-muted-foreground/70">
-                        {address?.slice(0, 6)}…{address?.slice(-4)}
-                      </p>
-                    )}
+                    <p className="text-center font-mono text-[11px] text-muted-foreground/70">
+                      {address?.slice(0, 6)}…{address?.slice(-4)}
+                    </p>
                     <Button
                       className="h-10 w-full rounded-xl"
                       disabled={!canPay || isPaying}

@@ -152,15 +152,6 @@ export function PaymentLinkCheckout({
   const isConnected = isSolana ? solanaPayment.isConnected : evmPayment.isConnected;
   const isPaying = isSolana ? solanaPayment.isPaying : evmPayment.isPaying;
 
-  const requiredChainId = isSolana
-    ? null
-    : getChainIdForNetwork(link.networkId);
-  const isWrongNetwork =
-    !isSolana &&
-    isConnected &&
-    requiredChainId != null &&
-    evmPayment.chainId !== requiredChainId;
-
   const showPayActions = link.status === "pending" && link.canPay;
 
   const showMetamaskAmountHint =
@@ -201,7 +192,7 @@ export function PaymentLinkCheckout({
       return;
     }
 
-    if (!isSolana && requiredChainId == null) {
+    if (!isSolana && getChainIdForNetwork(link.networkId) == null) {
       toast.error("Unsupported network");
       return;
     }
@@ -315,15 +306,9 @@ export function PaymentLinkCheckout({
                       </Button>
                     ) : (
                       <>
-                        {isWrongNetwork ? (
-                          <p className="text-center text-xs text-amber-700">
-                            Switch to {link.networkLabel} to continue.
-                          </p>
-                        ) : (
-                          <p className="text-center font-mono text-[11px] text-muted-foreground">
-                            {truncateAddress(address ?? "", 4)}
-                          </p>
-                        )}
+                        <p className="text-center font-mono text-[11px] text-muted-foreground">
+                          {truncateAddress(address ?? "", 4)}
+                        </p>
                         <Button
                           className="h-11 w-full rounded-xl"
                           disabled={isPaying}
@@ -337,9 +322,7 @@ export function PaymentLinkCheckout({
                           ) : (
                             <>
                               <WalletIcon className="size-4" />
-                              {isWrongNetwork
-                                ? `Switch to ${link.networkLabel} & pay`
-                                : `Pay ${link.amount} ${link.tokenSymbol}`}
+                              {`Pay ${link.amount} ${link.tokenSymbol}`}
                             </>
                           )}
                         </Button>
