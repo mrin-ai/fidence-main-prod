@@ -16,6 +16,8 @@ const RESERVED_PATHS = new Set([
   "referrals",
   "rewards",
   "transactions",
+  "leaderboard",
+  "token",
   "merchant",
   "icon.png",
   "favicon.ico",

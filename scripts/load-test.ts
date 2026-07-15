@@ -57,6 +57,7 @@ type Scenario = {
   id: string;
   label: string;
   path: string;
+  accept?: string;
 };
 
 type RequestSample = {
@@ -108,7 +109,7 @@ async function runWorker(
     const started = performance.now();
     try {
       const response = await fetch(`${BASE_URL}${scenario.path}`, {
-        headers: { Accept: "application/json" },
+        headers: { Accept: scenario.accept ?? "application/json" },
       });
       const ms = performance.now() - started;
       sink.push({ ok: response.ok, status: response.status, ms });
@@ -201,9 +202,15 @@ async function main() {
       path: `/api/public/users/${E2E_USERNAME}`,
     },
     {
-      id: "pay-page",
-      label: "Payment page (HTML)",
-      path: `/${E2E_USERNAME}/${linkId}`,
+      id: "leaderboard-page",
+      label: "Leaderboard page (HTML)",
+      path: "/leaderboard",
+      accept: "text/html",
+    },
+    {
+      id: "leaderboard-api",
+      label: "Leaderboard API",
+      path: "/api/public/leaderboard",
     },
   ];
 
@@ -253,11 +260,16 @@ async function main() {
   const healthBest = estimateCapacity(healthRows);
   console.log(`\n  Health endpoint headroom:     ~${healthBest.concurrentUsers} users (~${healthBest.rps.toFixed(0)} req/s)`);
 
+  const leaderboardRows = allResults.filter((r) => r.scenario === "leaderboard-api");
+  const leaderboardCapacity = estimateCapacity(leaderboardRows);
+  console.log(`\n  Leaderboard API headroom:     ~${leaderboardCapacity.concurrentUsers} users (~${leaderboardCapacity.rps.toFixed(0)} req/s, p95 ${leaderboardCapacity.p95?.toFixed(0) ?? "?"} ms)`);
+
   console.log("\nNotes:");
   console.log("  • Local dev (single Next.js process) ≠ production Vercel + MongoDB server.");
   console.log("  • POST /api/pay is rate-limited (10/min per IP) — not included in this read load test.");
   console.log("  • Run against production: BASE_URL=https://payagent.co npm run test:load");
   console.log("");
+  process.exit(0);
 }
 
 main().catch((error) => {

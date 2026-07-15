@@ -290,8 +290,71 @@ async function findPendingSepoliaLink(): Promise<PaymentLinkDoc | null> {
   );
 }
 
+async function testLeaderboard() {
+  console.log("\n[5] Leaderboard");
+
+  try {
+    const page = await fetch(`${BASE_URL}/leaderboard`, {
+      headers: { Accept: "text/html" },
+    });
+    if (page.status === 200) {
+      pass("GET /leaderboard page", "200");
+    } else {
+      fail("GET /leaderboard page", `status ${page.status}`);
+    }
+  } catch (error) {
+    fail(
+      "GET /leaderboard page",
+      error instanceof Error ? error.message : "request failed",
+    );
+  }
+
+  try {
+    const { status, data } = await api("/api/public/leaderboard");
+    if (status !== 200) {
+      fail("GET /api/public/leaderboard", `status ${status}`);
+      return;
+    }
+
+    const hasSummary =
+      typeof data.summary?.totalValue === "number" &&
+      typeof data.summary?.totalTxns === "number" &&
+      typeof data.summary?.activeAgents === "number";
+    const hasRows = Array.isArray(data.rows);
+
+    if (hasSummary && hasRows) {
+      pass(
+        "leaderboard API shape",
+        `${data.rows.length} agents, $${data.summary.totalValue} volume, ${data.summary.totalTxns} txns`,
+      );
+    } else {
+      fail("leaderboard API shape", JSON.stringify(data).slice(0, 200));
+    }
+
+    if (data.rows.length > 0) {
+      const row = data.rows[0];
+      if (
+        typeof row.rank === "number" &&
+        typeof row.publicId === "string" &&
+        typeof row.totalValue === "number"
+      ) {
+        pass("leaderboard row shape", `#${row.rank} ${row.publicId}`);
+      } else {
+        fail("leaderboard row shape", JSON.stringify(row).slice(0, 200));
+      }
+    } else {
+      pass("leaderboard rows", "empty (no agent activity yet)");
+    }
+  } catch (error) {
+    fail(
+      "GET /api/public/leaderboard",
+      error instanceof Error ? error.message : "request failed",
+    );
+  }
+}
+
 async function testPublicProfile() {
-  console.log("\n[5] Public profile");
+  console.log("\n[6] Public profile");
 
   const { status, data } = await api(`/api/public/users/${E2E_USERNAME}`);
   if (status !== 200 || !data.profile) {
@@ -316,7 +379,7 @@ async function testPublicProfile() {
 }
 
 async function testPaymentLinkFlow() {
-  console.log("\n[6] Payment link flow");
+  console.log("\n[7] Payment link flow");
 
   const linkDoc = await findPendingSepoliaLink();
   if (!linkDoc) {
@@ -397,7 +460,7 @@ async function testPaymentLinkFlow() {
 }
 
 async function testAgentApi() {
-  console.log("\n[7] Agent API (optional)");
+  console.log("\n[8] Agent API (optional)");
 
   const apiKey = process.env.FIDENCE_TEST_API_KEY_RITESH?.trim();
   if (!apiKey) {
@@ -461,7 +524,7 @@ async function testAgentApi() {
 }
 
 async function testOnChainPayment(linkDoc: PaymentLinkDoc | null) {
-  console.log("\n[8] On-chain payment (optional)");
+  console.log("\n[9] On-chain payment (optional)");
 
   const privateKey = process.env.SEPOLIA_PRIVATE_KEY?.trim() as `0x${string}` | undefined;
   if (!privateKey) {
@@ -546,6 +609,7 @@ async function main() {
   await testPaymentMatrix();
   await testSepoliaOnChain();
   await testApiHealth();
+  await testLeaderboard();
   await testPublicProfile();
   const linkDoc = await testPaymentLinkFlow();
   await testAgentApi();

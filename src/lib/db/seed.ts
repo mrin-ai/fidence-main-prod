@@ -209,16 +209,33 @@ export async function ensureDbIndexes() {
     ),
     db.collection(COLLECTIONS.agents).createIndex({ workspaceId: 1, lastActiveAt: -1 }),
     db.collection(COLLECTIONS.agents).createIndex({ publicId: 1 }, { unique: true }),
+    db.collection(COLLECTIONS.agents).createIndex({
+      status: 1,
+      amountPaid: -1,
+      amountReceived: -1,
+    }),
     db.collection(COLLECTIONS.paymentLinks).createIndex(
       { workspaceId: 1, source: 1, createdAt: -1 },
     ),
     db.collection(COLLECTIONS.transactions).createIndex(
       { workspaceId: 1, source: 1, occurredAt: -1 },
     ),
+    db.collection(COLLECTIONS.transactions).createIndex({
+      agentId: 1,
+      status: 1,
+    }),
+    db.collection(COLLECTIONS.paymentLinks).createIndex({
+      agentId: 1,
+      status: 1,
+    }),
     db.collection(COLLECTIONS.securityAudit).createIndex(
       { workspaceId: 1, occurredAt: -1 },
     ),
     db.collection(COLLECTIONS.securityAudit).createIndex({ date: 1 }),
+    db.collection(COLLECTIONS.securityAudit).createIndex({
+      agentId: 1,
+      action: 1,
+    }),
   ]);
 }
 

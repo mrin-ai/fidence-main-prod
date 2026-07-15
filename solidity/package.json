@@ -1,0 +1,20 @@
+{
+  "name": "payagent-contracts",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "compile": "hardhat compile",
+    "deploy:sepolia": "hardhat run scripts/deploy-payagent.cjs --network sepolia",
+    "deploy:oracle:sepolia": "hardhat run scripts/deploy-payagent-oracle.cjs --network sepolia"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@openzeppelin/hardhat-upgrades": "^3.9.0",
+    "dotenv": "^16.4.7",
+    "hardhat": "^2.22.17"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.4.0",
+    "@openzeppelin/contracts-upgradeable": "^5.4.0"
+  }
+}

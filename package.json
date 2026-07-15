@@ -11,8 +11,13 @@
     "backfill:workspace-stats": "npx tsx scripts/backfill-workspace-stats.ts",
     "seed:payment-links": "npx tsx scripts/seed-payment-links.ts",
     "test:e2e": "npx tsx scripts/e2e-test.ts",
+    "test:unit": "npx tsx scripts/test-unit.ts",
     "test:load": "npx tsx scripts/load-test.ts",
-    "check:mongo": "npx tsx scripts/check-mongo-connections.ts"
+    "test:viral": "npx tsx scripts/viral-spike-test.ts",
+    "check:mongo": "npx tsx scripts/check-mongo-connections.ts",
+    "contracts:compile": "cd solidity && npm run compile",
+    "contracts:deploy:sepolia": "cd solidity && npm run deploy:sepolia",
+    "contracts:deploy:oracle:sepolia": "cd solidity && npm run deploy:oracle:sepolia"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
@@ -69,6 +74,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dotenv": "^17.4.2",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
     "tailwindcss": "^4",
