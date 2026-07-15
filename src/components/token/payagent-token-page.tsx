@@ -297,7 +297,7 @@ export function PayagentTokenPage() {
           </Card>
         </div>
 
-        {isConnected && walletBalance && walletBalance > 0n ? (
+        {isConnected && walletBalance && walletBalance > BigInt(0) ? (
           <Card className="border-blue-500/20 bg-blue-500/5">
             <CardContent className="space-y-3 p-4">
               <p className="text-sm text-blue-900">

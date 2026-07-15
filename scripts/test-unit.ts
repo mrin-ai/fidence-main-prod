@@ -32,7 +32,7 @@ const tests: TestCase[] = [
   {
     name: "formatOracleUsdPrice formats $1.00 at 8 decimals",
     run: () => {
-      assertEqual(formatOracleUsdPrice(100_000_000n), "$1.00");
+      assertEqual(formatOracleUsdPrice(BigInt(100_000_000)), "$1.00");
     },
   },
   {
@@ -44,8 +44,8 @@ const tests: TestCase[] = [
   {
     name: "tokenUsdValue multiplies token amount by oracle price",
     run: () => {
-      assertEqual(tokenUsdValue(1_000, 100_000_000n), "$1,000.00");
-      assertEqual(tokenUsdValue(0.5, 200_000_000n), "$1.00");
+      assertEqual(tokenUsdValue(1_000, BigInt(100_000_000)), "$1,000.00");
+      assertEqual(tokenUsdValue(0.5, BigInt(200_000_000)), "$1.00");
     },
   },
   {

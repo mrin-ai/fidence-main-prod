@@ -28,7 +28,6 @@ import {
 } from "@/components/ui/tooltip";
 import type { AgentLeaderboard, AgentLeaderboardTxn } from "@/lib/db/agent-leaderboard";
 import {
-  formatOracleUsdPrice,
   PAYAGENT_ORACLE_ABI,
   PAYAGENT_ORACLE_ADDRESS,
   tokenUsdValue,
@@ -186,7 +185,6 @@ export function LeaderboardContent({
   });
 
   const totalVolumeUsd = tokenUsdValue(summary.totalValue, oraclePrice);
-  const oracleUnitPrice = formatOracleUsdPrice(oraclePrice);
 
   return (
     <TooltipProvider>
@@ -209,11 +207,7 @@ export function LeaderboardContent({
                 : totalVolumeUsd ?? "—"
             }
             highlight
-            description={
-              oracleUnitPrice
-                ? `Unique on-chain volume · PAYAGENT oracle ${oracleUnitPrice}`
-                : "Unique on-chain payment volume"
-            }
+            description="Confirmed on-chain payment volume in USD"
           />
           <SummaryCard
             label="Total transactions"
