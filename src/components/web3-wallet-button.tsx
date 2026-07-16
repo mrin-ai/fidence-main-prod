@@ -4,10 +4,32 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
-import { useAccount, useSignMessage } from "wagmi";
+import { useAccount, useDisconnect, useSignMessage } from "wagmi";
 import { Loader2 } from "lucide-react";
 import { buildSignInMessage } from "@/lib/auth-session";
 import { getClientReferralCode } from "@/components/referrals/referral-capture";
+
+const CHAIN_MISMATCH_MESSAGE =
+  "Your wallet network changed since the last connection. Connect your wallet again to sign in.";
+
+function isConnectorChainMismatch(error: unknown) {
+  if (!(error instanceof Error)) return false;
+  return error.message.includes("does not match the connection's chain");
+}
+
+async function connectorMatchesConnection(
+  connector: { getChainId: () => Promise<number> } | undefined,
+  connectionChainId: number | undefined,
+) {
+  if (!connector || connectionChainId == null) return true;
+
+  try {
+    const connectorChainId = await connector.getChainId();
+    return connectorChainId === connectionChainId;
+  } catch {
+    return false;
+  }
+}
 
 export function Web3WalletButton() {
   const searchParams = useSearchParams();
@@ -15,18 +37,38 @@ export function Web3WalletButton() {
   const referralCode = getClientReferralCode(searchParams);
 
   const { openConnectModal } = useConnectModal();
-  const { address, isConnected } = useAccount();
+  const { address, chainId, connector, isConnected } = useAccount();
+  const { disconnect } = useDisconnect();
   const { signMessageAsync } = useSignMessage();
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const pendingConnect = useRef(false);
+  const clearedStaleSession = useRef(false);
+
+  useEffect(() => {
+    if (clearedStaleSession.current) return;
+    clearedStaleSession.current = true;
+    disconnect();
+  }, [disconnect]);
+
+  const resetWalletConnection = useCallback(() => {
+    pendingConnect.current = false;
+    disconnect();
+  }, [disconnect]);
 
   const verifyWallet = useCallback(
     async (walletAddress: string) => {
       setLoading(true);
       setError(null);
       try {
+        const inSync = await connectorMatchesConnection(connector, chainId);
+        if (!inSync) {
+          resetWalletConnection();
+          setError(CHAIN_MISMATCH_MESSAGE);
+          return;
+        }
+
         const timestamp = Date.now();
         const message = buildSignInMessage(walletAddress, timestamp);
         const signature = await signMessageAsync({ message });
@@ -53,6 +95,11 @@ export function Web3WalletButton() {
         return;
       } catch (walletError) {
         pendingConnect.current = false;
+        if (isConnectorChainMismatch(walletError)) {
+          resetWalletConnection();
+          setError(CHAIN_MISMATCH_MESSAGE);
+          return;
+        }
         setError(
           walletError instanceof Error
             ? walletError.message
@@ -62,7 +109,14 @@ export function Web3WalletButton() {
         setLoading(false);
       }
     },
-    [redirect, referralCode, signMessageAsync],
+    [
+      chainId,
+      connector,
+      redirect,
+      referralCode,
+      resetWalletConnection,
+      signMessageAsync,
+    ],
   );
 
   useEffect(() => {
@@ -72,11 +126,18 @@ export function Web3WalletButton() {
     }
   }, [address, isConnected, verifyWallet]);
 
-  const handleClick = () => {
+  const handleClick = async () => {
     if (loading) return;
     setError(null);
 
     if (isConnected && address) {
+      const inSync = await connectorMatchesConnection(connector, chainId);
+      if (!inSync) {
+        resetWalletConnection();
+        setError(CHAIN_MISMATCH_MESSAGE);
+        return;
+      }
+
       verifyWallet(address);
       return;
     }
