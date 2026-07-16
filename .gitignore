@@ -50,3 +50,7 @@ next-env.d.ts
 /solidity/cache
 /solidity/artifacts
 /solidity/deployments
+
+# Local landing source (integrated into src/app)
+/fidence-landing
+/public/landing

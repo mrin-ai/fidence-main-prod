@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { Web3Providers } from "@/components/providers/web3-providers";
 import "@rainbow-me/rainbowkit/styles.css";
 import "./globals.css";
+import "./landing.css";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",

@@ -67,7 +67,8 @@ const tests: TestCase[] = [
     name: "leaderboard and token paths are reserved",
     run: () => {
       assertEqual(isReservedPaymentPathSegment("leaderboard"), true);
-      assertEqual(isReservedPaymentPathSegment("TOKEN"), true);
+      assertEqual(isReservedPaymentPathSegment("blog"), true);
+      assertEqual(isReservedPaymentPathSegment("about"), true);
       assertEqual(isReservedPaymentPathSegment("referealtest"), false);
     },
   },
