@@ -6,6 +6,7 @@ import { Loader2, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { Web3WalletButton } from "@/components/web3-wallet-button";
 import { getClientReferralCode } from "@/components/referrals/referral-capture";
+import { sanitizeRedirectPath } from "@/lib/sanitize-redirect";
 
 function GoogleIcon(props: React.ComponentProps<"svg">) {
   return (
@@ -50,7 +51,7 @@ export default function AuthCard({
   mode = "sign-in",
 }: AuthCardProps) {
   const searchParams = useSearchParams();
-  const redirect = searchParams.get("redirect") ?? "/dashboard";
+  const redirect = sanitizeRedirectPath(searchParams.get("redirect"));
   const referralCode = getClientReferralCode(searchParams);
   const authError = searchParams.get("error");
   const authErrorMessage = authError

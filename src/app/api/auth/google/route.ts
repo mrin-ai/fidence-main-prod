@@ -13,13 +13,7 @@ import {
   getClientIp,
   rateLimitResponse,
 } from "@/lib/rate-limit";
-
-function sanitizeRedirectPath(value: string | null) {
-  if (!value || !value.startsWith("/") || value.startsWith("//")) {
-    return "/dashboard";
-  }
-  return value;
-}
+import { sanitizeRedirectPath } from "@/lib/sanitize-redirect";
 
 export async function GET(request: Request) {
   if (!isGoogleOAuthConfigured()) {

@@ -7,6 +7,7 @@ import {
   sessionCookieOptions,
   upsertWalletUser,
 } from "@/lib/db/auth";
+import { isTransientMongoError, withDbRetry } from "@/lib/db/retry";
 import { parseReferralCookie } from "@/lib/referrals";
 import { extractSecurityContext } from "@/lib/request-security";
 import {
@@ -14,6 +15,7 @@ import {
   getClientIp,
   rateLimitResponse,
 } from "@/lib/rate-limit";
+import { sanitizeRedirectPath } from "@/lib/sanitize-redirect";
 
 export async function POST(request: Request) {
   try {
@@ -31,9 +33,18 @@ export async function POST(request: Request) {
       message?: string;
       signature?: string;
       referralCode?: string;
+      redirectPath?: string;
+      useRedirect?: boolean;
     };
 
-    const { address, message, signature, referralCode: bodyReferralCode } = body;
+    const {
+      address,
+      message,
+      signature,
+      referralCode: bodyReferralCode,
+      redirectPath: bodyRedirectPath,
+      useRedirect,
+    } = body;
 
     if (!address || !message || !signature) {
       return NextResponse.json(
@@ -59,15 +70,15 @@ export async function POST(request: Request) {
     const referralCode =
       bodyReferralCode?.trim() || parseReferralCookie(request.headers.get("cookie"));
 
-    const user = await upsertWalletUser(address, referralCode);
+    const user = await withDbRetry(() =>
+      upsertWalletUser(address, referralCode),
+    );
     if (!user) {
       return NextResponse.json({ error: "Failed to create user" }, { status: 500 });
     }
 
-    const { token, workspace } = await createSessionForUser(
-      user,
-      "wallet",
-      address,
+    const { token, workspace } = await withDbRetry(() =>
+      createSessionForUser(user, "wallet", address),
     );
 
     try {
@@ -82,6 +93,14 @@ export async function POST(request: Request) {
       });
     } catch (logError) {
       console.error("Wallet auth audit logging failed:", logError);
+    }
+
+    const redirectPath = sanitizeRedirectPath(bodyRedirectPath);
+
+    if (useRedirect) {
+      const response = NextResponse.redirect(new URL(redirectPath, request.url), 303);
+      response.cookies.set(sessionCookieOptions(token));
+      return response;
     }
 
     const response = NextResponse.json({
@@ -99,13 +118,9 @@ export async function POST(request: Request) {
     return response;
   } catch (error) {
     console.error("Wallet auth failed:", error);
-    const message =
-      error instanceof Error &&
-      /MongoServerSelectionError|ECONNREFUSED|ENOTFOUND|timed out/i.test(
-        error.message,
-      )
-        ? "Database connection failed. Check server configuration."
-        : "Authentication failed";
+    const message = isTransientMongoError(error)
+      ? "Database connection failed. Please try again."
+      : "Authentication failed";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

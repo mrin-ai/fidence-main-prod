@@ -9,10 +9,11 @@ import { Loader2 } from "lucide-react";
 import { buildSignInMessage } from "@/lib/auth-session";
 import { getClientReferralCode } from "@/components/referrals/referral-capture";
 import { signWalletMessage } from "@/lib/wagmi-sign-message";
+import { sanitizeRedirectPath } from "@/lib/sanitize-redirect";
 
 export function Web3WalletButton() {
   const searchParams = useSearchParams();
-  const redirect = searchParams.get("redirect") ?? "/dashboard";
+  const redirect = sanitizeRedirectPath(searchParams.get("redirect"));
   const referralCode = getClientReferralCode(searchParams);
 
   const { openConnectModal } = useConnectModal();
@@ -42,13 +43,23 @@ export function Web3WalletButton() {
         const response = await fetch("/api/auth/wallet", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          redirect: "manual",
           body: JSON.stringify({
             address: walletAddress,
             message,
             signature,
+            useRedirect: true,
+            redirectPath: redirect,
             ...(referralCode ? { referralCode } : {}),
           }),
         });
+
+        if (response.status >= 300 && response.status < 400) {
+          const location = response.headers.get("Location") ?? redirect;
+          window.location.replace(location);
+          return;
+        }
 
         if (!response.ok) {
           const data = (await response.json().catch(() => null)) as {
@@ -57,7 +68,8 @@ export function Web3WalletButton() {
           throw new Error(data?.error ?? "Wallet sign-in failed");
         }
 
-        window.location.assign(redirect);
+        await response.json();
+        window.location.replace(redirect);
       } catch (walletError) {
         pendingConnect.current = false;
         setError(

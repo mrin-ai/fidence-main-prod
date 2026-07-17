@@ -8,6 +8,7 @@ import {
   sessionCookieOptions,
   upsertGoogleUser,
 } from "@/lib/db/auth";
+import { withDbRetry } from "@/lib/db/retry";
 import {
   exchangeGoogleAuthCode,
   fetchGoogleUserProfile,
@@ -23,6 +24,7 @@ import {
   getClientIp,
   rateLimitResponse,
 } from "@/lib/rate-limit";
+import { sanitizeRedirectPath } from "@/lib/sanitize-redirect";
 
 function clearOAuthCookies(cookieStore: Awaited<ReturnType<typeof cookies>>) {
   cookieStore.delete(GOOGLE_OAUTH_STATE_COOKIE);
@@ -58,8 +60,9 @@ export async function GET(request: Request) {
 
   const cookieStore = await cookies();
   const storedState = cookieStore.get(GOOGLE_OAUTH_STATE_COOKIE)?.value;
-  const redirectPath =
-    cookieStore.get(GOOGLE_OAUTH_REDIRECT_COOKIE)?.value ?? "/dashboard";
+  const redirectPath = sanitizeRedirectPath(
+    cookieStore.get(GOOGLE_OAUTH_REDIRECT_COOKIE)?.value,
+  );
 
   if (error) {
     clearOAuthCookies(cookieStore);
@@ -82,18 +85,22 @@ export async function GET(request: Request) {
     const accessToken = await exchangeGoogleAuthCode(code, origin);
     const profile = await fetchGoogleUserProfile(accessToken);
 
-    const user = await upsertGoogleUser({
-      email: profile.email,
-      name: profile.name,
-      referralCode: parseReferralCookie(request.headers.get("cookie")),
-    });
+    const user = await withDbRetry(() =>
+      upsertGoogleUser({
+        email: profile.email,
+        name: profile.name,
+        referralCode: parseReferralCookie(request.headers.get("cookie")),
+      }),
+    );
 
     if (!user) {
       clearOAuthCookies(cookieStore);
       return redirectToSignIn(request, "google_auth_failed");
     }
 
-    const { token, workspace } = await createSessionForUser(user, "google");
+    const { token, workspace } = await withDbRetry(() =>
+      createSessionForUser(user, "google"),
+    );
 
     try {
       await logLoginActivity(workspace._id, "google");

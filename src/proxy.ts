@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { AUTH_COOKIE } from "@/lib/auth-session";
+import { sanitizeRedirectPath } from "@/lib/sanitize-redirect";
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -28,13 +29,9 @@ export function proxy(request: NextRequest) {
   }
 
   if (isAuthRoute && token) {
-    const redirectParam = request.nextUrl.searchParams.get("redirect");
-    const destination =
-      redirectParam &&
-      redirectParam.startsWith("/") &&
-      !redirectParam.startsWith("//")
-        ? redirectParam
-        : "/dashboard";
+    const destination = sanitizeRedirectPath(
+      request.nextUrl.searchParams.get("redirect"),
+    );
     const url = request.nextUrl.clone();
     url.pathname = destination;
     url.search = "";

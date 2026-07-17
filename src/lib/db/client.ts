@@ -14,7 +14,7 @@ const useReadReplica = Boolean(readUri) && !isLocalMongoUri(uri);
 
 const clientOptions = {
   maxPoolSize,
-  serverSelectionTimeoutMS: 5000,
+  serverSelectionTimeoutMS: Number(process.env.MONGODB_SERVER_SELECTION_TIMEOUT_MS ?? 10_000),
 };
 
 const readClientOptions = {
@@ -34,16 +34,11 @@ function connectClient(
   options: typeof clientOptions,
   globalKey: "__mongoClientPromise" | "__mongoReadClientPromise",
 ) {
-  if (process.env.NODE_ENV === "development") {
-    if (!global[globalKey]) {
-      const client = new MongoClient(connectionUri, options);
-      global[globalKey] = client.connect();
-    }
-    return global[globalKey]!;
+  if (!global[globalKey]) {
+    const client = new MongoClient(connectionUri, options);
+    global[globalKey] = client.connect();
   }
-
-  const client = new MongoClient(connectionUri, options);
-  return client.connect();
+  return global[globalKey]!;
 }
 
 const clientPromise = connectClient(uri, clientOptions, "__mongoClientPromise");
