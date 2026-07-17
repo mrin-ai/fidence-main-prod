@@ -10,6 +10,7 @@ import { buildSignInMessage } from "@/lib/auth-session";
 import { getClientReferralCode } from "@/components/referrals/referral-capture";
 import { signWalletMessage } from "@/lib/wagmi-sign-message";
 import { sanitizeRedirectPath } from "@/lib/sanitize-redirect";
+import { waitForAuthSessionThenRedirect } from "@/lib/wait-for-auth-session";
 
 export function Web3WalletButton() {
   const searchParams = useSearchParams();
@@ -44,22 +45,13 @@ export function Web3WalletButton() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
-          redirect: "manual",
           body: JSON.stringify({
             address: walletAddress,
             message,
             signature,
-            useRedirect: true,
-            redirectPath: redirect,
             ...(referralCode ? { referralCode } : {}),
           }),
         });
-
-        if (response.status >= 300 && response.status < 400) {
-          const location = response.headers.get("Location") ?? redirect;
-          window.location.replace(location);
-          return;
-        }
 
         if (!response.ok) {
           const data = (await response.json().catch(() => null)) as {
@@ -69,7 +61,7 @@ export function Web3WalletButton() {
         }
 
         await response.json();
-        window.location.replace(redirect);
+        await waitForAuthSessionThenRedirect(redirect);
       } catch (walletError) {
         pendingConnect.current = false;
         setError(

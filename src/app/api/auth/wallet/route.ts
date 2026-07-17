@@ -15,7 +15,6 @@ import {
   getClientIp,
   rateLimitResponse,
 } from "@/lib/rate-limit";
-import { sanitizeRedirectPath } from "@/lib/sanitize-redirect";
 
 export async function POST(request: Request) {
   try {
@@ -33,18 +32,9 @@ export async function POST(request: Request) {
       message?: string;
       signature?: string;
       referralCode?: string;
-      redirectPath?: string;
-      useRedirect?: boolean;
     };
 
-    const {
-      address,
-      message,
-      signature,
-      referralCode: bodyReferralCode,
-      redirectPath: bodyRedirectPath,
-      useRedirect,
-    } = body;
+    const { address, message, signature, referralCode: bodyReferralCode } = body;
 
     if (!address || !message || !signature) {
       return NextResponse.json(
@@ -93,14 +83,6 @@ export async function POST(request: Request) {
       });
     } catch (logError) {
       console.error("Wallet auth audit logging failed:", logError);
-    }
-
-    const redirectPath = sanitizeRedirectPath(bodyRedirectPath);
-
-    if (useRedirect) {
-      const response = NextResponse.redirect(new URL(redirectPath, request.url), 303);
-      response.cookies.set(sessionCookieOptions(token));
-      return response;
     }
 
     const response = NextResponse.json({
