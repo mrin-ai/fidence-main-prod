@@ -24,7 +24,7 @@ function listInjectedEthereumProviders(): EthereumProvider[] {
   if (!ethereum) return [];
 
   if (Array.isArray(ethereum.providers) && ethereum.providers.length > 0) {
-    return ethereum.providers.filter((provider) =>
+    return ethereum.providers.filter((provider: EthereumProvider) =>
       Boolean(provider?.request),
     );
   }
