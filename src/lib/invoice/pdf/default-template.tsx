@@ -32,14 +32,25 @@ function createStyles(
   fontFamily: string,
   monoFamily: string,
   accentColor: string,
+  darkMode: boolean,
 ) {
+  const foreground = darkMode ? "#FFFFFF" : "#111827";
+  const muted = darkMode ? "#A3A3A3" : "#6B7280";
+  const subtle = darkMode ? "#737373" : "#9CA3AF";
+  const border = darkMode ? "#262626" : "#E5E7EB";
+  const borderStrong = darkMode ? "#404040" : "#D1D5DB";
+  const cardBg = darkMode ? "#262626" : "#F3F4F6";
+  const pageBg = darkMode ? "#181818" : "#FFFFFF";
+  const heading = darkMode ? "#FFFFFF" : accentColor;
+  const tableHeaderBg = darkMode ? "#404040" : accentColor;
+
   return StyleSheet.create({
     page: {
       padding: 36,
       fontSize: 10,
       fontFamily,
-      color: "#111827",
-      backgroundColor: "#FFFFFF",
+      color: foreground,
+      backgroundColor: pageBg,
       flexDirection: "column",
     },
     content: {
@@ -49,12 +60,32 @@ function createStyles(
       fontFamily: monoFamily,
       fontSize: 28,
       fontWeight: 700,
-      color: accentColor,
+      color: heading,
       marginBottom: 18,
+    },
+    headerRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "flex-start",
+      marginBottom: 28,
     },
     metaBlock: {
       width: 210,
-      marginBottom: 28,
+    },
+    logo: {
+      width: 80,
+      height: 80,
+      objectFit: "contain",
+    },
+    signatureBlock: {
+      alignItems: "flex-end",
+      marginBottom: 12,
+      width: "100%",
+    },
+    signatureLabel: {
+      fontSize: 8,
+      color: muted,
+      marginBottom: 4,
     },
     metaRow: {
       flexDirection: "row",
@@ -62,13 +93,13 @@ function createStyles(
       marginBottom: 6,
     },
     metaLabel: {
-      color: "#6B7280",
+      color: muted,
       fontSize: 10,
     },
     metaValue: {
       fontFamily: monoFamily,
       fontSize: 10,
-      color: "#111827",
+      color: foreground,
     },
     billingRow: {
       flexDirection: "row",
@@ -76,7 +107,7 @@ function createStyles(
     },
     billingCard: {
       flex: 1,
-      backgroundColor: "#F3F4F6",
+      backgroundColor: cardBg,
       borderRadius: 10,
       padding: 14,
     },
@@ -84,7 +115,7 @@ function createStyles(
       marginRight: 10,
     },
     billingCardTitle: {
-      color: accentColor,
+      color: heading,
       fontSize: 11,
       fontWeight: 700,
       marginBottom: 8,
@@ -93,11 +124,11 @@ function createStyles(
       fontSize: 10,
       fontWeight: 700,
       marginBottom: 4,
-      color: "#111827",
+      color: foreground,
     },
     billingAddress: {
       fontSize: 9,
-      color: "#6B7280",
+      color: muted,
       lineHeight: 1.45,
     },
     table: {
@@ -106,7 +137,7 @@ function createStyles(
     },
     tableHeader: {
       flexDirection: "row",
-      backgroundColor: accentColor,
+      backgroundColor: tableHeaderBg,
       paddingVertical: 10,
       paddingHorizontal: 12,
     },
@@ -120,7 +151,7 @@ function createStyles(
       paddingVertical: 10,
       paddingHorizontal: 12,
       borderBottomWidth: 1,
-      borderBottomColor: "#E5E7EB",
+      borderBottomColor: border,
     },
     tableRowLast: {
       borderBottomWidth: 0,
@@ -133,10 +164,11 @@ function createStyles(
       fontSize: 10,
       fontWeight: 700,
       marginBottom: 2,
+      color: foreground,
     },
     itemDescription: {
       fontSize: 9,
-      color: "#6B7280",
+      color: muted,
     },
     totalsBlock: {
       width: 220,
@@ -146,7 +178,7 @@ function createStyles(
       marginTop: "auto",
       paddingTop: 24,
       borderTopWidth: 1,
-      borderTopColor: "#E5E7EB",
+      borderTopColor: border,
       width: "100%",
     },
     totalRow: {
@@ -155,19 +187,20 @@ function createStyles(
       marginBottom: 8,
     },
     totalLabel: {
-      color: "#6B7280",
+      color: muted,
       fontSize: 10,
     },
     totalValue: {
       fontFamily: monoFamily,
       fontSize: 10,
+      color: foreground,
     },
     grandTotalRow: {
       flexDirection: "row",
       justifyContent: "space-between",
       alignItems: "center",
       borderTopWidth: 1,
-      borderTopColor: "#D1D5DB",
+      borderTopColor: borderStrong,
       paddingTop: 10,
       marginTop: 2,
       marginBottom: 10,
@@ -175,21 +208,22 @@ function createStyles(
     grandTotalLabel: {
       fontSize: 11,
       fontWeight: 700,
+      color: foreground,
     },
     grandTotalValue: {
       fontFamily: monoFamily,
       fontSize: 22,
       fontWeight: 700,
-      color: "#111827",
+      color: foreground,
     },
     totalInWordsLabel: {
       fontSize: 8,
-      color: "#9CA3AF",
+      color: subtle,
       marginBottom: 2,
     },
     totalInWordsValue: {
       fontSize: 9,
-      color: "#6B7280",
+      color: muted,
     },
     footer: {
       marginTop: 24,
@@ -197,12 +231,12 @@ function createStyles(
     footerTitle: {
       fontSize: 9,
       fontWeight: 700,
-      color: accentColor,
+      color: heading,
       marginBottom: 4,
     },
     footerText: {
       fontSize: 9,
-      color: "#6B7280",
+      color: muted,
       lineHeight: 1.45,
       marginBottom: 10,
     },
@@ -216,13 +250,13 @@ function createStyles(
       marginTop: 12,
       paddingTop: 12,
       borderTopWidth: 1,
-      borderTopColor: "#E5E7EB",
+      borderTopColor: border,
     },
     paymentButton: {
       marginTop: 10,
       borderWidth: 1,
       borderColor: accentColor,
-      backgroundColor: "#FFFFFF",
+      backgroundColor: darkMode ? pageBg : "#FFFFFF",
       paddingVertical: 8,
       paddingHorizontal: 12,
       borderRadius: 6,
@@ -239,7 +273,7 @@ function createStyles(
       marginTop: 12,
       paddingTop: 12,
       borderTopWidth: 1,
-      borderTopColor: "#E5E7EB",
+      borderTopColor: border,
       fontSize: 10,
       fontWeight: 600,
       color: "#047857",
@@ -260,11 +294,16 @@ export function DefaultInvoicePdf({
   const total = calculateInvoiceTotal(data);
   const reference = invoiceReference(data);
   const accentColor = data.invoiceDetails.theme.baseColor;
+  const darkMode = data.invoiceDetails.theme.mode === "dark";
   const fontFamily = invoicePdfFontFamily(data.invoiceDetails.theme.font);
   const monoFamily = invoicePdfMonoFontFamily(data.invoiceDetails.theme.font);
-  const styles = createStyles(fontFamily, monoFamily, accentColor);
+  const styles = createStyles(fontFamily, monoFamily, accentColor, darkMode);
+  const logo =
+    data.companyDetails.logoBase64 || data.companyDetails.logo || undefined;
   const signature =
-    data.companyDetails.signatureBase64 || data.companyDetails.signature;
+    data.companyDetails.signatureBase64 ||
+    data.companyDetails.signature ||
+    undefined;
 
   return (
     <Document>
@@ -272,23 +311,42 @@ export function DefaultInvoicePdf({
         <View style={styles.content}>
           <Text style={styles.title}>Invoice {reference}</Text>
 
-          <View style={styles.metaBlock}>
-            <View style={styles.metaRow}>
-              <Text style={styles.metaLabel}>Serial Number</Text>
-              <Text style={styles.metaValue}>
-                {data.invoiceDetails.serialNumber}
-              </Text>
+          <View style={styles.headerRow}>
+            <View style={styles.metaBlock}>
+              <View style={styles.metaRow}>
+                <Text style={styles.metaLabel}>Serial Number</Text>
+                <Text style={styles.metaValue}>
+                  {data.invoiceDetails.serialNumber}
+                </Text>
+              </View>
+              <View style={styles.metaRow}>
+                <Text style={styles.metaLabel}>Date</Text>
+                <Text style={styles.metaValue}>
+                  {formatInvoiceDate(data.invoiceDetails.date)}
+                </Text>
+              </View>
+              {data.invoiceDetails.dueDate ? (
+                <View style={styles.metaRow}>
+                  <Text style={styles.metaLabel}>Due Date</Text>
+                  <Text style={styles.metaValue}>
+                    {formatInvoiceDate(data.invoiceDetails.dueDate)}
+                  </Text>
+                </View>
+              ) : null}
+              {data.invoiceDetails.paymentTerms ? (
+                <View style={styles.metaRow}>
+                  <Text style={styles.metaLabel}>Payment Terms</Text>
+                  <Text style={styles.metaValue}>
+                    {data.invoiceDetails.paymentTerms}
+                  </Text>
+                </View>
+              ) : null}
+              <View style={styles.metaRow}>
+                <Text style={styles.metaLabel}>Currency</Text>
+                <Text style={styles.metaValue}>{currency}</Text>
+              </View>
             </View>
-            <View style={styles.metaRow}>
-              <Text style={styles.metaLabel}>Date</Text>
-              <Text style={styles.metaValue}>
-                {formatInvoiceDate(data.invoiceDetails.date)}
-              </Text>
-            </View>
-            <View style={styles.metaRow}>
-              <Text style={styles.metaLabel}>Currency</Text>
-              <Text style={styles.metaValue}>{currency}</Text>
-            </View>
+            {logo ? <Image src={logo} style={styles.logo} /> : null}
           </View>
 
           <View style={styles.billingRow}>
@@ -363,8 +421,20 @@ export function DefaultInvoicePdf({
             ))}
           </View>
 
-          {(data.metadata.notes || data.metadata.terms || signature) && (
+          {(data.metadata.notes ||
+            data.metadata.terms ||
+            data.metadata.paymentInformation.length > 0) && (
             <View style={styles.footer}>
+              {data.metadata.paymentInformation.length > 0 ? (
+                <View>
+                  <Text style={styles.footerTitle}>Payment Information</Text>
+                  {data.metadata.paymentInformation.map((row) => (
+                    <Text key={row.label} style={styles.footerText}>
+                      {row.label}: {row.value}
+                    </Text>
+                  ))}
+                </View>
+              ) : null}
               {data.metadata.notes ? (
                 <View>
                   <Text style={styles.footerTitle}>Notes</Text>
@@ -377,15 +447,20 @@ export function DefaultInvoicePdf({
                   <Text style={styles.footerText}>{data.metadata.terms}</Text>
                 </View>
               ) : null}
-              {signature ? (
-                <Image src={signature} style={styles.signature} />
-              ) : null}
             </View>
           )}
         </View>
 
         <View style={styles.bottomSection}>
           <View style={styles.totalsBlock}>
+            {signature ? (
+              <View style={styles.signatureBlock}>
+                <Text style={styles.signatureLabel}>
+                  Verified by {data.companyDetails.name}
+                </Text>
+                <Image src={signature} style={styles.signature} />
+              </View>
+            ) : null}
             <View style={styles.totalRow}>
               <Text style={styles.totalLabel}>Subtotal</Text>
               <Text style={styles.totalValue}>

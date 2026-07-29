@@ -13,10 +13,20 @@ import {
   getInvoicePaymentLinkById,
   upsertInvoicePaymentLink,
 } from "@/lib/db/payment-links";
-import type { InvoiceDoc, InvoiceFieldsDoc, InvoiceStatus } from "@/lib/db/types";
+import type {
+  InvoiceDoc,
+  InvoiceFieldsDoc,
+  InvoiceStatus,
+  UserDoc,
+} from "@/lib/db/types";
+import {
+  sendInvoicePaidEmail,
+  sendInvoiceShareEmail,
+} from "@/lib/email/invoice-emails";
 import type { InvoiceFormData } from "@/lib/invoice/schema";
 import { invoiceReference } from "@/lib/invoice/schema";
 import { calculateInvoiceTotal } from "@/lib/invoice/calculate-totals";
+import { getTokenById } from "@/lib/create-payment-link-data";
 import { resolveInvoicePaymentExpiry } from "@/lib/invoice/invoice-payment-link";
 import {
   MANAGE_INVOICES_PAGE_SIZE,
@@ -94,6 +104,7 @@ export type ManageInvoiceListItem = {
   shortId: string;
   serialNumber: string;
   reference: string;
+  clientName: string;
   storage: string;
   total: number;
   currency: string;
@@ -123,6 +134,7 @@ function mapManageInvoice(invoice: InvoiceDoc): ManageInvoiceListItem {
     shortId: invoice._id.toString().slice(-8),
     serialNumber: invoice.fields.invoiceDetails.serialNumber,
     reference: invoice.reference || invoiceReference(fields),
+    clientName: fields.clientDetails.name,
     storage: template === "vercel" ? "Minimal" : "Default",
     total: calculateInvoiceTotal(fields),
     currency: invoice.fields.invoiceDetails.currency,
@@ -421,4 +433,155 @@ export async function deleteInvoice(workspaceId: ObjectId, invoiceId: string) {
       reference: invoice.reference,
     });
   }
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export async function shareInvoiceByEmail(input: {
+  workspaceId: ObjectId;
+  userId: ObjectId;
+  invoiceId: string;
+  to: string;
+  message?: string;
+  replyTo?: string;
+}) {
+  const to = input.to.trim().toLowerCase();
+  if (!EMAIL_RE.test(to)) {
+    throw new Error("Enter a valid email address");
+  }
+
+  const db = await getDb();
+  const invoice = await db.collection<InvoiceDoc>(COLLECTIONS.invoices).findOne({
+    _id: new ObjectId(input.invoiceId),
+    workspaceId: input.workspaceId,
+  });
+
+  if (!invoice) {
+    throw new Error("Invoice not found");
+  }
+
+  if (invoice.status === "cancelled") {
+    throw new Error("Cancelled invoices cannot be shared");
+  }
+
+  if (invoice.status === "paid") {
+    throw new Error("This invoice is already paid");
+  }
+
+  if (!invoice.paymentLinkId) {
+    throw new Error("Save the invoice first to create a payment link");
+  }
+
+  const paymentLink = await getInvoicePaymentLinkById(
+    input.workspaceId,
+    invoice.paymentLinkId,
+  );
+
+  if (!paymentLink) {
+    throw new Error("Payment link not found. Save the invoice and try again.");
+  }
+
+  if (paymentLink.status !== "pending") {
+    throw new Error("This invoice payment link is no longer active");
+  }
+
+  const fields = fromFieldsDoc(invoice.fields);
+  const token = getTokenById(paymentLink.tokenId);
+  const amountLabel = `${paymentLink.amount.toLocaleString("en-US", {
+    maximumFractionDigits: 2,
+  })} ${token?.symbol ?? paymentLink.tokenId.toUpperCase()}`;
+
+  await sendInvoiceShareEmail({
+    to,
+    replyTo: input.replyTo,
+    companyName: fields.companyDetails.name,
+    clientName: fields.clientDetails.name,
+    reference: invoice.reference,
+    amountLabel,
+    paymentUrl: paymentLink.url,
+    message: input.message,
+  });
+
+  const now = new Date();
+  const nextStatus: InvoiceStatus =
+    invoice.status === "draft" ? "sent" : invoice.status;
+
+  await db.collection<InvoiceDoc>(COLLECTIONS.invoices).updateOne(
+    { _id: invoice._id },
+    {
+      $set: {
+        status: nextStatus,
+        lastSharedAt: now,
+        updatedAt: now,
+      },
+      $push: {
+        sharedRecipients: {
+          email: to,
+          sharedAt: now,
+          ...(input.message?.trim()
+            ? { message: input.message.trim().slice(0, 1000) }
+            : {}),
+        },
+      },
+    },
+  );
+
+  if (invoice.status === "draft") {
+    await logInvoiceSentActivity({
+      workspaceId: input.workspaceId,
+      reference: invoice.reference,
+    });
+  }
+
+  return {
+    ok: true as const,
+    to,
+    reference: invoice.reference,
+    paymentUrl: paymentLink.url,
+    status: nextStatus,
+  };
+}
+
+export async function notifyInvoiceCreatorOfPayment(input: {
+  invoiceId: ObjectId;
+  amount: number;
+  tokenSymbol: string;
+  paymentUrl?: string;
+}) {
+  const db = await getDb();
+  const invoice = await db.collection<InvoiceDoc>(COLLECTIONS.invoices).findOne({
+    _id: input.invoiceId,
+  });
+
+  if (!invoice || invoice.paidNotificationSentAt) {
+    return { sent: false as const };
+  }
+
+  const creator = await db.collection<UserDoc>(COLLECTIONS.users).findOne({
+    _id: invoice.createdBy,
+  });
+
+  const to = creator?.email?.trim().toLowerCase();
+  if (!to) {
+    return { sent: false as const, reason: "missing_creator_email" as const };
+  }
+
+  const amountLabel = `${input.amount.toLocaleString("en-US", {
+    maximumFractionDigits: 2,
+  })} ${input.tokenSymbol}`;
+
+  await sendInvoicePaidEmail({
+    to,
+    reference: invoice.reference,
+    clientName: invoice.fields.clientDetails.name,
+    amountLabel,
+    paymentUrl: input.paymentUrl,
+  });
+
+  await db.collection<InvoiceDoc>(COLLECTIONS.invoices).updateOne(
+    { _id: invoice._id, paidNotificationSentAt: { $exists: false } },
+    { $set: { paidNotificationSentAt: new Date() } },
+  );
+
+  return { sent: true as const, to };
 }

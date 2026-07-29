@@ -12,12 +12,11 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { Field, FieldContent } from "@/components/ui/field";
 import {
-  Field,
-  FieldContent,
-  FieldDescription,
-  FieldLabel,
-} from "@/components/ui/field";
+  InvoiceFieldHint,
+  InvoiceFieldLabel,
+} from "@/components/invoice/invoice-form-field";
 import { cn } from "@/lib/utils";
 import type { InvoiceFormData } from "@/lib/invoice/schema";
 
@@ -36,7 +35,7 @@ export function InvoiceDatePicker({
 
   return (
     <Field>
-      <FieldLabel>{label}</FieldLabel>
+      <InvoiceFieldLabel>{label}</InvoiceFieldLabel>
       <FieldContent>
         <Popover>
           <PopoverTrigger
@@ -64,7 +63,9 @@ export function InvoiceDatePicker({
             />
           </PopoverContent>
         </Popover>
-        {description ? <FieldDescription>{description}</FieldDescription> : null}
+        {description ? (
+          <InvoiceFieldHint>{description}</InvoiceFieldHint>
+        ) : null}
       </FieldContent>
     </Field>
   );

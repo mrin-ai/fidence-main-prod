@@ -28,7 +28,6 @@ import {
 } from "@/hooks/use-local-preference"
 import {
   BellIcon,
-  GiftIcon,
   HistoryIcon,
   LogOutIcon,
   SettingsIcon,
@@ -67,6 +66,7 @@ export function NavUser({
             render={
               <SidebarMenuButton
                 size="lg"
+                tooltip={user.name}
                 className="aria-expanded:bg-sidebar-accent"
               />
             }
@@ -76,13 +76,13 @@ export function NavUser({
                 {user.initials}
               </AvatarFallback>
             </Avatar>
-            <div className="grid flex-1 text-left text-sm leading-tight">
+            <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
               <span className="truncate font-semibold">{user.name}</span>
               <span className="truncate font-mono text-xs text-muted-foreground">
                 {user.role}
               </span>
             </div>
-            <SettingsIcon className="ml-auto size-4 text-muted-foreground" />
+            <SettingsIcon className="ml-auto size-4 text-muted-foreground group-data-[collapsible=icon]:hidden" />
           </DropdownMenuTrigger>
           <DropdownMenuContent
             className="min-w-56"
@@ -124,17 +124,29 @@ export function NavUser({
                   onClick={(event) => event.stopPropagation()}
                 />
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => router.push("/activity")}>
-                <HistoryIcon />
-                Activity
+              <DropdownMenuItem
+                className="justify-between gap-3"
+                onClick={() => router.push("/activity")}
+              >
+                <span className="flex items-center gap-2">
+                  <HistoryIcon />
+                  Activity
+                </span>
+                <span className="rounded-md bg-secondary px-1.5 py-0.5 text-[0.625rem] font-medium text-secondary-foreground">
+                  New
+                </span>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => router.push("/referrals")}>
-                <UsersIcon />
-                Referrals
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => router.push("/rewards")}>
-                <GiftIcon />
-                Reward
+              <DropdownMenuItem
+                className="justify-between gap-3"
+                onClick={() => router.push("/referrals")}
+              >
+                <span className="flex items-center gap-2">
+                  <UsersIcon />
+                  Referrals
+                </span>
+                <span className="rounded-md bg-secondary px-1.5 py-0.5 text-[0.625rem] font-medium text-secondary-foreground">
+                  New
+                </span>
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => router.push("/settings")}>
                 <SettingsIcon />

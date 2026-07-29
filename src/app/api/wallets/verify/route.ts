@@ -34,7 +34,7 @@ export async function POST(request: Request) {
 
     const limit = await checkRateLimit(
       `wallet:verify:${session.user._id.toString()}`,
-      { max: 20, windowMs: 60 * 60 * 1000 },
+      { max: 1000, windowMs: 60 * 60 * 1000 },
     );
     if (!limit.allowed) {
       return rateLimitResponse(limit);

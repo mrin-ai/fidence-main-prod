@@ -1,10 +1,18 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { useState } from "react"
+import { usePathname, useRouter } from "next/navigation"
+import { useEffect, useState } from "react"
 import { ChevronRightIcon } from "lucide-react"
 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import {
   SidebarGroup,
   SidebarGroupContent,
@@ -16,6 +24,7 @@ import {
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
+  useSidebar,
 } from "@/components/ui/sidebar"
 import { cn } from "@/lib/utils"
 
@@ -25,6 +34,7 @@ type NavItem = {
   icon?: React.ReactNode
   badge?: string | number
   comingSoon?: boolean
+  isNew?: boolean
   children?: NavItem[]
 }
 
@@ -38,6 +48,14 @@ function NavSubItemBadge({ item }: { item: NavItem }) {
     return (
       <span className="ml-auto shrink-0 rounded-md bg-secondary px-1.5 py-0.5 text-[0.625rem] font-medium text-secondary-foreground">
         Soon
+      </span>
+    )
+  }
+
+  if (item.isNew) {
+    return (
+      <span className="ml-auto shrink-0 rounded-md bg-secondary px-1.5 py-0.5 text-[0.625rem] font-medium text-secondary-foreground">
+        New
       </span>
     )
   }
@@ -60,6 +78,16 @@ function NavItemBadge({ item }: { item: NavItem }) {
         className={cn("bg-secondary text-[0.625rem] text-secondary-foreground")}
       >
         Soon
+      </SidebarMenuBadge>
+    )
+  }
+
+  if (item.isNew) {
+    return (
+      <SidebarMenuBadge
+        className={cn("bg-secondary text-[0.625rem] text-secondary-foreground")}
+      >
+        New
       </SidebarMenuBadge>
     )
   }
@@ -148,22 +176,92 @@ function NavCollapsibleItem({
   item: NavItem
   pathname: string
 }) {
-  const [open, setOpen] = useState(false)
+  const router = useRouter()
+  const { state, isMobile } = useSidebar()
+  const childActive = item.children?.some(
+    (child) =>
+      !child.comingSoon &&
+      child.url !== "#" &&
+      (pathname === child.url || pathname.startsWith(`${child.url}/`)),
+  )
+  const [open, setOpen] = useState(Boolean(childActive))
+
+  useEffect(() => {
+    if (childActive) setOpen(true)
+  }, [childActive])
+
+  if (state === "collapsed" && !isMobile) {
+    return (
+      <SidebarMenuItem>
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <SidebarMenuButton
+                tooltip={item.title}
+                isActive={childActive}
+              />
+            }
+          >
+            {item.icon}
+            <span>{item.title}</span>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            className="min-w-56"
+            side="right"
+            align="start"
+            sideOffset={8}
+          >
+            <DropdownMenuLabel>{item.title}</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {item.children?.map((child) =>
+              child.comingSoon ? (
+                <DropdownMenuItem
+                  key={child.title}
+                  disabled
+                  className="text-muted-foreground"
+                >
+                  {child.icon}
+                  <span>{child.title}</span>
+                  <span className="ml-auto rounded-md bg-secondary px-1.5 py-0.5 text-[0.625rem] font-medium text-secondary-foreground">
+                    Soon
+                  </span>
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem
+                  key={child.title}
+                  onClick={() => router.push(child.url)}
+                >
+                  {child.icon}
+                  <span>{child.title}</span>
+                </DropdownMenuItem>
+              ),
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </SidebarMenuItem>
+    )
+  }
 
   return (
     <SidebarMenuItem>
       <SidebarMenuButton
         tooltip={item.title}
         data-open={open}
+        isActive={childActive}
         className="group/collapsible"
         onClick={() => setOpen((current) => !current)}
         render={<button type="button" />}
       >
         {item.icon}
         <span>{item.title}</span>
+        {item.isNew ? (
+          <span className="rounded-md bg-secondary px-1.5 py-0.5 text-[0.625rem] font-medium text-secondary-foreground group-data-[collapsible=icon]:hidden">
+            New
+          </span>
+        ) : null}
         <ChevronRightIcon
           className={cn(
-            "ml-auto size-4 text-muted-foreground transition-transform",
+            "ml-auto size-4 text-muted-foreground transition-transform group-data-[collapsible=icon]:hidden",
             open && "rotate-90",
           )}
         />

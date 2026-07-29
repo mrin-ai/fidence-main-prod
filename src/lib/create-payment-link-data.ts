@@ -22,16 +22,14 @@ export const paymentTokens: PaymentToken[] = [
 ]
 
 const productionPaymentNetworks: PaymentNetwork[] = [
-  { id: "base", label: "Base", tokenIds: ["usdc", "usdt", "eth"] },
   { id: "ethereum", label: "Ethereum", tokenIds: ["usdc", "usdt", "eth"] },
-  { id: "arbitrum", label: "Arbitrum", tokenIds: ["usdc", "usdt", "eth"] },
-  { id: "polygon", label: "Polygon", tokenIds: ["usdc", "usdt"] },
+  { id: "base", label: "Base", tokenIds: ["usdc", "usdt", "eth"] },
   { id: "solana", label: "Solana", tokenIds: ["usdc", "usdt", "sol"] },
 ]
 
 const sepoliaPaymentNetwork: PaymentNetwork = {
   id: "sepolia",
-  label: "Sepolia (testnet)",
+  label: "Sepolia",
   tokenIds: ["usdc", "usdt", "eth"],
   testnet: true,
 }
@@ -85,4 +83,15 @@ export function getDefaultExpirationValue() {
   date.setDate(date.getDate() + 7)
   date.setMinutes(date.getMinutes() - date.getTimezoneOffset())
   return date.toISOString().slice(0, 16)
+}
+
+const tokenIconById: Record<string, string> = {
+  usdc: "/tokens/usdc.svg",
+  usdt: "/tokens/usdt.svg",
+  eth: "/tokens/eth.svg",
+  sol: "/tokens/sol.svg",
+}
+
+export function getPaymentTokenIcon(id: string) {
+  return tokenIconById[id]
 }

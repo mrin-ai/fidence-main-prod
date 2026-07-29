@@ -18,11 +18,15 @@ export function EmptyStateLottie({
   description,
   className,
   animationClassName,
+  src = "/animations/empty-status.lottie",
+  loop = true,
 }: {
   title: string;
   description?: string;
   className?: string;
   animationClassName?: string;
+  src?: string;
+  loop?: boolean;
 }) {
   return (
     <div
@@ -32,8 +36,8 @@ export function EmptyStateLottie({
       )}
     >
       <DotLottieReact
-        src="/animations/empty-status.lottie"
-        loop
+        src={src}
+        loop={loop}
         autoplay
         className={cn("h-28 w-28", animationClassName)}
       />

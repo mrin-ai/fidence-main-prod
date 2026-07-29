@@ -196,10 +196,22 @@ export function coerceInvoicePreviewData(value: unknown): InvoiceFormData {
     companyDetails: {
       ...defaults.companyDetails,
       ...input.companyDetails,
-      logo: input.companyDetails?.logo ?? defaults.companyDetails.logo,
-      logoBase64: input.companyDetails?.logoBase64,
-      signature: input.companyDetails?.signature ?? defaults.companyDetails.signature,
-      signatureBase64: input.companyDetails?.signatureBase64,
+      logo:
+        input.companyDetails?.logo ||
+        input.companyDetails?.logoBase64 ||
+        defaults.companyDetails.logo,
+      logoBase64:
+        input.companyDetails?.logoBase64 ||
+        input.companyDetails?.logo ||
+        undefined,
+      signature:
+        input.companyDetails?.signature ||
+        input.companyDetails?.signatureBase64 ||
+        defaults.companyDetails.signature,
+      signatureBase64:
+        input.companyDetails?.signatureBase64 ||
+        input.companyDetails?.signature ||
+        undefined,
       name: input.companyDetails?.name?.trim() || defaults.companyDetails.name,
       address: input.companyDetails?.address ?? defaults.companyDetails.address,
       metadata: validFieldRows(input.companyDetails?.metadata),

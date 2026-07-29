@@ -62,6 +62,17 @@ export function isSupportedWalletNetworkId(id: string) {
 export function getWalletNetworkLabel(id: string) {
   return (
     getWalletNetworkById(id)?.label ??
-    (id === "sepolia" ? "Sepolia (testnet)" : id)
+    (id === "sepolia" ? "Sepolia" : id)
   );
+}
+
+const networkIconById: Record<string, string> = {
+  ethereum: "/networks/ethereum.svg",
+  base: "/networks/base.svg",
+  sepolia: "/networks/sepolia.svg",
+  solana: "/networks/solana.svg",
+};
+
+export function getWalletNetworkIcon(id: string) {
+  return networkIconById[id];
 }

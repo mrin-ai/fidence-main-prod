@@ -10,13 +10,56 @@ import { getChainIdForNetwork } from "@/lib/payment-contracts";
 
 type EthereumProvider = {
   request: (args: { method: string; params?: unknown }) => Promise<unknown>;
+  isMetaMask?: boolean;
+  isPhantom?: boolean;
+  providers?: EthereumProvider[];
 };
 
-export function getEthereumProvider() {
-  if (typeof window === "undefined") return null;
+function listInjectedEthereumProviders(): EthereumProvider[] {
+  if (typeof window === "undefined") return [];
 
-  const provider = (window as Window & { ethereum?: EthereumProvider }).ethereum;
-  return provider?.request ? provider : null;
+  const ethereum = (
+    window as Window & { ethereum?: EthereumProvider }
+  ).ethereum;
+  if (!ethereum) return [];
+
+  if (Array.isArray(ethereum.providers) && ethereum.providers.length > 0) {
+    return ethereum.providers.filter((provider) =>
+      Boolean(provider?.request),
+    );
+  }
+
+  return ethereum.request ? [ethereum] : [];
+}
+
+function isPhantomProvider(provider: EthereumProvider) {
+  return Boolean(provider.isPhantom);
+}
+
+function isMetaMaskProvider(provider: EthereumProvider) {
+  // Phantom may also set isMetaMask for compatibility — exclude it.
+  return Boolean(provider.isMetaMask) && !isPhantomProvider(provider);
+}
+
+/**
+ * EVM provider for payments / wallet verify.
+ * Prefers MetaMask and never returns Phantom (Solana uses the Solana adapter).
+ */
+export function getEthereumProvider() {
+  const providers = listInjectedEthereumProviders();
+  if (providers.length === 0) return null;
+
+  const metamask = providers.find(isMetaMaskProvider);
+  if (metamask) return metamask;
+
+  const nonPhantom = providers.find((provider) => !isPhantomProvider(provider));
+  if (nonPhantom) return nonPhantom;
+
+  return null;
+}
+
+export function hasMetaMaskProvider() {
+  return listInjectedEthereumProviders().some(isMetaMaskProvider);
 }
 
 function isUserRejected(error: unknown) {
@@ -61,7 +104,9 @@ export async function getProviderChainId(provider = getEthereumProvider()) {
 export async function switchWalletChain(chainId: number) {
   const provider = getEthereumProvider();
   if (!provider) {
-    throw new Error("Wallet provider not found. Connect your wallet and try again.");
+    throw new Error(
+      "MetaMask not found. Install or unlock MetaMask for EVM networks. Use Phantom only for Solana.",
+    );
   }
 
   const chainIdHex = `0x${chainId.toString(16)}` as `0x${string}`;
@@ -112,8 +157,15 @@ export async function switchWalletChain(chainId: number) {
 export async function ensureProviderOnChain(chainId: number) {
   const provider = getEthereumProvider();
   if (!provider) {
-    throw new Error("Wallet provider not found. Connect your wallet and try again.");
+    throw new Error(
+      "MetaMask not found. Install or unlock MetaMask for EVM networks. Use Phantom only for Solana.",
+    );
   }
+
+  // Ensure MetaMask is the active account source before switch/sign.
+  await provider.request({ method: "eth_requestAccounts" }).catch(() => {
+    // Some wallets throw if already authorized — continue to chain switch.
+  });
 
   const currentChainId = await getProviderChainId(provider);
   if (currentChainId === chainId) {
@@ -141,7 +193,9 @@ export function createPaymentWalletClient(input: {
 }) {
   const provider = getEthereumProvider();
   if (!provider) {
-    throw new Error("Wallet provider not found. Connect your wallet and try again.");
+    throw new Error(
+      "MetaMask not found. Install or unlock MetaMask for EVM networks. Use Phantom only for Solana.",
+    );
   }
 
   const chain = getChainConfig(input.chainId);

@@ -13,12 +13,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Field,
-  FieldContent,
-  FieldDescription,
-  FieldLabel,
-} from "@/components/ui/field";
+import { Field, FieldContent } from "@/components/ui/field";
 import {
   Select,
   SelectContent,
@@ -32,6 +27,11 @@ import {
   InvoiceImagePicker,
   InvoiceStringFieldRows,
 } from "@/components/invoice/invoice-field-rows";
+import {
+  InvoiceFieldHint,
+  InvoiceFieldLabel,
+  InvoiceFormRow,
+} from "@/components/invoice/invoice-form-field";
 import { InvoiceItemsSection } from "@/components/invoice/invoice-items-section";
 import { InvoicePaymentLinkSection } from "@/components/invoice/invoice-payment-link-section";
 import { currenciesWithSymbols } from "@/lib/invoice/currency";
@@ -41,19 +41,6 @@ import {
   type InvoiceFormData,
 } from "@/lib/invoice/schema";
 import type { InvoicePaymentLinkInfo } from "@/lib/invoice/invoice-payment-link";
-import { cn } from "@/lib/utils";
-
-function FormRow({
-  children,
-  className,
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <div className={cn("grid gap-4 md:grid-cols-2", className)}>{children}</div>
-  );
-}
 
 export function useInvoiceForm(defaultValues?: InvoiceFormData) {
   return useForm<InvoiceFormData>({
@@ -76,16 +63,18 @@ export function InvoiceFormPanel({
   const signaturePreview =
     form.watch("companyDetails.signatureBase64") ||
     form.watch("companyDetails.signature");
-
   return (
     <div className="flex h-full flex-col overflow-y-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-      <Accordion defaultValue={["company-details"]} className="w-full divide-y border-b">
+      <Accordion
+        defaultValue={["company-details"]}
+        className="w-full divide-y border-b"
+      >
         <AccordionItem value="company-details">
-          <AccordionTrigger className="px-4">Company details</AccordionTrigger>
+          <AccordionTrigger className="px-4">Company Details</AccordionTrigger>
           <AccordionContent className="space-y-4 px-4 pb-4">
             <div className="flex flex-col gap-4 lg:flex-row">
               <InvoiceImagePicker
-                label="Company logo"
+                label="Company Logo"
                 previewUrl={logoPreview}
                 onChange={(dataUrl) => {
                   form.setValue("companyDetails.logoBase64", dataUrl, {
@@ -103,7 +92,7 @@ export function InvoiceFormPanel({
                 }}
               />
               <InvoiceImagePicker
-                label="Signature"
+                label="Company Signature"
                 previewUrl={signaturePreview}
                 onChange={(dataUrl) => {
                   form.setValue("companyDetails.signatureBase64", dataUrl, {
@@ -124,16 +113,21 @@ export function InvoiceFormPanel({
               />
             </div>
             <Field>
-              <FieldLabel>Company name</FieldLabel>
+              <InvoiceFieldLabel>Company Name</InvoiceFieldLabel>
               <FieldContent>
-                <Input {...form.register("companyDetails.name")} />
+                <Input
+                  placeholder="John Doe ltd."
+                  {...form.register("companyDetails.name")}
+                />
+                <InvoiceFieldHint>Name of your company</InvoiceFieldHint>
               </FieldContent>
             </Field>
             <Field>
-              <FieldLabel>Company address</FieldLabel>
+              <InvoiceFieldLabel>Company Address</InvoiceFieldLabel>
               <FieldContent>
                 <Textarea
                   className="min-h-20"
+                  placeholder="123 Business St, City, Country"
                   {...form.register("companyDetails.address")}
                 />
               </FieldContent>
@@ -141,25 +135,29 @@ export function InvoiceFormPanel({
             <InvoiceStringFieldRows
               form={form}
               name="companyDetails.metadata"
-              label="Company fields"
+              label="Company Fields"
             />
           </AccordionContent>
         </AccordionItem>
 
         <AccordionItem value="client-details">
-          <AccordionTrigger className="px-4">Client details</AccordionTrigger>
+          <AccordionTrigger className="px-4">Client Details</AccordionTrigger>
           <AccordionContent className="space-y-4 px-4 pb-4">
             <Field>
-              <FieldLabel>Client name</FieldLabel>
+              <InvoiceFieldLabel>Client Name</InvoiceFieldLabel>
               <FieldContent>
-                <Input {...form.register("clientDetails.name")} />
+                <Input
+                  placeholder="John Doe"
+                  {...form.register("clientDetails.name")}
+                />
               </FieldContent>
             </Field>
             <Field>
-              <FieldLabel>Client address</FieldLabel>
+              <InvoiceFieldLabel>Client Address</InvoiceFieldLabel>
               <FieldContent>
                 <Textarea
                   className="min-h-20"
+                  placeholder="456 Client St, City, Country"
                   {...form.register("clientDetails.address")}
                 />
               </FieldContent>
@@ -167,17 +165,17 @@ export function InvoiceFormPanel({
             <InvoiceStringFieldRows
               form={form}
               name="clientDetails.metadata"
-              label="Client fields"
+              label="Client Fields"
             />
           </AccordionContent>
         </AccordionItem>
 
         <AccordionItem value="invoice-details">
-          <AccordionTrigger className="px-4">Invoice details</AccordionTrigger>
+          <AccordionTrigger className="px-4">Invoice Details</AccordionTrigger>
           <AccordionContent className="space-y-4 px-4 pb-4">
-            <FormRow>
-              <Field>
-                <FieldLabel>Currency</FieldLabel>
+            <InvoiceFormRow>
+              <Field className="min-w-0 flex-1">
+                <InvoiceFieldLabel>Currency</InvoiceFieldLabel>
                 <FieldContent>
                   <Select
                     value={form.watch("invoiceDetails.currency")}
@@ -192,91 +190,70 @@ export function InvoiceFormPanel({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {Object.entries(currenciesWithSymbols).map(([key, symbol]) => (
-                        <SelectItem key={key} value={key}>
-                          <span>{key}</span>
-                          <Badge variant="secondary" className="ml-2">
-                            {symbol}
-                          </Badge>
-                        </SelectItem>
-                      ))}
+                      {Object.entries(currenciesWithSymbols).map(
+                        ([key, symbol]) => (
+                          <SelectItem key={key} value={key}>
+                            <span>{key}</span>
+                            <Badge className="rounded bg-primary/15 text-primary">
+                              {symbol}
+                            </Badge>
+                          </SelectItem>
+                        ),
+                      )}
                     </SelectContent>
                   </Select>
-                  <FieldDescription>Currency for amounts on this invoice</FieldDescription>
+                  <InvoiceFieldHint>
+                    Currency code for the invoice
+                  </InvoiceFieldHint>
                 </FieldContent>
               </Field>
-              <Field>
-                <FieldLabel>Theme mode</FieldLabel>
+              <Field className="min-w-0 flex-1">
+                <InvoiceFieldLabel optional>Invoice Prefix</InvoiceFieldLabel>
                 <FieldContent>
-                  <Select
-                    value={form.watch("invoiceDetails.theme.mode")}
-                    onValueChange={(value) => {
-                      if (!value) return;
-                      form.setValue(
-                        "invoiceDetails.theme.mode",
-                        value as "dark" | "light",
-                        { shouldDirty: true },
-                      );
-                    }}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="light">Light</SelectItem>
-                      <SelectItem value="dark">Dark</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Input
+                    placeholder="INV-"
+                    {...form.register("invoiceDetails.prefix")}
+                  />
+                  <InvoiceFieldHint>Prefix for invoice number</InvoiceFieldHint>
                 </FieldContent>
               </Field>
-            </FormRow>
+              <Field className="min-w-0 flex-1">
+                <InvoiceFieldLabel>Serial Number</InvoiceFieldLabel>
+                <FieldContent>
+                  <Input
+                    placeholder="0001"
+                    {...form.register("invoiceDetails.serialNumber")}
+                  />
+                  <InvoiceFieldHint>Invoice serial number</InvoiceFieldHint>
+                </FieldContent>
+              </Field>
+            </InvoiceFormRow>
+            <InvoiceFormRow>
+              <div className="min-w-0 flex-1">
+                <InvoiceDatePicker
+                  form={form}
+                  name="invoiceDetails.date"
+                  label="Invoice Date"
+                  description="Date when invoice is issued"
+                />
+              </div>
+              <div className="min-w-0 flex-1">
+                <InvoiceDatePicker
+                  form={form}
+                  name="invoiceDetails.dueDate"
+                  label="Due Date"
+                  description="Date when payment is due"
+                />
+              </div>
+            </InvoiceFormRow>
             <Field>
-              <FieldLabel>Theme color</FieldLabel>
+              <InvoiceFieldLabel optional>Payment Terms</InvoiceFieldLabel>
               <FieldContent>
                 <Input
-                  type="color"
-                  className="h-10 w-full cursor-pointer p-1"
-                  value={form.watch("invoiceDetails.theme.baseColor")}
-                  onChange={(event) =>
-                    form.setValue(
-                      "invoiceDetails.theme.baseColor",
-                      event.target.value,
-                      { shouldDirty: true },
-                    )
-                  }
+                  placeholder="50% of total amount upfront"
+                  {...form.register("invoiceDetails.paymentTerms")}
                 />
-              </FieldContent>
-            </Field>
-            <FormRow>
-              <Field>
-                <FieldLabel>Invoice prefix</FieldLabel>
-                <FieldContent>
-                  <Input {...form.register("invoiceDetails.prefix")} />
-                </FieldContent>
-              </Field>
-              <Field>
-                <FieldLabel>Serial number</FieldLabel>
-                <FieldContent>
-                  <Input {...form.register("invoiceDetails.serialNumber")} />
-                </FieldContent>
-              </Field>
-            </FormRow>
-            <FormRow>
-              <InvoiceDatePicker
-                form={form}
-                name="invoiceDetails.date"
-                label="Invoice date"
-              />
-              <InvoiceDatePicker
-                form={form}
-                name="invoiceDetails.dueDate"
-                label="Due date"
-              />
-            </FormRow>
-            <Field>
-              <FieldLabel>Payment terms</FieldLabel>
-              <FieldContent>
-                <Input {...form.register("invoiceDetails.paymentTerms")} />
+                <InvoiceFieldHint>Terms of payment</InvoiceFieldHint>
               </FieldContent>
             </Field>
             <InvoiceBillingFieldRows form={form} />
@@ -284,27 +261,46 @@ export function InvoiceFormPanel({
         </AccordionItem>
 
         <AccordionItem value="invoice-items">
-          <AccordionTrigger className="px-4">Invoice items</AccordionTrigger>
+          <AccordionTrigger className="px-4">Invoice Items</AccordionTrigger>
           <AccordionContent className="px-4 pb-4">
             <InvoiceItemsSection form={form} />
           </AccordionContent>
         </AccordionItem>
 
         <AccordionItem value="additional-info">
-          <AccordionTrigger className="px-4">Additional information</AccordionTrigger>
+          <AccordionTrigger className="px-4">
+            Additional Information
+          </AccordionTrigger>
           <AccordionContent className="space-y-4 px-4 pb-4">
             <Field>
-              <FieldLabel>Notes</FieldLabel>
+              <InvoiceFieldLabel optional>Notes</InvoiceFieldLabel>
               <FieldContent>
-                <Textarea {...form.register("metadata.notes")} />
+                <Textarea
+                  placeholder="Notes - any relevant information not already covered"
+                  {...form.register("metadata.notes")}
+                />
+                <InvoiceFieldHint>
+                  Additional notes for the invoice
+                </InvoiceFieldHint>
               </FieldContent>
             </Field>
             <Field>
-              <FieldLabel>Terms</FieldLabel>
+              <InvoiceFieldLabel optional>Terms</InvoiceFieldLabel>
               <FieldContent>
-                <Textarea {...form.register("metadata.terms")} />
+                <Textarea
+                  placeholder="Terms & Conditions - late fees, payment methods, delivery terms, etc."
+                  {...form.register("metadata.terms")}
+                />
+                <InvoiceFieldHint>
+                  Terms and conditions for the invoice
+                </InvoiceFieldHint>
               </FieldContent>
             </Field>
+            <InvoiceStringFieldRows
+              form={form}
+              name="metadata.paymentInformation"
+              label="Payment Information"
+            />
           </AccordionContent>
         </AccordionItem>
 

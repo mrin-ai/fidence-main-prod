@@ -197,6 +197,12 @@ export type InvoiceFieldsDoc = {
   };
 };
 
+export type InvoiceShareRecipient = {
+  email: string;
+  sharedAt: Date;
+  message?: string;
+};
+
 export type InvoiceDoc = {
   _id: ObjectId;
   workspaceId: ObjectId;
@@ -206,6 +212,10 @@ export type InvoiceDoc = {
   fields: InvoiceFieldsDoc;
   paymentLinkId?: ObjectId;
   paidAt?: Date;
+  /** Recipients who received a share email from the platform. */
+  sharedRecipients?: InvoiceShareRecipient[];
+  lastSharedAt?: Date;
+  paidNotificationSentAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 };

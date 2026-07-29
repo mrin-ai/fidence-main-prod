@@ -4,6 +4,7 @@ import * as React from "react";
 import { PlusIcon, Trash2Icon } from "lucide-react";
 import type { UseFormReturn } from "react-hook-form";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -100,8 +101,7 @@ export function InvoiceStringFieldRows({
         className="w-full border-dashed"
         onClick={appendRow}
       >
-        <PlusIcon data-icon="inline-start" />
-        Add field
+        Add New Field
       </Button>
     </div>
   );
@@ -118,7 +118,7 @@ export function InvoiceBillingFieldRows({
   function appendRow() {
     form.setValue(
       name,
-      [...rows, { label: "Tax", value: 0, type: "percentage" as const }],
+      [...rows, { label: "", value: 0, type: "fixed" as const }],
       { shouldDirty: true },
     );
   }
@@ -133,73 +133,90 @@ export function InvoiceBillingFieldRows({
 
   return (
     <div className="flex flex-col gap-2">
-      <FieldLabel>Billing details</FieldLabel>
+      <FieldLabel>Billing Details</FieldLabel>
       {rows.map((row, index) => (
-        <div key={`billing-${index}`} className="flex items-end gap-2">
-          <Field className="flex-1">
-            <FieldLabel className="text-xs">Label</FieldLabel>
-            <FieldContent>
-              <Input
-                value={row.label}
-                onChange={(event) => {
-                  const next = [...rows];
-                  next[index] = { ...next[index], label: event.target.value };
-                  form.setValue(name, next, { shouldDirty: true });
-                }}
-              />
-            </FieldContent>
-          </Field>
-          <Field className="w-28">
-            <FieldLabel className="text-xs">Type</FieldLabel>
-            <FieldContent>
-              <Select
-                value={row.type}
-                onValueChange={(value) => {
-                  if (!value) return;
-                  const next = [...rows];
-                  next[index] = {
-                    ...next[index],
-                    type: value as "fixed" | "percentage",
-                  };
-                  form.setValue(name, next, { shouldDirty: true });
-                }}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="percentage">%</SelectItem>
-                  <SelectItem value="fixed">Fixed</SelectItem>
-                </SelectContent>
-              </Select>
-            </FieldContent>
-          </Field>
-          <Field className="w-28">
-            <FieldLabel className="text-xs">Value</FieldLabel>
-            <FieldContent>
-              <Input
-                type="number"
-                value={row.value}
-                onChange={(event) => {
-                  const next = [...rows];
-                  next[index] = {
-                    ...next[index],
-                    value: Number(event.target.value),
-                  };
-                  form.setValue(name, next, { shouldDirty: true });
-                }}
-              />
-            </FieldContent>
-          </Field>
-          <Button
-            type="button"
-            variant="destructive"
-            size="icon"
-            className="mb-0.5 shrink-0"
-            onClick={() => removeRow(index)}
-          >
-            <Trash2Icon className="size-4" />
-          </Button>
+        <div
+          key={`billing-${index}`}
+          className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-end"
+        >
+          <div className="flex w-full flex-row gap-2 sm:w-2/3">
+            <Field className="flex-1">
+              <FieldLabel className="flex items-center gap-1.5 text-xs">
+                Label
+                <Badge
+                  variant="secondary"
+                  className="h-4 rounded px-1.5 text-[10px] font-medium"
+                >
+                  Tax/Discount/Other
+                </Badge>
+              </FieldLabel>
+              <FieldContent>
+                <Input
+                  placeholder="Label"
+                  value={row.label}
+                  onChange={(event) => {
+                    const next = [...rows];
+                    next[index] = { ...next[index], label: event.target.value };
+                    form.setValue(name, next, { shouldDirty: true });
+                  }}
+                />
+              </FieldContent>
+            </Field>
+            <Field className="w-36">
+              <FieldLabel className="text-xs">Type</FieldLabel>
+              <FieldContent>
+                <Select
+                  value={row.type}
+                  onValueChange={(value) => {
+                    if (!value) return;
+                    const next = [...rows];
+                    next[index] = {
+                      ...next[index],
+                      type: value as "fixed" | "percentage",
+                    };
+                    form.setValue(name, next, { shouldDirty: true });
+                  }}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="fixed">Fixed</SelectItem>
+                    <SelectItem value="percentage">Percentage</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FieldContent>
+            </Field>
+          </div>
+          <div className="flex w-full flex-row items-end gap-2 sm:w-1/3">
+            <Field className="flex-1">
+              <FieldLabel className="text-xs">Value</FieldLabel>
+              <FieldContent>
+                <Input
+                  type="number"
+                  placeholder="Value"
+                  value={row.value}
+                  onChange={(event) => {
+                    const next = [...rows];
+                    next[index] = {
+                      ...next[index],
+                      value: Number(event.target.value),
+                    };
+                    form.setValue(name, next, { shouldDirty: true });
+                  }}
+                />
+              </FieldContent>
+            </Field>
+            <Button
+              type="button"
+              variant="destructive"
+              size="icon"
+              className="mb-0.5 shrink-0"
+              onClick={() => removeRow(index)}
+            >
+              <Trash2Icon className="size-4" />
+            </Button>
+          </div>
         </div>
       ))}
       <Button
@@ -208,11 +225,39 @@ export function InvoiceBillingFieldRows({
         className="w-full border-dashed"
         onClick={appendRow}
       >
-        <PlusIcon data-icon="inline-start" />
-        Add billing row
+        Add New Field
       </Button>
     </div>
   );
+}
+
+/** Convert uploads to PNG data URLs so @react-pdf can render them reliably. */
+async function fileToPngDataUrl(file: File): Promise<string> {
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const element = new window.Image();
+      element.onload = () => resolve(element);
+      element.onerror = () => reject(new Error("Failed to load image"));
+      element.src = objectUrl;
+    });
+
+    const maxEdge = 1024;
+    const scale = Math.min(1, maxEdge / Math.max(image.width, image.height));
+    const width = Math.max(1, Math.round(image.width * scale));
+    const height = Math.max(1, Math.round(image.height * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d");
+    if (!context) {
+      throw new Error("Could not process image");
+    }
+    context.drawImage(image, 0, 0, width, height);
+    return canvas.toDataURL("image/png");
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
 }
 
 export function InvoiceImagePicker({
@@ -228,14 +273,19 @@ export function InvoiceImagePicker({
 }) {
   const inputRef = React.useRef<HTMLInputElement>(null);
 
-  function handleFile(file: File) {
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === "string") {
-        onChange(reader.result);
-      }
-    };
-    reader.readAsDataURL(file);
+  async function handleFile(file: File) {
+    try {
+      const dataUrl = await fileToPngDataUrl(file);
+      onChange(dataUrl);
+    } catch {
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === "string") {
+          onChange(reader.result);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
   }
 
   return (
@@ -264,7 +314,8 @@ export function InvoiceImagePicker({
         className="hidden"
         onChange={(event) => {
           const file = event.target.files?.[0];
-          if (file) handleFile(file);
+          if (file) void handleFile(file);
+          event.target.value = "";
         }}
       />
       {previewUrl ? (

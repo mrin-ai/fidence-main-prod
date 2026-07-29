@@ -128,6 +128,48 @@ export async function addVerifiedWallet(
   return { ok: true as const, wallet };
 }
 
+export async function updateVerifiedWalletLabel(
+  userId: ObjectId,
+  walletId: string,
+  label?: string,
+) {
+  const db = await getDb();
+  const now = new Date();
+  const trimmed = label?.trim();
+
+  const result = await db.collection<UserDoc>(COLLECTIONS.users).updateOne(
+    { _id: userId, "verifiedWallets.id": walletId },
+    trimmed
+      ? {
+          $set: {
+            "verifiedWallets.$.label": trimmed,
+            updatedAt: now,
+          },
+        }
+      : {
+          $unset: { "verifiedWallets.$.label": "" },
+          $set: { updatedAt: now },
+        },
+  );
+
+  if (result.matchedCount === 0) {
+    return { ok: false as const, error: "Wallet not found" };
+  }
+
+  const user = await db.collection<UserDoc>(COLLECTIONS.users).findOne({
+    _id: userId,
+  });
+  const wallet = user
+    ? listVerifiedWallets(user).find((entry) => entry.id === walletId)
+    : undefined;
+
+  if (!wallet) {
+    return { ok: false as const, error: "Wallet not found" };
+  }
+
+  return { ok: true as const, wallet };
+}
+
 export async function removeVerifiedWallet(userId: ObjectId, walletId: string) {
   const db = await getDb();
   const now = new Date();

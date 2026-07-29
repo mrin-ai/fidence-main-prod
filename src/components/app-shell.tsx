@@ -2,6 +2,7 @@ import type { ReactNode } from "react"
 
 import { AppSidebar } from "@/components/app-sidebar"
 import { CreatePaymentLinkProvider } from "@/components/create-payment-link-sheet"
+import { OnboardingModal } from "@/components/onboarding/onboarding-modal"
 import { ShellHeader } from "@/components/shell-header"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 
@@ -10,6 +11,7 @@ export function AppShell({
   user,
   workspace,
   hideSiteHeader = false,
+  needsOnboarding = false,
   children,
 }: {
   title?: string
@@ -24,10 +26,12 @@ export function AppShell({
     paymentLink: string
   }
   hideSiteHeader?: boolean
+  needsOnboarding?: boolean
   children?: ReactNode
 }) {
   return (
     <CreatePaymentLinkProvider>
+      {needsOnboarding ? <OnboardingModal /> : null}
       <SidebarProvider
         style={
           {

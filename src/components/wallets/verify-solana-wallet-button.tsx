@@ -1,14 +1,14 @@
 "use client";
 
-import { useCallback, useState } from "react";
-import { useWallet } from "@solana/wallet-adapter-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useWallet, type WalletName } from "@solana/wallet-adapter-react";
+import { WalletReadyState } from "@solana/wallet-adapter-base";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import bs58 from "bs58";
-import { Loader2Icon, WalletIcon } from "lucide-react";
+import { Loader2Icon } from "lucide-react";
 import { toast } from "sonner";
 
 import { buildWalletVerifyMessage } from "@/lib/auth-session";
-import { getWalletNetworkById } from "@/lib/wallet-networks";
 import { Button } from "@/components/ui/button";
 import type { WalletNetworkId } from "@/lib/db/types";
 import { cn } from "@/lib/utils";
@@ -19,6 +19,8 @@ export function VerifySolanaWalletButton({
   onVerified,
   disabled,
   className,
+  connectLabel = "Connect Phantom",
+  verifyLabel = "Sign to verify",
 }: {
   networkId: WalletNetworkId;
   label?: string;
@@ -32,13 +34,75 @@ export function VerifySolanaWalletButton({
   }) => void;
   disabled?: boolean;
   className?: string;
+  connectLabel?: string;
+  verifyLabel?: string;
 }) {
-  const { publicKey, connected, signMessage } = useWallet();
+  const {
+    publicKey,
+    connected,
+    connecting,
+    signMessage,
+    wallets,
+    select,
+    connect,
+    wallet,
+  } = useWallet();
   const { setVisible } = useWalletModal();
   const [loading, setLoading] = useState(false);
+  const pendingConnectRef = useRef(false);
 
-  const network = getWalletNetworkById(networkId);
   const address = publicKey?.toBase58();
+
+  useEffect(() => {
+    if (!pendingConnectRef.current || !wallet || connected || connecting) {
+      return;
+    }
+
+    pendingConnectRef.current = false;
+    void connect().catch((error) => {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Could not connect Phantom. Try again.",
+      );
+    });
+  }, [wallet, connected, connecting, connect]);
+
+  const connectPhantom = useCallback(() => {
+    const phantom = wallets.find(
+      (entry) => entry.adapter.name.toLowerCase() === "phantom",
+    );
+
+    if (!phantom) {
+      toast.error("Phantom wallet not found. Install Phantom and try again.");
+      window.open("https://phantom.app/", "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    if (
+      phantom.readyState !== WalletReadyState.Installed &&
+      phantom.readyState !== WalletReadyState.Loadable
+    ) {
+      toast.error("Open or install the Phantom extension, then try again.");
+      window.open("https://phantom.app/", "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    // Only attaches a Solana receiving wallet — does not change login session.
+    if (wallet?.adapter.name === phantom.adapter.name) {
+      void connect().catch((error) => {
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Could not connect Phantom. Try again.",
+        );
+      });
+      return;
+    }
+
+    pendingConnectRef.current = true;
+    select(phantom.adapter.name as WalletName);
+  }, [wallets, wallet, connect, select]);
 
   const verifyWallet = useCallback(async () => {
     if (!publicKey || !signMessage) return;
@@ -86,10 +150,19 @@ export function VerifySolanaWalletButton({
 
       if (data.wallet) {
         onVerified(data.wallet);
-        toast.success("Wallet verified");
+        toast.success("Solana wallet verified");
       }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Verification failed");
+      const message =
+        error instanceof Error ? error.message : "Verification failed";
+      const rejected =
+        /user rejected|rejected the request|cancelled|canceled/i.test(message);
+
+      if (rejected) {
+        toast.message("Signature cancelled in Phantom. Try again when ready.");
+      } else {
+        toast.error(message);
+      }
     } finally {
       setLoading(false);
     }
@@ -99,12 +172,25 @@ export function VerifySolanaWalletButton({
     return (
       <Button
         type="button"
-        className={cn("h-10 w-full", className)}
-        onClick={() => setVisible(true)}
-        disabled={disabled}
+        className={cn("h-9", className)}
+        onClick={() => {
+          try {
+            connectPhantom();
+          } catch {
+            // Fallback if adapter select fails for any reason.
+            setVisible(true);
+          }
+        }}
+        disabled={disabled || connecting}
       >
-        <WalletIcon className="size-4" />
-        Connect Phantom
+        {connecting ? (
+          <>
+            <Loader2Icon className="size-4 animate-spin" />
+            Connecting…
+          </>
+        ) : (
+          connectLabel
+        )}
       </Button>
     );
   }
@@ -112,7 +198,7 @@ export function VerifySolanaWalletButton({
   return (
     <Button
       type="button"
-      className={cn("h-10 w-full", className)}
+      className={cn("h-9", className)}
       disabled={disabled || loading}
       onClick={() => void verifyWallet()}
     >
@@ -122,10 +208,7 @@ export function VerifySolanaWalletButton({
           Verifying…
         </>
       ) : (
-        <>
-          <WalletIcon className="size-4" />
-          Sign to verify {network?.label ?? "Solana"}
-        </>
+        verifyLabel
       )}
     </Button>
   );

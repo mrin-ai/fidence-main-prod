@@ -54,3 +54,7 @@ next-env.d.ts
 # Local landing source (integrated into src/app)
 /fidence-landing
 /public/landing
+
+# Local Invoicely reference clone (do not push)
+/Invoicely
+/invoicely

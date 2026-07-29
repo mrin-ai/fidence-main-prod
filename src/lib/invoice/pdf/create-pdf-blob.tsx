@@ -4,6 +4,7 @@ import type { InvoiceFormData } from "@/lib/invoice/schema";
 import type { InvoicePdfPayment } from "@/lib/invoice/invoice-payment-link";
 
 import { DefaultInvoicePdf } from "./default-template";
+import { VercelInvoicePdf } from "./vercel-template";
 import { registerInvoiceFonts } from "./register-fonts";
 
 export async function createInvoicePdfBlob(
@@ -11,7 +12,14 @@ export async function createInvoicePdfBlob(
   payment?: InvoicePdfPayment,
 ) {
   registerInvoiceFonts();
-  return pdf(<DefaultInvoicePdf data={data} payment={payment} />).toBlob();
+  const template = data.invoiceDetails.theme.template ?? "default";
+  const document =
+    template === "vercel" ? (
+      <VercelInvoicePdf data={data} payment={payment} />
+    ) : (
+      <DefaultInvoicePdf data={data} payment={payment} />
+    );
+  return pdf(document).toBlob();
 }
 
 export function downloadBlob(blob: Blob, filename: string) {

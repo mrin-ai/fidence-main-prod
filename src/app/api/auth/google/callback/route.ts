@@ -24,6 +24,7 @@ import {
   getClientIp,
   rateLimitResponse,
 } from "@/lib/rate-limit";
+import { resolvePostAuthPath } from "@/lib/onboarding";
 import { sanitizeRedirectPath } from "@/lib/sanitize-redirect";
 
 function clearOAuthCookies(cookieStore: Awaited<ReturnType<typeof cookies>>) {
@@ -119,7 +120,8 @@ export async function GET(request: Request) {
     cookieStore.set(sessionCookieOptions(token));
     clearOAuthCookies(cookieStore);
 
-    const response = NextResponse.redirect(new URL(redirectPath, request.url));
+    const destination = resolvePostAuthPath(user.username, redirectPath);
+    const response = NextResponse.redirect(new URL(destination, request.url));
     response.cookies.set(sessionCookieOptions(token));
     return response;
   } catch (authError) {

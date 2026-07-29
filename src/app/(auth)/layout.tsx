@@ -10,6 +10,7 @@ import {
 import { useState, useEffect } from "react";
 import Autoplay from "embla-carousel-autoplay";
 import { LcxLogo } from "@/components/lcx-logo";
+import { PixelCard } from "@/components/pixel-card";
 import {
   CreditCard,
   Link2,
@@ -88,8 +89,21 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
   return (
     <div className="lcx-auth flex min-h-svh w-full bg-background">
       <div className="relative hidden flex-col overflow-hidden lg:flex lg:w-[45%] xl:w-[50%]">
-        <div className="absolute inset-0 pixel-grid-bg opacity-30" />
-        <div className="absolute inset-0 bg-linear-to-br from-background via-background to-muted/30" />
+        <div className="absolute inset-0">
+          <PixelCard
+            autoPlay
+            backgroundColor="#5264E200"
+            borderColor="#00000000"
+            borderWidth={0}
+            radius={0}
+            gap={6}
+            pixelSize={2}
+            speed={80}
+            appearFrom="middle"
+            colors={["#93c5fd", "#60a5fa", "#3b82f6", "#2563eb"]}
+          />
+        </div>
+        <div className="absolute inset-0 bg-linear-to-br from-background/75 via-background/55 to-background/35" />
 
         <div className="relative flex flex-1 flex-col px-12 py-10 xl:px-20">
           <Link
@@ -117,7 +131,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
                 {features.map((f) => (
                   <div
                     key={f.label}
-                    className="flex items-start gap-3 rounded-xl border border-border/30 bg-card/20 p-3"
+                    className="flex items-start gap-3 rounded-xl border border-border/30 bg-white p-3"
                   >
                     <f.icon className="mt-0.5 h-4 w-4 shrink-0 text-primary/70" />
                     <div>
@@ -148,7 +162,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
                   <CarouselContent>
                     {testimonials.map((testimonial, index) => (
                       <CarouselItem key={index}>
-                        <div className="rounded-xl border border-border/50 bg-card/30 p-5 transition-all duration-300 hover:border-border hover:bg-card">
+                        <div className="rounded-xl border border-border/50 bg-white p-5">
                           <blockquote className="mb-4 line-clamp-3 text-sm leading-relaxed text-muted-foreground">
                             &ldquo;{testimonial.content}&rdquo;
                           </blockquote>

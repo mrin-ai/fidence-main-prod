@@ -23,6 +23,7 @@ const RESERVED_PATHS = new Set([
   "docs",
   "blog",
   "merchant",
+  "onboarding",
   "icon.png",
   "favicon.ico",
 ]);

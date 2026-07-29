@@ -1,14 +1,17 @@
 "use client"
 
 import Image from "next/image"
-import { SearchIcon } from "lucide-react"
+import { Link2Icon } from "lucide-react"
 
+import { useCreatePaymentLink } from "@/components/create-payment-link-sheet"
 import { NotificationDropdown } from "@/components/notifications/notification-dropdown"
-import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 
 export function SiteHeader({ title }: { title: string }) {
+  const { openCreatePaymentLink } = useCreatePaymentLink()
+
   return (
     <header className="flex h-(--header-height) shrink-0 items-center gap-2 border-b border-border/50 bg-background/80 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-(--header-height)">
       <div className="flex w-full items-center gap-1 px-4 lg:gap-2 lg:px-6">
@@ -31,14 +34,15 @@ export function SiteHeader({ title }: { title: string }) {
         </div>
 
         <div className="ml-auto flex items-center gap-2">
-          <div className="relative hidden sm:block">
-            <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Search..."
-              className="h-8 w-44 bg-background pl-8 lg:w-60"
-            />
-          </div>
+          <Button
+            type="button"
+            size="sm"
+            className="h-8 px-3"
+            onClick={openCreatePaymentLink}
+          >
+            <Link2Icon data-icon="inline-start" />
+            Create
+          </Button>
           <NotificationDropdown />
         </div>
       </div>

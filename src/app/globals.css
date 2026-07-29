@@ -151,3 +151,11 @@
     @apply font-sans;
   }
 }
+
+/* Solana wallet modal must sit above app dialogs (z-50). */
+.wallet-adapter-modal-wrapper {
+  z-index: 10000 !important;
+}
+.wallet-adapter-modal {
+  z-index: 10001 !important;
+}

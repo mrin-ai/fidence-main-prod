@@ -2,24 +2,14 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import {
-  DownloadIcon,
-  EyeIcon,
-  Loader2Icon,
-  SaveIcon,
-} from "lucide-react";
+import { DownloadIcon, Loader2Icon, MailIcon, SaveIcon } from "lucide-react";
 import type { UseFormReturn } from "react-hook-form";
 import { toast } from "sonner";
 
 import { downloadInvoicePdf } from "@/components/invoice/invoice-preview";
+import { ShareInvoiceDialog } from "@/components/invoice/share-invoice-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import type { InvoicePaymentLinkInfo } from "@/lib/invoice/invoice-payment-link";
 import type { InvoiceStatus } from "@/lib/db/types";
 import {
@@ -53,6 +43,21 @@ export function InvoiceToolbar({
 }) {
   const router = useRouter();
   const [isSaving, setIsSaving] = React.useState(false);
+  const [isDownloading, setIsDownloading] = React.useState(false);
+  const [shareOpen, setShareOpen] = React.useState(false);
+
+  async function handleDownloadPdf() {
+    setIsDownloading(true);
+    try {
+      await downloadInvoicePdf(form, paymentLink);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to download PDF",
+      );
+    } finally {
+      setIsDownloading(false);
+    }
+  }
 
   async function saveInvoice() {
     const parsed = invoiceFormSchema.safeParse(form.getValues());
@@ -116,55 +121,89 @@ export function InvoiceToolbar({
     }
   }
 
-  async function handleViewPdf() {
-    try {
-      await downloadInvoicePdf(form, paymentLink);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to open PDF");
-    }
-  }
-
   const displayStatus = paymentLink?.status === "paid" ? "paid" : invoiceStatus;
+  const canShare =
+    Boolean(invoiceId) &&
+    Boolean(paymentLink?.url) &&
+    paymentLink?.status === "pending" &&
+    displayStatus !== "paid" &&
+    displayStatus !== "cancelled";
 
   return (
-    <div className="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-border/50 px-3">
-      <div className="flex min-w-0 items-center gap-2">
-        <span className="truncate text-sm text-muted-foreground">
-          {invoiceId ? "Edit invoice" : "Create invoice"}
-        </span>
-        {displayStatus ? (
-          <Badge
-            variant={displayStatus === "paid" ? "default" : "secondary"}
-            className="shrink-0"
+    <>
+      <div className="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-border/50 px-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="truncate text-sm text-muted-foreground">
+            {invoiceId ? "Edit invoice" : "Create invoice"}
+          </span>
+          {displayStatus ? (
+            <Badge
+              variant={displayStatus === "paid" ? "default" : "secondary"}
+              className="shrink-0"
+            >
+              {statusLabel[displayStatus]}
+            </Badge>
+          ) : null}
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="md:hidden"
+            disabled={isDownloading || isSaving}
+            onClick={() => void handleDownloadPdf()}
           >
-            {statusLabel[displayStatus]}
-          </Badge>
-        ) : null}
-      </div>
-      <div className="flex items-center gap-2">
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            render={<Button size="sm" disabled={isSaving} />}
-          >
-            {isSaving ? (
+            {isDownloading ? (
               <Loader2Icon className="size-4 animate-spin" />
             ) : (
               <DownloadIcon className="size-4" />
             )}
-            Download
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => void saveInvoice()}>
+            PDF
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={!canShare || isSaving}
+            onClick={() => {
+              if (!invoiceId) {
+                toast.error("Save the invoice before sharing");
+                return;
+              }
+              setShareOpen(true);
+            }}
+          >
+            <MailIcon className="size-4" />
+            Share
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            disabled={isSaving}
+            onClick={() => void saveInvoice()}
+          >
+            {isSaving ? (
+              <Loader2Icon className="size-4 animate-spin" />
+            ) : (
               <SaveIcon className="size-4" />
-              Save invoice
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => void handleViewPdf()}>
-              <EyeIcon className="size-4" />
-              Download PDF
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+            )}
+            Save
+          </Button>
+        </div>
       </div>
-    </div>
+      {invoiceId ? (
+        <ShareInvoiceDialog
+          open={shareOpen}
+          onOpenChange={setShareOpen}
+          invoiceId={invoiceId}
+          onShared={(status) => {
+            if (status) {
+              onSaved?.({ id: invoiceId, status, paymentLink: paymentLink ?? undefined });
+            }
+          }}
+        />
+      ) : null}
+    </>
   );
 }

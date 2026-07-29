@@ -2,26 +2,21 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ArrowDownIcon,
   ArrowUpDownIcon,
   ArrowUpIcon,
   FilePlus2Icon,
   FileTextIcon,
-  HardDriveIcon,
-  MoreHorizontalIcon,
   PencilIcon,
+  Trash2Icon,
 } from "lucide-react";
+import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
   Pagination,
   PaginationContent,
@@ -42,7 +37,6 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { dashboardCardClassName } from "@/lib/dashboard-styles";
 import type { ManageInvoiceListItem } from "@/lib/db/invoices";
 import type { InvoiceStatus } from "@/lib/db/types";
-import { formatPaymentDateTime } from "@/lib/format-date";
 import { formatCurrency } from "@/lib/invoice/currency";
 import {
   MANAGE_INVOICES_PAGE_SIZE,
@@ -52,22 +46,27 @@ import {
 } from "@/lib/invoice/manage-invoices";
 import { cn } from "@/lib/utils";
 
-const statusVariant: Record<
-  InvoiceStatus,
-  "default" | "secondary" | "outline" | "destructive"
-> = {
-  draft: "secondary",
-  sent: "default",
-  paid: "default",
-  cancelled: "destructive",
-};
-
 const statusLabel: Record<InvoiceStatus, string> = {
   draft: "Draft",
   sent: "Sent",
   paid: "Paid",
   cancelled: "Cancelled",
 };
+
+const statusBadgeClassName: Record<InvoiceStatus, string> = {
+  draft: "border-border bg-secondary/40 text-muted-foreground",
+  sent: "border-amber-500 bg-amber-500/10 text-amber-700 dark:text-amber-400",
+  paid: "border-emerald-600 bg-emerald-600/10 text-emerald-700 dark:text-emerald-400",
+  cancelled: "border-red-600 bg-red-600/10 text-red-700 dark:text-red-400",
+};
+
+const invoiceDateFormatter = new Intl.DateTimeFormat("en-US", {
+  dateStyle: "medium",
+});
+
+function formatInvoiceDate(value: string) {
+  return invoiceDateFormatter.format(new Date(value));
+}
 
 function SortableHead({
   label,
@@ -146,6 +145,9 @@ export function ManageInvoicesPageContent({
   sortField: ManageInvoiceSortField;
   sort: ManageInvoiceSort;
 }) {
+  const router = useRouter();
+  const [deletingId, setDeletingId] = React.useState<string | null>(null);
+
   function handleSort(field: ManageInvoiceSortField) {
     const nextSort =
       sortField === field ? (sort === "asc" ? "desc" : "asc") : "desc";
@@ -157,6 +159,36 @@ export function ManageInvoicesPageContent({
     });
   }
 
+  async function handleDeleteInvoice(invoice: ManageInvoiceListItem) {
+    const confirmed = window.confirm(
+      `Delete invoice ${invoice.reference}? This cannot be undone.`,
+    );
+    if (!confirmed) return;
+
+    setDeletingId(invoice.id);
+    try {
+      const response = await fetch(`/api/invoices/${invoice.id}`, {
+        method: "DELETE",
+      });
+      const payload = (await response.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+
+      if (!response.ok) {
+        throw new Error(payload?.error ?? "Failed to delete invoice");
+      }
+
+      toast.success(`Deleted ${invoice.reference}`);
+      router.refresh();
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to delete invoice",
+      );
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   const currentPage = feed.page;
   const pageStart =
     feed.total === 0 ? 0 : (currentPage - 1) * feed.limit + 1;
@@ -164,24 +196,22 @@ export function ManageInvoicesPageContent({
   const paginatedInvoices = feed.items;
 
   return (
-    <div className="flex w-full flex-col gap-8 px-4 py-6 lg:px-8 lg:py-8">
-      <Card className={dashboardCardClassName}>
-        <CardHeader className="gap-4 space-y-0 pb-4">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <CardTitle className="text-base font-medium">
-                Manage invoices
-              </CardTitle>
-              <p className="text-sm text-muted-foreground">
-                View all created invoices, track status, and open the editor.
-              </p>
-            </div>
-            <Link href="/invoice/new" className={cn(buttonVariants())}>
-              <FilePlus2Icon data-icon="inline-start" />
-              New invoice
-            </Link>
-          </div>
+    <div className="flex w-full flex-col gap-6 px-4 py-6 lg:px-8 lg:py-8">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight">Invoices</h1>
+          <p className="text-sm text-muted-foreground">
+            Track payments and open any invoice to edit or share.
+          </p>
+        </div>
+        <Link href="/invoice/new" className={cn(buttonVariants())}>
+          <FilePlus2Icon data-icon="inline-start" />
+          New invoice
+        </Link>
+      </div>
 
+      <Card className={dashboardCardClassName}>
+        <CardHeader className="pb-3">
           <Tabs
             value={statusFilter}
             onValueChange={(value) => {
@@ -212,11 +242,11 @@ export function ManageInvoicesPageContent({
             <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border/60 bg-secondary/10 px-6 py-16 text-center">
               <FileTextIcon className="size-8 text-primary/70" />
               <div>
-                <p className="text-sm font-medium">No invoices found</p>
+                <p className="text-sm font-medium">No invoices yet</p>
                 <p className="text-sm text-muted-foreground">
                   {statusFilter === "all"
-                    ? "Create your first invoice to see it here."
-                    : "Try another status filter."}
+                    ? "Create an invoice to get started."
+                    : `No ${statusLabel[statusFilter as InvoiceStatus].toLowerCase()} invoices.`}
                 </p>
               </div>
               {statusFilter === "all" ? (
@@ -227,133 +257,123 @@ export function ManageInvoicesPageContent({
             </div>
           ) : (
             <>
-              <div className="overflow-x-auto">
+              <div className="overflow-hidden rounded-xl border border-border bg-card">
                 <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Storage</TableHead>
-                      <TableHead>ID</TableHead>
-                      <TableHead>Serial No</TableHead>
-                      <SortableHead
-                        label="Total"
-                        field="total"
-                        activeField={sortField}
-                        sort={sort}
-                        onSort={handleSort}
-                        className="text-right"
-                      />
+                  <TableHeader className="bg-muted/60 [&_tr]:border-border">
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="h-11 px-4">Invoice</TableHead>
+                      <TableHead className="h-11 px-4">Client</TableHead>
                       <SortableHead
                         label="Items"
                         field="items"
                         activeField={sortField}
                         sort={sort}
                         onSort={handleSort}
-                        className="text-right"
+                        className="h-11 px-4 text-right"
                       />
-                      <TableHead>Status</TableHead>
+                      <TableHead className="h-11 w-[120px] px-4">
+                        Status
+                      </TableHead>
                       <SortableHead
-                        label="Invoice Date"
+                        label="Amount"
+                        field="total"
+                        activeField={sortField}
+                        sort={sort}
+                        onSort={handleSort}
+                        className="h-11 min-w-[120px] px-4 text-right"
+                      />
+                      <SortableHead
+                        label="Date"
                         field="invoiceDate"
                         activeField={sortField}
                         sort={sort}
                         onSort={handleSort}
+                        className="h-11 min-w-[120px] px-4"
                       />
                       <SortableHead
-                        label="Created At"
-                        field="createdAt"
-                        activeField={sortField}
-                        sort={sort}
-                        onSort={handleSort}
-                      />
-                      <SortableHead
-                        label="Paid At"
+                        label="Paid"
                         field="paidAt"
                         activeField={sortField}
                         sort={sort}
                         onSort={handleSort}
+                        className="h-11 min-w-[120px] px-4"
                       />
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead className="h-11 w-28 px-4 text-right">
+                        Actions
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {paginatedInvoices.map((invoice) => (
-                      <TableRow key={invoice.id}>
-                        <TableCell>
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <HardDriveIcon className="size-3.5 shrink-0" />
-                            {invoice.storage}
-                          </div>
+                      <TableRow
+                        key={invoice.id}
+                        className="border-border/80 hover:bg-muted/40"
+                      >
+                        <TableCell className="px-4 py-3.5">
+                          <Link
+                            href={`/invoice/${invoice.id}`}
+                            className="group flex flex-col gap-0.5"
+                          >
+                            <span className="font-medium text-foreground group-hover:text-primary group-hover:underline">
+                              {invoice.reference}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              #{invoice.serialNumber}
+                            </span>
+                          </Link>
                         </TableCell>
-                        <TableCell className="font-mono text-xs">
-                          {invoice.shortId}
+                        <TableCell className="max-w-[200px] truncate px-4 py-3.5 text-sm">
+                          {invoice.clientName || "—"}
                         </TableCell>
-                        <TableCell className="font-mono text-xs">
-                          {invoice.serialNumber}
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-sm tabular-nums">
-                          {formatCurrency(invoice.total, invoice.currency)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-sm tabular-nums">
+                        <TableCell className="px-4 py-3.5 text-right tabular-nums text-muted-foreground">
                           {invoice.itemCount}
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="px-4 py-3.5">
                           <Badge
-                            variant={statusVariant[invoice.status] ?? "outline"}
+                            variant="outline"
+                            className={
+                              statusBadgeClassName[invoice.status] ?? undefined
+                            }
                           >
                             {statusLabel[invoice.status]}
                           </Badge>
                         </TableCell>
-                        <TableCell className="font-mono text-xs text-muted-foreground">
-                          {formatPaymentDateTime(invoice.invoiceDate)}
+                        <TableCell className="px-4 py-3.5 text-right font-medium tabular-nums">
+                          {formatCurrency(invoice.total, invoice.currency)}
                         </TableCell>
-                        <TableCell className="font-mono text-xs text-muted-foreground">
-                          {formatPaymentDateTime(invoice.createdAt)}
+                        <TableCell className="px-4 py-3.5 text-sm text-muted-foreground">
+                          {formatInvoiceDate(invoice.invoiceDate)}
                         </TableCell>
-                        <TableCell className="font-mono text-xs text-muted-foreground">
+                        <TableCell className="px-4 py-3.5 text-sm text-muted-foreground">
                           {invoice.paidAt
-                            ? formatPaymentDateTime(invoice.paidAt)
+                            ? formatInvoiceDate(invoice.paidAt)
                             : "—"}
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="px-4 py-3.5">
                           <div className="flex items-center justify-end gap-1">
                             <Button
-                              variant="ghost"
+                              variant="outline"
                               size="icon-sm"
                               aria-label="Edit invoice"
                               nativeButton={false}
-                              render={<Link href={`/invoice/${invoice.id}`} />}
+                              render={
+                                <Link href={`/invoice/${invoice.id}`} />
+                              }
                             >
                               <PencilIcon className="size-3.5" />
                             </Button>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger
-                                render={
-                                  <Button
-                                    variant="ghost"
-                                    size="icon-sm"
-                                    aria-label="Invoice actions"
-                                  />
-                                }
-                              >
-                                <MoreHorizontalIcon className="size-3.5" />
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem
-                                  render={
-                                    <Link href={`/invoice/${invoice.id}`} />
-                                  }
-                                >
-                                  Edit invoice
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  render={
-                                    <Link href={`/invoice/${invoice.id}`} />
-                                  }
-                                >
-                                  View details
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
+                            <Button
+                              variant="outline"
+                              size="icon-sm"
+                              aria-label="Delete invoice"
+                              disabled={deletingId === invoice.id}
+                              className="text-muted-foreground hover:border-destructive/40 hover:text-destructive"
+                              onClick={() => {
+                                void handleDeleteInvoice(invoice);
+                              }}
+                            >
+                              <Trash2Icon className="size-3.5" />
+                            </Button>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -365,7 +385,7 @@ export function ManageInvoicesPageContent({
               {feed.total > MANAGE_INVOICES_PAGE_SIZE ? (
                 <div className="mt-4 flex flex-col gap-3 border-t border-border/50 pt-4 sm:flex-row sm:items-center sm:justify-between">
                   <p className="text-sm text-muted-foreground">
-                    Showing {pageStart}–{pageEnd} of {feed.total} invoices
+                    Showing {pageStart}–{pageEnd} of {feed.total}
                   </p>
                   <Pagination className="mx-0 w-auto justify-end">
                     <PaginationContent>

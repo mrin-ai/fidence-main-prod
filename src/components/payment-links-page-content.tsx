@@ -112,6 +112,8 @@ export function PaymentLinksPageContent({
     }
 
     const controller = new AbortController();
+    let cancelled = false;
+
     const timer = window.setTimeout(async () => {
       setIsRefreshing(true);
       try {
@@ -128,16 +130,30 @@ export function PaymentLinksPageContent({
           signal: controller.signal,
         });
 
-        if (!response.ok) return;
+        if (cancelled || !response.ok) return;
 
         const payload = (await response.json()) as { links: PaymentLinkListItem[] };
-        setLinks(payload.links);
+        if (!cancelled) {
+          setLinks(payload.links);
+        }
+      } catch (error) {
+        if (
+          cancelled ||
+          (error instanceof DOMException && error.name === "AbortError") ||
+          (error instanceof Error && error.name === "AbortError")
+        ) {
+          return;
+        }
+        console.error("Failed to refresh payment links:", error);
       } finally {
-        setIsRefreshing(false);
+        if (!cancelled) {
+          setIsRefreshing(false);
+        }
       }
     }, 250);
 
     return () => {
+      cancelled = true;
       controller.abort();
       window.clearTimeout(timer);
     };

@@ -9,15 +9,12 @@ import type { SessionDoc, UserDoc } from "@/lib/db/types";
 const DEFAULT_SEED_COUNT = 50;
 
 const seedCombos = [
-  { tokenId: "usdc", networkId: "base" },
   { tokenId: "usdc", networkId: "ethereum" },
-  { tokenId: "usdc", networkId: "polygon" },
-  { tokenId: "usdc", networkId: "arbitrum" },
-  { tokenId: "usdt", networkId: "base" },
+  { tokenId: "usdc", networkId: "base" },
   { tokenId: "usdt", networkId: "ethereum" },
-  { tokenId: "usdt", networkId: "polygon" },
-  { tokenId: "eth", networkId: "base" },
+  { tokenId: "usdt", networkId: "base" },
   { tokenId: "eth", networkId: "ethereum" },
+  { tokenId: "eth", networkId: "base" },
   { tokenId: "sol", networkId: "solana" },
 ] as const;
 

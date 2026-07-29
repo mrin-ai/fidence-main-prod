@@ -13,31 +13,28 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarRail,
 } from "@/components/ui/sidebar"
 import {
   BotIcon,
-  ChevronsUpDownIcon,
   Code2Icon,
   FileTextIcon,
+  GiftIcon,
   KeyRoundIcon,
   LayoutDashboardIcon,
   Link2Icon,
   ReceiptIcon,
-  ShieldCheckIcon,
-  SlidersHorizontalIcon,
-  ScrollTextIcon,
   StoreIcon,
   WalletIcon,
-  UsersIcon,
 } from "lucide-react"
 
 const data = {
   navGroups: [
     {
-      label: "Control Plane",
+      label: "Menu",
       items: [
         {
-          title: "Overview",
+          title: "Dashboard",
           url: "/dashboard",
           icon: <LayoutDashboardIcon />,
         },
@@ -45,61 +42,60 @@ const data = {
           title: "Wallets",
           url: "/wallets",
           icon: <WalletIcon />,
+          isNew: true,
         },
         {
-          title: "Invoice",
-          url: "/invoice",
-          icon: <FileTextIcon />,
-        },
-        {
-          title: "Manage Invoices",
+          title: "Invoices",
           url: "/manage-invoices",
-          icon: <ReceiptIcon />,
-        },
-        {
-          title: "Intelligence Commerce",
-          url: "#",
-          icon: <StoreIcon />,
+          icon: <FileTextIcon />,
+          isNew: true,
           children: [
             {
-              title: "Identities",
-              url: "#",
-              icon: <UsersIcon />,
-              comingSoon: true,
+              title: "Create invoice",
+              url: "/invoice/new",
+              icon: <FileTextIcon />,
             },
             {
-              title: "Agents",
-              url: "#",
-              icon: <BotIcon />,
-              comingSoon: true,
-            },
-            {
-              title: "Approvals",
-              url: "#",
-              icon: <ShieldCheckIcon />,
-              badge: 4,
-              comingSoon: true,
-            },
-            {
-              title: "Policies",
-              url: "#",
-              icon: <SlidersHorizontalIcon />,
-              comingSoon: true,
+              title: "Manage invoices",
+              url: "/manage-invoices",
+              icon: <ReceiptIcon />,
             },
           ],
         },
         {
-          title: "Merchant Commerce",
-          url: "#",
-          icon: <Code2Icon />,
+          title: "Payments",
+          url: "/payment-links",
+          icon: <Link2Icon />,
           children: [
             {
-              title: "API Credentials",
+              title: "Payment links",
+              url: "/payment-links",
+              icon: <Link2Icon />,
+            },
+            {
+              title: "Transactions",
+              url: "/transactions",
+              icon: <ReceiptIcon />,
+            },
+          ],
+        },
+        {
+          title: "Reward",
+          url: "/rewards",
+          icon: <GiftIcon />,
+        },
+        {
+          title: "Merchant",
+          url: "/merchant/api-credentials",
+          icon: <KeyRoundIcon />,
+          children: [
+            {
+              title: "API credentials",
               url: "/merchant/api-credentials",
               icon: <KeyRoundIcon />,
             },
             {
-              title: "Registered Agents",
+              title: "Registered agents",
               url: "/merchant/agents",
               icon: <BotIcon />,
             },
@@ -108,33 +104,18 @@ const data = {
       ],
     },
     {
-      label: "Commerce",
+      label: "Soon",
       items: [
         {
-          title: "Transactions",
-          url: "/transactions",
-          icon: <ReceiptIcon />,
+          title: "Intelligence Commerce",
+          url: "#",
+          icon: <StoreIcon />,
+          comingSoon: true,
         },
-        {
-          title: "Payment Links",
-          url: "/payment-links",
-          icon: <Link2Icon />,
-        },
-      ],
-    },
-    {
-      label: "Developer",
-      items: [
         {
           title: "API & Webhooks",
           url: "#",
           icon: <Code2Icon />,
-          comingSoon: true,
-        },
-        {
-          title: "Audit logs",
-          url: "#",
-          icon: <ScrollTextIcon />,
           comingSoon: true,
         },
       ],
@@ -144,7 +125,7 @@ const data = {
 
 export function AppSidebar({
   user,
-  workspace,
+  workspace: _workspace,
   ...props
 }: React.ComponentProps<typeof Sidebar> & {
   user: {
@@ -157,52 +138,42 @@ export function AppSidebar({
     slug: string
   }
 }) {
-  const sidebarData = {
-    workspace: {
-      name: workspace.name,
-      label: "Workspace",
-    },
-    user,
-    navGroups: data.navGroups,
-  }
-
   return (
-    <Sidebar collapsible="offcanvas" {...props}>
+    <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
               size="lg"
-              className="data-[slot=sidebar-menu-button]:p-2!"
-              render={<button type="button" />}
+              tooltip="Payagent"
+              className="pointer-events-none group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:overflow-visible! group-data-[collapsible=icon]:p-0.5!"
+              render={<div />}
             >
-              <div className="relative flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border/50 bg-white">
+              <div className="flex aspect-square size-8 shrink-0 items-center justify-center rounded-lg border border-border/50 bg-white group-data-[collapsible=icon]:size-full group-data-[collapsible=icon]:border-0 group-data-[collapsible=icon]:bg-transparent">
                 <Image
                   src="/logo.png"
-                  alt="PayAgent"
+                  alt="Payagent"
                   width={32}
                   height={32}
-                  className="size-8 object-contain"
+                  className="size-7 object-contain group-data-[collapsible=icon]:size-7"
                   priority
                 />
               </div>
-              <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-semibold">{sidebarData.workspace.name}</span>
-                <span className="truncate font-mono text-xs text-muted-foreground">
-                  {sidebarData.workspace.label}
-                </span>
+              <div className="flex min-w-0 flex-1 items-baseline gap-1.5 text-left font-serif text-xl tracking-tight leading-none group-data-[collapsible=icon]:hidden">
+                <span className="truncate">Payagent</span>
+                <span className="shrink-0 text-muted-foreground">by LCX</span>
               </div>
-              <ChevronsUpDownIcon className="ml-auto size-4 text-muted-foreground" />
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain groups={sidebarData.navGroups} />
+        <NavMain groups={data.navGroups} />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={sidebarData.user} />
+        <NavUser user={user} />
       </SidebarFooter>
+      <SidebarRail />
     </Sidebar>
   )
 }

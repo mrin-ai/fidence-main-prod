@@ -8,6 +8,16 @@ export function proxy(request: NextRequest) {
   const token = request.cookies.get(AUTH_COOKIE)?.value;
 
   const isAuthRoute = pathname === "/sign-in" || pathname === "/sign-up";
+  const isOnboarding =
+    pathname === "/onboarding" || pathname.startsWith("/onboarding/");
+
+  if (isOnboarding) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/dashboard";
+    url.search = "";
+    return NextResponse.redirect(url);
+  }
+
   const isProtected =
     pathname.startsWith("/dashboard") ||
     pathname.startsWith("/settings") ||
@@ -33,6 +43,7 @@ export function proxy(request: NextRequest) {
       request.nextUrl.searchParams.get("redirect"),
     );
     const url = request.nextUrl.clone();
+    // Session may still need username; shell onboarding modal handles it.
     url.pathname = destination;
     url.search = "";
     return NextResponse.redirect(url);
@@ -43,6 +54,8 @@ export function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
+    "/onboarding",
+    "/onboarding/:path*",
     "/dashboard",
     "/dashboard/:path*",
     "/settings",

@@ -2,21 +2,14 @@
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
+import Image from "next/image"
 import Link from "next/link"
-import { ArrowLeftIcon, CheckIcon, CopyIcon, Link2Icon } from "lucide-react"
+import { format } from "date-fns"
+import { CalendarIcon, CopyIcon, Link2Icon, XIcon } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { Calendar } from "@/components/ui/calendar"
 import {
   Dialog,
   DialogContent,
@@ -26,15 +19,36 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field"
+import { Input } from "@/components/ui/input"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Badge } from "@/components/ui/badge"
+import {
   getDefaultExpirationValue,
   getNetworkById,
   getNetworksForToken,
+  getPaymentTokenIcon,
   getSupportedPaymentTokens,
   getTokenById,
 } from "@/lib/create-payment-link-data"
+import { getWalletNetworkIcon } from "@/lib/wallet-networks"
 import { cn } from "@/lib/utils"
-
-type Step = 1 | 2 | 3 | 4
 
 type PaymentLinkDraft = {
   amount: string
@@ -43,30 +57,36 @@ type PaymentLinkDraft = {
   expiresAt: string
 }
 
-const stepLabels: Record<Step, { title: string; description: string }> = {
-  1: {
-    title: "Amount & token",
-    description: "Enter how much you want to collect and choose a token.",
-  },
-  2: {
-    title: "Network",
-    description: "Select the network for this payment link.",
-  },
-  3: {
-    title: "Expiration",
-    description: "Set when this payment link should expire.",
-  },
-  4: {
-    title: "Preview",
-    description: "Review the details before creating your link.",
-  },
-}
-
 const initialDraft: PaymentLinkDraft = {
   amount: "",
   tokenId: "usdc",
   networkId: "",
   expiresAt: getDefaultExpirationValue(),
+}
+
+function parseLocalDatetime(value: string) {
+  if (!value) return undefined
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? undefined : date
+}
+
+function toLocalDatetimeValue(date: Date) {
+  const copy = new Date(date)
+  copy.setMinutes(copy.getMinutes() - copy.getTimezoneOffset())
+  return copy.toISOString().slice(0, 16)
+}
+
+function mergeExpirationDate(current: string, next: Date | undefined) {
+  if (!next) return ""
+  const previous = parseLocalDatetime(current) ?? new Date()
+  const merged = new Date(next)
+  merged.setHours(
+    previous.getHours(),
+    previous.getMinutes(),
+    previous.getSeconds(),
+    0,
+  )
+  return toLocalDatetimeValue(merged)
 }
 
 type CreatePaymentLinkContextValue = {
@@ -80,35 +100,10 @@ export function useCreatePaymentLink() {
   const context = React.useContext(CreatePaymentLinkContext)
   if (!context) {
     throw new Error(
-      "useCreatePaymentLink must be used within CreatePaymentLinkProvider"
+      "useCreatePaymentLink must be used within CreatePaymentLinkProvider",
     )
   }
   return context
-}
-
-function StepIndicator({ step }: { step: Step }) {
-  return (
-    <div className="flex items-center gap-2">
-      {[1, 2, 3, 4].map((value) => (
-        <div
-          key={value}
-          className={cn(
-            "h-1.5 flex-1 rounded-full transition-colors",
-            value <= step ? "bg-primary" : "bg-border"
-          )}
-        />
-      ))}
-    </div>
-  )
-}
-
-function PreviewRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-start justify-between gap-4">
-      <span className="text-sm text-muted-foreground">{label}</span>
-      <span className="text-right text-sm font-medium">{value}</span>
-    </div>
-  )
 }
 
 function CreatePaymentLinkModal({
@@ -118,11 +113,13 @@ function CreatePaymentLinkModal({
   open: boolean
   onOpenChange: (open: boolean) => void
 }) {
-  const [step, setStep] = React.useState<Step>(1)
   const [draft, setDraft] = React.useState<PaymentLinkDraft>(initialDraft)
   const [createdLink, setCreatedLink] = React.useState<string | null>(null)
   const [copied, setCopied] = React.useState(false)
-  const [verifiedNetworkIds, setVerifiedNetworkIds] = React.useState<string[]>([])
+  const [submitting, setSubmitting] = React.useState(false)
+  const [verifiedNetworkIds, setVerifiedNetworkIds] = React.useState<string[]>(
+    [],
+  )
   const router = useRouter()
 
   React.useEffect(() => {
@@ -144,7 +141,7 @@ function CreatePaymentLinkModal({
 
   const availableNetworks = React.useMemo(
     () => getNetworksForToken(draft.tokenId),
-    [draft.tokenId]
+    [draft.tokenId],
   )
 
   const selectedToken = getTokenById(draft.tokenId)
@@ -153,10 +150,10 @@ function CreatePaymentLinkModal({
   React.useEffect(() => {
     if (!open) return
 
-    setStep(1)
     setDraft(initialDraft)
     setCreatedLink(null)
     setCopied(false)
+    setSubmitting(false)
   }, [open])
 
   React.useEffect(() => {
@@ -185,68 +182,68 @@ function CreatePaymentLinkModal({
     setDraft((current) => ({ ...current, ...partial }))
   }
 
-  function canContinue() {
-    if (step === 1) {
-      return draft.amount.trim().length > 0 && Number(draft.amount) > 0
-    }
-    if (step === 2) {
-      return draft.networkId.length > 0
-    }
-    if (step === 3) {
-      return draft.expiresAt.length > 0
-    }
-    return true
+  function selectNetwork(networkId: string) {
+    setDraft((current) => ({
+      ...current,
+      networkId: current.networkId === networkId ? "" : networkId,
+    }))
   }
 
-  async function handleContinue() {
-    if (step < 4) {
-      setStep((current) => (current + 1) as Step)
-      return
-    }
+  const canCreate =
+    draft.amount.trim().length > 0 &&
+    Number(draft.amount) > 0 &&
+    draft.tokenId.length > 0 &&
+    draft.networkId.length > 0 &&
+    draft.expiresAt.length > 0 &&
+    hasVerifiedWalletForNetwork
 
-    const response = await fetch("/api/payment-links", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        amount: draft.amount,
-        tokenId: draft.tokenId,
-        networkId: draft.networkId,
-        expiresAt: new Date(draft.expiresAt).toISOString(),
-      }),
-    })
+  async function handleCreate() {
+    if (!canCreate || submitting) return
 
-    const payload = (await response.json()) as {
-      url?: string
-      error?: string
-      code?: string
-    }
+    setSubmitting(true)
+    try {
+      const response = await fetch("/api/payment-links", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount: draft.amount,
+          tokenId: draft.tokenId,
+          networkId: draft.networkId,
+          expiresAt: new Date(draft.expiresAt).toISOString(),
+        }),
+      })
 
-    if (!response.ok) {
-      if (payload.code === "USERNAME_REQUIRED") {
-        toast.error("Set a username in Settings before creating links")
-      } else if (payload.code === "WALLET_NOT_VERIFIED_FOR_NETWORK") {
-        toast.error(payload.error ?? "Add a verified wallet for this network")
-      } else if (payload.code === "WALLET_REQUIRED") {
-        toast.error("Connect a wallet to your account to receive payments")
-      } else {
-        toast.error(payload.error ?? "Failed to create payment link")
+      const payload = (await response.json()) as {
+        url?: string
+        error?: string
+        code?: string
       }
-      return
-    }
 
-    if (!payload.url) {
-      toast.error("Failed to create payment link")
-      return
-    }
+      if (!response.ok) {
+        if (payload.code === "USERNAME_REQUIRED") {
+          toast.error("Set a username in Settings before creating links")
+        } else if (payload.code === "WALLET_NOT_VERIFIED_FOR_NETWORK") {
+          toast.error(
+            payload.error ?? "Add a verified wallet for this network",
+          )
+        } else if (payload.code === "WALLET_REQUIRED") {
+          toast.error("Connect a wallet to your account to receive payments")
+        } else {
+          toast.error(payload.error ?? "Failed to create payment link")
+        }
+        return
+      }
 
-    setCreatedLink(payload.url)
-    toast.success("Payment link created")
-    router.refresh()
-  }
+      if (!payload.url) {
+        toast.error("Failed to create payment link")
+        return
+      }
 
-  function handleBack() {
-    if (step > 1) {
-      setStep((current) => (current - 1) as Step)
+      setCreatedLink(payload.url)
+      toast.success("Payment link created")
+      router.refresh()
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -257,137 +254,31 @@ function CreatePaymentLinkModal({
     window.setTimeout(() => setCopied(false), 1500)
   }
 
-  const formattedExpiration = draft.expiresAt
+  const expirationDate = parseLocalDatetime(draft.expiresAt)
+  const formattedExpiration = expirationDate
     ? new Intl.DateTimeFormat(undefined, {
         dateStyle: "medium",
         timeStyle: "short",
-      }).format(new Date(draft.expiresAt))
+      }).format(expirationDate)
     : "—"
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md p-0">
-        <DialogHeader className="border-b border-border/50 pb-4">
-          <p className="text-xs font-medium text-muted-foreground">
-            Step {step} of 4
-          </p>
-          <DialogTitle>{stepLabels[step].title}</DialogTitle>
-          <DialogDescription>{stepLabels[step].description}</DialogDescription>
-          <StepIndicator step={step} />
+      <DialogContent className="max-w-md gap-0 overflow-hidden p-0">
+        <DialogHeader className="border-b border-border/50 px-5 pt-5 pb-4">
+          <DialogTitle className="text-base">
+            {createdLink ? "Link created" : "Create payment link"}
+          </DialogTitle>
+          <DialogDescription>
+            {createdLink
+              ? "Share this link with anyone who needs to pay."
+              : "Set amount, token, network, and expiration."}
+          </DialogDescription>
         </DialogHeader>
 
-        <div className="flex max-h-[min(28rem,calc(100vh-16rem))] flex-col gap-5 overflow-y-auto px-6 py-6">
-          {step === 1 ? (
-            <>
-              <div className="space-y-2">
-                <Label htmlFor="payment-amount">Amount</Label>
-                <Input
-                  id="payment-amount"
-                  type="number"
-                  min="0"
-                  step="any"
-                  inputMode="decimal"
-                  placeholder="0.00"
-                  value={draft.amount}
-                  onChange={(event) =>
-                    updateDraft({ amount: event.target.value })
-                  }
-                  className="h-10 font-mono"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="payment-token">Token</Label>
-                <Select
-                  value={draft.tokenId}
-                  onValueChange={(value) =>
-                    updateDraft({ tokenId: value ?? "usdc", networkId: "" })
-                  }
-                  items={supportedTokens.map((token) => ({
-                    label: token.symbol,
-                    value: token.id,
-                  }))}
-                >
-                  <SelectTrigger id="payment-token" className="h-10 w-full">
-                    <SelectValue placeholder="Select token" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      {supportedTokens.map((token) => (
-                        <SelectItem key={token.id} value={token.id}>
-                          {token.symbol} · {token.label}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </div>
-            </>
-          ) : null}
-
-          {step === 2 ? (
-            <div className="grid gap-3">
-              {availableNetworks.map((network) => {
-                const isSelected = draft.networkId === network.id
-                return (
-                  <button
-                    key={network.id}
-                    type="button"
-                    onClick={() => updateDraft({ networkId: network.id })}
-                    className={cn(
-                      "flex items-center justify-between rounded-xl border px-4 py-3 text-left transition-colors",
-                      isSelected
-                        ? "border-primary bg-secondary text-secondary-foreground"
-                        : "border-border/50 bg-card hover:border-primary/30 hover:bg-secondary/40"
-                    )}
-                  >
-                    <span className="text-sm font-medium">{network.label}</span>
-                    {isSelected ? (
-                      <CheckIcon className="size-4 text-primary" />
-                    ) : null}
-                  </button>
-                )
-              })}
-              {draft.networkId && !hasVerifiedWalletForNetwork ? (
-                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                  Add and verify a wallet for {selectedNetwork?.label ?? draft.networkId} in{" "}
-                  <Link href="/wallets" className="font-medium underline">
-                    Wallets
-                  </Link>{" "}
-                  before creating this link.
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-
-          {step === 3 ? (
-            <div className="space-y-2">
-              <Label htmlFor="payment-expiration">Expiration date & time</Label>
-              <Input
-                id="payment-expiration"
-                type="datetime-local"
-                value={draft.expiresAt}
-                onChange={(event) =>
-                  updateDraft({ expiresAt: event.target.value })
-                }
-                className="h-10"
-              />
-            </div>
-          ) : null}
-
-          {step === 4 && !createdLink ? (
-            <div className="space-y-4 rounded-xl border border-border/50 bg-secondary/30 p-4">
-              <PreviewRow
-                label="Amount"
-                value={`${draft.amount} ${selectedToken?.symbol ?? ""}`}
-              />
-              <PreviewRow label="Token" value={selectedToken?.label ?? "—"} />
-              <PreviewRow label="Network" value={selectedNetwork?.label ?? "—"} />
-              <PreviewRow label="Expires" value={formattedExpiration} />
-            </div>
-          ) : null}
-
-          {step === 4 && createdLink ? (
-            <div className="space-y-4">
+        {createdLink ? (
+          <>
+            <div className="space-y-4 px-5 py-5">
               <div className="flex items-center gap-2 rounded-xl border border-border/50 bg-secondary px-3 py-2.5">
                 <Link2Icon className="size-4 shrink-0 text-primary" />
                 <p className="min-w-0 flex-1 break-all font-mono text-sm">
@@ -398,65 +289,284 @@ function CreatePaymentLinkModal({
                   size="icon-xs"
                   className="shrink-0 text-primary"
                   aria-label="Copy payment link"
-                  onClick={handleCopy}
+                  onClick={() => void handleCopy()}
                 >
                   <CopyIcon className="size-3.5" />
                 </Button>
               </div>
               {copied ? (
-                <p className="text-xs text-secondary-foreground">Link copied</p>
+                <p className="text-xs text-muted-foreground">Link copied</p>
               ) : null}
-              <p className="text-xs text-muted-foreground">
-                Share this link with anyone who needs to pay. Format:{" "}
-                <span className="font-mono">domain/username/id</span>
-              </p>
-              <div className="rounded-xl border border-border/50 bg-secondary/30 p-4">
-                <PreviewRow
-                  label="Amount"
-                  value={`${draft.amount} ${selectedToken?.symbol ?? ""}`}
-                />
-                <div className="mt-3 space-y-3">
-                  <PreviewRow label="Network" value={selectedNetwork?.label ?? "—"} />
-                  <PreviewRow label="Expires" value={formattedExpiration} />
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between gap-4">
+                  <span className="text-muted-foreground">Amount</span>
+                  <span className="font-medium">
+                    {draft.amount} {selectedToken?.symbol ?? ""}
+                  </span>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <span className="text-muted-foreground">Network</span>
+                  <span className="font-medium">
+                    {selectedNetwork?.label ?? "—"}
+                  </span>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <span className="text-muted-foreground">Expires</span>
+                  <span className="font-medium">{formattedExpiration}</span>
                 </div>
               </div>
             </div>
-          ) : null}
-        </div>
-
-        <DialogFooter className="border-t border-border/50">
-          <div className="flex w-full gap-2">
-            {step > 1 && !createdLink ? (
+            <DialogFooter className="border-t border-border/50 bg-muted/20 px-5 py-4">
               <Button
                 type="button"
-                variant="outline"
-                className="flex-1"
-                onClick={handleBack}
+                className="h-9 w-full"
+                onClick={() => onOpenChange(false)}
               >
-                <ArrowLeftIcon data-icon="inline-start" />
-                Back
+                Done
               </Button>
-            ) : null}
-            <Button
-              type="button"
-              className="flex-1"
-              disabled={!createdLink && (!canContinue() || (step === 4 && !hasVerifiedWalletForNetwork))}
-              onClick={() => {
-                if (createdLink) {
-                  onOpenChange(false)
-                  return
-                }
-                handleContinue()
-              }}
-            >
-              {step === 4 && !createdLink
-                ? "Create link"
-                : createdLink
-                  ? "Done"
-                  : "Continue"}
-            </Button>
-          </div>
-        </DialogFooter>
+            </DialogFooter>
+          </>
+        ) : (
+          <>
+            <div className="px-5 py-5">
+              <FieldGroup>
+                <div className="grid grid-cols-2 gap-4">
+                  <Field>
+                    <FieldLabel htmlFor="payment-amount">Amount</FieldLabel>
+                    <Input
+                      id="payment-amount"
+                      type="number"
+                      min="0"
+                      step="any"
+                      inputMode="decimal"
+                      placeholder="0.00"
+                      value={draft.amount}
+                      onChange={(event) =>
+                        updateDraft({ amount: event.target.value })
+                      }
+                      className="h-9 font-mono"
+                    />
+                  </Field>
+
+                  <Field>
+                    <FieldLabel htmlFor="payment-token">Token</FieldLabel>
+                    <Select
+                      value={draft.tokenId}
+                      onValueChange={(value) =>
+                        updateDraft({
+                          tokenId: value ?? "usdc",
+                          networkId: "",
+                        })
+                      }
+                      items={supportedTokens.map((token) => ({
+                        label: token.symbol,
+                        value: token.id,
+                      }))}
+                    >
+                      <SelectTrigger id="payment-token" className="h-9 w-full">
+                        <SelectValue placeholder="Select token">
+                          {selectedToken ? (
+                            <span className="flex items-center gap-2">
+                              {getPaymentTokenIcon(selectedToken.id) ? (
+                                <Image
+                                  src={getPaymentTokenIcon(selectedToken.id)!}
+                                  alt=""
+                                  width={selectedToken.id === "eth" ? 18 : 16}
+                                  height={selectedToken.id === "eth" ? 18 : 16}
+                                  className={
+                                    selectedToken.id === "eth"
+                                      ? "size-[18px] shrink-0 object-contain"
+                                      : "size-4 shrink-0 object-contain"
+                                  }
+                                />
+                              ) : null}
+                              {selectedToken.symbol}
+                            </span>
+                          ) : null}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          {supportedTokens.map((token) => {
+                            const iconSrc = getPaymentTokenIcon(token.id)
+                            return (
+                              <SelectItem key={token.id} value={token.id}>
+                                <span className="flex items-center gap-2">
+                                  {iconSrc ? (
+                                    <Image
+                                      src={iconSrc}
+                                      alt=""
+                                      width={token.id === "eth" ? 18 : 16}
+                                      height={token.id === "eth" ? 18 : 16}
+                                      className={
+                                        token.id === "eth"
+                                          ? "size-[18px] shrink-0 object-contain"
+                                          : "size-4 shrink-0 object-contain"
+                                      }
+                                    />
+                                  ) : null}
+                                  {token.symbol}
+                                </span>
+                              </SelectItem>
+                            )
+                          })}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                </div>
+
+                <Field>
+                  <FieldLabel>Network</FieldLabel>
+                  <div className="flex flex-wrap gap-2">
+                    {availableNetworks.map((network) => {
+                      const isSelected = draft.networkId === network.id
+                      const iconSrc = getWalletNetworkIcon(network.id)
+
+                      return (
+                        <Badge
+                          key={network.id}
+                          variant={isSelected ? "default" : "outline"}
+                          render={<button type="button" />}
+                          aria-pressed={isSelected}
+                          aria-label={
+                            isSelected
+                              ? `${network.label}, selected. Click to unselect`
+                              : `Select ${network.label}`
+                          }
+                          onClick={() => selectNetwork(network.id)}
+                          className={cn(
+                            "h-7 cursor-pointer gap-1.5 px-2.5 text-xs",
+                            isSelected && "pr-1.5",
+                          )}
+                        >
+                          {iconSrc ? (
+                            <Image
+                              src={iconSrc}
+                              alt=""
+                              width={network.id === "base" ? 14 : 18}
+                              height={network.id === "base" ? 14 : 18}
+                              className={cn(
+                                "shrink-0 object-contain",
+                                network.id === "base"
+                                  ? "size-3.5"
+                                  : "size-[18px]",
+                                isSelected && "brightness-0 invert",
+                              )}
+                            />
+                          ) : null}
+                          {network.label}
+                          {isSelected ? (
+                            <XIcon
+                              data-icon="inline-end"
+                              className="size-3.5 opacity-90"
+                            />
+                          ) : null}
+                        </Badge>
+                      )
+                    })}
+                  </div>
+                  {draft.networkId && !hasVerifiedWalletForNetwork ? (
+                    <FieldDescription className="text-amber-700">
+                      Add and verify a wallet for{" "}
+                      {selectedNetwork?.label ?? draft.networkId} in{" "}
+                      <Link href="/wallets" className="font-medium underline">
+                        Wallets
+                      </Link>{" "}
+                      first.
+                    </FieldDescription>
+                  ) : (
+                    <FieldDescription>
+                      Tap × to clear, or pick another network.
+                    </FieldDescription>
+                  )}
+                </Field>
+
+                <Field>
+                  <FieldLabel htmlFor="payment-expiration">
+                    Expiration
+                  </FieldLabel>
+                  <Popover>
+                    <PopoverTrigger
+                      id="payment-expiration"
+                      render={
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className={cn(
+                            "h-9 w-full justify-start text-left font-normal",
+                            !draft.expiresAt && "text-muted-foreground",
+                          )}
+                        />
+                      }
+                    >
+                      <CalendarIcon className="size-4" />
+                      {expirationDate
+                        ? format(expirationDate, "PPP")
+                        : "Pick a date"}
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={expirationDate}
+                        onSelect={(date) =>
+                          updateDraft({
+                            expiresAt: mergeExpirationDate(
+                              draft.expiresAt,
+                              date,
+                            ),
+                          })
+                        }
+                        captionLayout="dropdown"
+                        startMonth={
+                          new Date(
+                            new Date().getFullYear(),
+                            new Date().getMonth(),
+                          )
+                        }
+                        endMonth={
+                          new Date(
+                            new Date().getFullYear() + 2,
+                            new Date().getMonth(),
+                          )
+                        }
+                        disabled={{
+                          before: new Date(
+                            new Date().getFullYear(),
+                            new Date().getMonth(),
+                            new Date().getDate(),
+                          ),
+                        }}
+                        className="rounded-lg"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </Field>
+              </FieldGroup>
+            </div>
+
+            <DialogFooter className="border-t border-border/50 bg-muted/20 px-5 py-4">
+              <div className="flex w-full gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-9 flex-1"
+                  onClick={() => onOpenChange(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  className="h-9 flex-1"
+                  disabled={!canCreate || submitting}
+                  onClick={() => void handleCreate()}
+                >
+                  {submitting ? "Creating…" : "Create link"}
+                </Button>
+              </div>
+            </DialogFooter>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   )
@@ -473,7 +583,7 @@ export function CreatePaymentLinkProvider({
     () => ({
       openCreatePaymentLink: () => setOpen(true),
     }),
-    []
+    [],
   )
 
   return (

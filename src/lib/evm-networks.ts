@@ -1,32 +1,5 @@
 import type { Chain } from "viem";
-import {
-  arbitrum,
-  avalanche,
-  base,
-  blast,
-  bsc,
-  celo,
-  cronos,
-  fantom,
-  gnosis,
-  linea,
-  mainnet,
-  mantle,
-  metis,
-  mode,
-  moonbeam,
-  opBNB,
-  optimism,
-  polygon,
-  scroll,
-  sepolia,
-  sonic,
-  taiko,
-  unichain,
-  worldchain,
-  zkSync,
-  zora,
-} from "wagmi/chains";
+import { base, mainnet, sepolia } from "wagmi/chains";
 
 import { testnetsEnabled } from "@/lib/testnets";
 
@@ -40,35 +13,12 @@ export type EvmWalletNetwork = {
 const mainnetWalletNetworks: EvmWalletNetwork[] = [
   { id: "ethereum", label: "Ethereum", chain: mainnet },
   { id: "base", label: "Base", chain: base },
-  { id: "arbitrum", label: "Arbitrum", chain: arbitrum },
-  { id: "optimism", label: "Optimism", chain: optimism },
-  { id: "polygon", label: "Polygon", chain: polygon },
-  { id: "bsc", label: "BNB Chain", chain: bsc },
-  { id: "avalanche", label: "Avalanche", chain: avalanche },
-  { id: "linea", label: "Linea", chain: linea },
-  { id: "zksync", label: "zkSync Era", chain: zkSync },
-  { id: "scroll", label: "Scroll", chain: scroll },
-  { id: "blast", label: "Blast", chain: blast },
-  { id: "mantle", label: "Mantle", chain: mantle },
-  { id: "gnosis", label: "Gnosis", chain: gnosis },
-  { id: "celo", label: "Celo", chain: celo },
-  { id: "fantom", label: "Fantom", chain: fantom },
-  { id: "moonbeam", label: "Moonbeam", chain: moonbeam },
-  { id: "cronos", label: "Cronos", chain: cronos },
-  { id: "opbnb", label: "opBNB", chain: opBNB },
-  { id: "metis", label: "Metis", chain: metis },
-  { id: "mode", label: "Mode", chain: mode },
-  { id: "zora", label: "Zora", chain: zora },
-  { id: "sonic", label: "Sonic", chain: sonic },
-  { id: "taiko", label: "Taiko", chain: taiko },
-  { id: "unichain", label: "Unichain", chain: unichain },
-  { id: "worldchain", label: "World Chain", chain: worldchain },
 ];
 
 const testnetWalletNetworks: EvmWalletNetwork[] = [
   {
     id: "sepolia",
-    label: "Sepolia (testnet)",
+    label: "Sepolia",
     chain: sepolia,
     testnet: true,
   },

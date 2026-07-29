@@ -8,9 +8,6 @@ import {
 const alchemyHostByNetworkId: Record<string, string> = {
   ethereum: "eth-mainnet",
   base: "base-mainnet",
-  arbitrum: "arb-mainnet",
-  polygon: "polygon-mainnet",
-  optimism: "opt-mainnet",
   sepolia: "eth-sepolia",
 };
 
@@ -31,9 +28,6 @@ function getAlchemyRpcUrl(networkId: string) {
 const rpcUrlByNetworkId: Record<string, string | undefined> = {
   ethereum: process.env.NEXT_PUBLIC_ETHEREUM_RPC_URL,
   base: process.env.NEXT_PUBLIC_BASE_RPC_URL,
-  arbitrum: process.env.NEXT_PUBLIC_ARBITRUM_RPC_URL,
-  polygon: process.env.NEXT_PUBLIC_POLYGON_RPC_URL,
-  optimism: process.env.NEXT_PUBLIC_OPTIMISM_RPC_URL,
   sepolia: process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL,
 };
 

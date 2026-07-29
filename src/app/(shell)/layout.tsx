@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import { AppShell } from "@/components/app-shell";
+import { hasUsername } from "@/lib/onboarding";
 import { requireShellSession } from "@/lib/shell-session";
 
 export default async function ShellLayout({
@@ -8,10 +9,14 @@ export default async function ShellLayout({
 }: {
   children: ReactNode;
 }) {
-  const { user, workspace } = await requireShellSession();
+  const { session, user, workspace } = await requireShellSession();
 
   return (
-    <AppShell user={user} workspace={workspace}>
+    <AppShell
+      user={user}
+      workspace={workspace}
+      needsOnboarding={!hasUsername(session.user.username)}
+    >
       {children}
     </AppShell>
   );

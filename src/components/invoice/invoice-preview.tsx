@@ -2,8 +2,11 @@
 
 import * as React from "react";
 import dynamic from "next/dynamic";
+import { DownloadIcon, Loader2Icon } from "lucide-react";
 import type { UseFormReturn } from "react-hook-form";
+import { toast } from "sonner";
 
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   createInvoicePdfBlob,
@@ -52,6 +55,22 @@ export function InvoicePreviewPanel({
   const [pdfUrl, setPdfUrl] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [isGenerating, setIsGenerating] = React.useState(true);
+  const [isDownloading, setIsDownloading] = React.useState(false);
+
+  async function handleDownloadPdf() {
+    setIsDownloading(true);
+    try {
+      await downloadInvoicePdf(form, paymentLink);
+    } catch (downloadError) {
+      toast.error(
+        downloadError instanceof Error
+          ? downloadError.message
+          : "Failed to download PDF",
+      );
+    } finally {
+      setIsDownloading(false);
+    }
+  }
 
   React.useEffect(() => {
     let cancelled = false;
@@ -134,8 +153,25 @@ export function InvoicePreviewPanel({
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-y-auto bg-muted/20">
-      <div className="flex min-h-full w-full flex-1 items-center justify-center">
+    <div className="flex h-full min-h-0 flex-col bg-muted/20">
+      <div className="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-border/50 bg-background/80 px-3">
+        <span className="text-sm text-muted-foreground">Preview</span>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled={isDownloading || isGenerating}
+          onClick={() => void handleDownloadPdf()}
+        >
+          {isDownloading ? (
+            <Loader2Icon className="size-4 animate-spin" />
+          ) : (
+            <DownloadIcon className="size-4" />
+          )}
+          Download PDF
+        </Button>
+      </div>
+      <div className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto">
         {content}
       </div>
     </div>

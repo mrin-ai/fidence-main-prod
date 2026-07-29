@@ -90,11 +90,13 @@ export async function POST(request: Request) {
         name: user.name,
         role: user.role,
         initials: user.initials,
+        username: user.username ?? null,
       },
       workspace: {
         name: workspace.name,
         slug: workspace.slug,
       },
+      needsOnboarding: !user.username?.trim(),
     });
     response.cookies.set(sessionCookieOptions(token));
     return response;

@@ -645,6 +645,23 @@ export async function markPaymentLinkPaid(input: {
           tokenSymbol: token?.symbol ?? syncedLink.tokenId.toUpperCase(),
         });
       }
+
+      try {
+        const { notifyInvoiceCreatorOfPayment } = await import(
+          "@/lib/db/invoices"
+        );
+        await notifyInvoiceCreatorOfPayment({
+          invoiceId: syncedLink.invoiceId,
+          amount: syncedLink.amount,
+          tokenSymbol: token?.symbol ?? syncedLink.tokenId.toUpperCase(),
+          paymentUrl: buildPaymentLinkUrl(
+            syncedLink.username,
+            syncedLink.publicId,
+          ),
+        });
+      } catch (error) {
+        console.error("Failed to send invoice paid email", error);
+      }
     }
   }
 

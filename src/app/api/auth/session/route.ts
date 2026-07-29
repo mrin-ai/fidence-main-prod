@@ -14,10 +14,12 @@ export async function GET() {
       role: session.user.role,
       initials: session.user.initials,
       email: session.user.email,
+      username: session.user.username ?? null,
     },
     workspace: {
       name: session.workspace.name,
       slug: session.workspace.slug,
     },
+    needsOnboarding: !session.user.username?.trim(),
   });
 }
