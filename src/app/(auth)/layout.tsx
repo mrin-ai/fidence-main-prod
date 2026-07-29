@@ -10,7 +10,7 @@ import {
 import { useState, useEffect } from "react";
 import Autoplay from "embla-carousel-autoplay";
 import { LcxLogo } from "@/components/lcx-logo";
-import { PixelCard } from "@/components/pixel-card";
+import { BlinkingSquares } from "@/components/blinking-squares";
 import {
   CreditCard,
   Link2,
@@ -90,20 +90,15 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
     <div className="lcx-auth flex min-h-svh w-full bg-background">
       <div className="relative hidden flex-col overflow-hidden lg:flex lg:w-[45%] xl:w-[50%]">
         <div className="absolute inset-0">
-          <PixelCard
-            autoPlay
-            backgroundColor="#5264E200"
-            borderColor="#00000000"
-            borderWidth={0}
-            radius={0}
-            gap={6}
-            pixelSize={2}
-            speed={80}
-            appearFrom="middle"
-            colors={["#93c5fd", "#60a5fa", "#3b82f6", "#2563eb"]}
+          <BlinkingSquares
+            fadeDirection="left"
+            gridSize={72}
+            fillPercent={45}
+            squareColor="#0066ff"
+            colorMode="single"
           />
         </div>
-        <div className="absolute inset-0 bg-linear-to-br from-background/75 via-background/55 to-background/35" />
+        <div className="absolute inset-0 bg-linear-to-br from-background/80 via-background/55 to-background/30" />
 
         <div className="relative flex flex-1 flex-col px-12 py-10 xl:px-20">
           <Link
