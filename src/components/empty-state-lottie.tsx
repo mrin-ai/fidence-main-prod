@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import dynamic from "next/dynamic";
 
 import { cn } from "@/lib/utils";
@@ -22,7 +23,7 @@ export function EmptyStateLottie({
   loop = true,
 }: {
   title: string;
-  description?: string;
+  description?: ReactNode;
   className?: string;
   animationClassName?: string;
   src?: string;
@@ -44,7 +45,7 @@ export function EmptyStateLottie({
       <div className="space-y-1">
         <p className="text-sm font-medium text-foreground">{title}</p>
         {description ? (
-          <p className="text-xs text-muted-foreground">{description}</p>
+          <div className="text-xs text-muted-foreground">{description}</div>
         ) : null}
       </div>
     </div>

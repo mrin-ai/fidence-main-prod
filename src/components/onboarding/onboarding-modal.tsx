@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Loader2Icon, PlayIcon } from "lucide-react";
 import { toast } from "sonner";
 
+import { EmptyStateLottie } from "@/components/empty-state-lottie";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -31,6 +32,8 @@ const INTRO_STEPS = [
       "Accept USDC, USDT, ETH, and SOL across Ethereum, Base, and Solana.",
   },
 ] as const;
+
+type OnboardingPhase = "intro" | "username" | "success";
 
 function normalizeUsernameInput(value: string) {
   return value.trim().toLowerCase().replace(/[^a-z0-9_]/g, "");
@@ -65,8 +68,10 @@ function StepDots({ step, total }: { step: number; total: number }) {
 export function OnboardingModal() {
   const router = useRouter();
   const [open, setOpen] = React.useState(true);
-  const [step, setStep] = React.useState(0);
+  const [phase, setPhase] = React.useState<OnboardingPhase>("intro");
+  const [introStep, setIntroStep] = React.useState(0);
   const [username, setUsername] = React.useState("");
+  const [savedUsername, setSavedUsername] = React.useState("");
   const [isSaving, setIsSaving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const allowClose = React.useRef(false);
@@ -75,8 +80,7 @@ export function OnboardingModal() {
   const profileUrl = preview
     ? `${getPaymentBaseUrl()}/${preview}`
     : `${getPaymentBaseUrl()}/username`;
-  const totalSteps = INTRO_STEPS.length + 1;
-  const isUsernameStep = step === INTRO_STEPS.length;
+  const totalDots = INTRO_STEPS.length + 1;
 
   function handleOpenChange(nextOpen: boolean) {
     if (nextOpen) {
@@ -90,7 +94,28 @@ export function OnboardingModal() {
   }
 
   function handleSkipAndContinue() {
-    setStep((current) => current + 1);
+    if (introStep < INTRO_STEPS.length - 1) {
+      setIntroStep((current) => current + 1);
+      return;
+    }
+    setPhase("username");
+  }
+
+  function finishOnboarding(path: string) {
+    allowClose.current = true;
+    setOpen(false);
+    router.push(path);
+    router.refresh();
+  }
+
+  async function handleCopyUsername() {
+    if (!savedUsername) return;
+    try {
+      await navigator.clipboard.writeText(`@${savedUsername}`);
+      toast.success("Username copied");
+    } catch {
+      toast.error("Couldn’t copy username");
+    }
   }
 
   async function handleSaveUsername(event: React.FormEvent) {
@@ -117,10 +142,8 @@ export function OnboardingModal() {
         throw new Error(data.error ?? "Failed to save username");
       }
 
-      toast.success(`Welcome @${data.username ?? preview}`);
-      allowClose.current = true;
-      setOpen(false);
-      router.refresh();
+      setSavedUsername(data.username ?? preview);
+      setPhase("success");
     } catch (saveError) {
       const message =
         saveError instanceof Error
@@ -139,14 +162,14 @@ export function OnboardingModal() {
         className="max-w-lg gap-0 p-0 sm:max-w-xl"
         showCloseButton={false}
       >
-        {!isUsernameStep ? (
+        {phase === "intro" ? (
           <>
             <DialogHeader className="px-6 pt-6 pb-0 text-left">
               <DialogTitle className="font-serif text-2xl font-light tracking-tight">
-                {INTRO_STEPS[step].title}
+                {INTRO_STEPS[introStep].title}
               </DialogTitle>
               <DialogDescription className="text-sm leading-relaxed">
-                {INTRO_STEPS[step].subtitle}
+                {INTRO_STEPS[introStep].subtitle}
               </DialogDescription>
             </DialogHeader>
 
@@ -155,13 +178,19 @@ export function OnboardingModal() {
             </div>
 
             <DialogFooter className="flex-col items-stretch gap-3 border-t border-border/60 bg-muted/20 px-6 py-4 sm:flex-col">
-              <Button type="button" className="w-full sm:w-auto sm:self-end" onClick={handleSkipAndContinue}>
+              <Button
+                type="button"
+                className="w-full sm:w-auto sm:self-end"
+                onClick={handleSkipAndContinue}
+              >
                 Skip and continue
               </Button>
-              <StepDots step={step} total={totalSteps} />
+              <StepDots step={introStep} total={totalDots} />
             </DialogFooter>
           </>
-        ) : (
+        ) : null}
+
+        {phase === "username" ? (
           <form onSubmit={(event) => void handleSaveUsername(event)}>
             <DialogHeader className="px-6 pt-6 pb-0 text-left">
               <DialogTitle className="font-serif text-2xl font-light tracking-tight">
@@ -237,10 +266,76 @@ export function OnboardingModal() {
                   "Continue"
                 )}
               </Button>
-              <StepDots step={step} total={totalSteps} />
+              <StepDots step={INTRO_STEPS.length} total={totalDots} />
             </DialogFooter>
           </form>
-        )}
+        ) : null}
+
+        {phase === "success" ? (
+          <>
+            <div className="relative px-6 pt-6">
+              <button
+                type="button"
+                onClick={() => finishOnboarding("/dashboard")}
+                className="absolute top-5 right-5 text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+              >
+                Skip
+              </button>
+              <DialogHeader className="pr-12 pb-0 text-left">
+                <DialogTitle className="font-serif text-2xl font-light tracking-tight">
+                  You&apos;re all set
+                </DialogTitle>
+                <DialogDescription className="text-sm leading-relaxed">
+                  Your PayAgent profile is ready to use.
+                </DialogDescription>
+              </DialogHeader>
+            </div>
+
+            <EmptyStateLottie
+              src="/animations/success.lottie"
+              loop={false}
+              title="Congratulations!"
+              description={
+                savedUsername ? (
+                  <p className="leading-relaxed">
+                    You&apos;ve successfully set up{" "}
+                    <button
+                      type="button"
+                      onClick={() => void handleCopyUsername()}
+                      className="rounded-md bg-primary/10 px-1.5 py-0.5 font-mono font-medium text-primary transition-colors hover:bg-primary/15"
+                      title="Copy username"
+                    >
+                      @{savedUsername}
+                    </button>
+                    . Verify a wallet next, or continue to your dashboard.
+                  </p>
+                ) : (
+                  "You've successfully set up your username. Verify a wallet next, or continue to your dashboard."
+                )
+              }
+              className="px-6 py-6"
+              animationClassName="h-32 w-32"
+            />
+
+            <DialogFooter className="flex-row gap-2 border-t border-border/60 bg-muted/20 px-6 py-4 sm:flex-row sm:justify-stretch">
+              <Button
+                type="button"
+                variant="outline"
+                className="h-10 flex-1"
+                onClick={() => finishOnboarding("/dashboard")}
+              >
+                Continue to dashboard
+              </Button>
+              <Button
+                type="button"
+                className="h-10 flex-1"
+                onClick={() => finishOnboarding("/wallets")}
+              >
+                Verify wallet
+              </Button>
+            </DialogFooter>
+          </>
+        ) : null}
       </DialogContent>
     </Dialog>
   );
