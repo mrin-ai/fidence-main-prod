@@ -6,6 +6,7 @@ import { COLLECTIONS } from "@/lib/db/collections";
 import type { TransactionDoc } from "@/lib/db/types";
 import { buildCommerceSourceFilter } from "@/lib/db/commerce-source";
 import type { CommerceSource } from "@/lib/db/merchant-types";
+import { resolveTokenIdFromSymbol } from "@/lib/coingecko/resolve-token-id";
 import { formatPaymentDateTime } from "@/lib/format-date";
 
 export const TRANSACTIONS_PAGE_LIMIT = 20;
@@ -14,6 +15,9 @@ export type TransactionListItem = {
   id: string;
   label: string;
   amount: string;
+  tokenAmount: number;
+  tokenId: string | null;
+  tokenSymbol: string;
   direction: "in" | "out";
   date: string;
   source: CommerceSource;
@@ -41,6 +45,9 @@ function mapTransactionDoc(tx: TransactionDoc): TransactionListItem {
     id: tx._id.toString(),
     label: tx.label,
     amount: `${outgoing ? "-" : "+"}${formatTokenAmount(tx.amount, tx.symbol)}`,
+    tokenAmount: tx.amount,
+    tokenId: resolveTokenIdFromSymbol(tx.symbol),
+    tokenSymbol: tx.symbol.toUpperCase(),
     direction: outgoing ? "out" : "in",
     date: formatPaymentDateTime(tx.occurredAt),
     source: tx.source ?? "human",

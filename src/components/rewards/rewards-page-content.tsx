@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo } from "react";
 
 import { EmptyStateLottie } from "@/components/empty-state-lottie";
+import { TokenUsdInfo } from "@/components/token-usd-info";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -213,7 +214,13 @@ export function RewardsPageContent({
                           {payment.type.replaceAll("_", " ")}
                         </TableCell>
                         <TableCell className="text-right text-sm tabular-nums">
-                          {formatAmount(payment.amount, payment.symbol)}
+                          <span className="inline-flex items-center justify-end gap-1">
+                            {formatAmount(payment.amount, payment.symbol)}
+                            <TokenUsdInfo
+                              amount={payment.amount}
+                              symbol={payment.symbol}
+                            />
+                          </span>
                         </TableCell>
                         <TableCell className="text-right text-sm font-medium tabular-nums">
                           {formatRewardCredits(payment.credits)}

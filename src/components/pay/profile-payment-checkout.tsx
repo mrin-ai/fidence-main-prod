@@ -26,6 +26,7 @@ import {
   shouldShowMetamaskAtomicAmountHint,
 } from "@/lib/payment/register-wallet-token";
 import { PayPageNavbar } from "@/components/pay/pay-page-navbar";
+import { TokenUsdInfo } from "@/components/token-usd-info";
 import { useOnchainPayment } from "@/components/pay/use-onchain-payment";
 import { useSolanaPayment } from "@/components/pay/use-solana-payment";
 import { PaymentQrCode } from "@/components/payment/payment-qr-code";
@@ -185,8 +186,13 @@ export function ProfilePaymentCheckout({
               <div className="flex flex-col items-center gap-2 text-center">
                 <CheckCircle2Icon className="size-8 text-emerald-600" />
                 <p className="text-sm font-medium">Payment sent</p>
-                <p className="text-xs text-muted-foreground">
+                <p className="inline-flex items-center gap-1 text-xs text-muted-foreground">
                   {parsedAmount} {token?.symbol ?? tokenId.toUpperCase()}
+                  <TokenUsdInfo
+                    amount={parsedAmount}
+                    tokenId={tokenId}
+                    symbol={token?.symbol}
+                  />
                   {paidTxHash ? ` · ${paidTxHash.slice(0, 10)}…` : ""}
                 </p>
               </div>

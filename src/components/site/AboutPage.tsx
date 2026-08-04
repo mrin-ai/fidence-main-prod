@@ -3,10 +3,10 @@ import { SiteBreadcrumb } from "@/components/site/SiteBreadcrumb";
 import { ABOUT_FAQ } from "@/lib/site/about-data";
 
 const STATS = [
-  { num: "3", label: "Stablecoins" },
-  { num: "2 LCX", label: "Flat Fee" },
-  { num: "50%", label: "Back to Creator" },
-  { num: "Any", label: "ERC-20 (Pro)" },
+  { num: "5", label: "Live networks", hint: "Ethereum, Base, Solana & more" },
+  { num: "4+", label: "Core assets", hint: "USDC, USDT, ETH, SOL" },
+  { num: "EVM+SOL", label: "Wallet support", hint: "MetaMask & Phantom" },
+  { num: "API", label: "Merchant access", hint: "For registered agents" },
 ];
 
 const USE_CASES = [
@@ -106,16 +106,18 @@ export function AboutPage() {
               is deterministic, auditable, and settled on-chain.
             </p>
             <p>
-              The platform currently supports USDC and USDT on Ethereum. Payagent Pro
-              extends this to any ERC-20 token. The roadmap includes all major L2
+              Payagent supports live networks across EVM and Solana, core
+              settlement assets, multi-wallet verification, and merchant API
+              access for registered agents. The roadmap includes all major L2
               networks, including Liberty Chain by <LcxLink>LCX</LcxLink>.
             </p>
 
-            <div className="site-stats">
+            <div className="site-stats" role="list">
               {STATS.map((s) => (
-                <div key={s.label} className="site-stats__item">
+                <div key={s.label} className="site-stats__item" role="listitem">
                   <span className="site-stats__num">{s.num}</span>
                   <span className="site-stats__label">{s.label}</span>
+                  <span className="site-stats__hint">{s.hint}</span>
                 </div>
               ))}
             </div>

@@ -1,8 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import type { AgentListItem } from "@/lib/merchant-ui-types";
 import { truncateAddress } from "@/lib/profile-url";
+import { listPolicies } from "@/lib/compliance/policy-store";
+import { getComplianceStatus } from "@/lib/compliance/policy-helpers";
+import type { AgentPolicy } from "@/lib/compliance/types";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Table,
@@ -30,6 +34,15 @@ export function AgentsPageContent({
 }) {
   const [agents, setAgents] = useState(initialAgents);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [policies, setPolicies] = useState<Record<string, AgentPolicy>>({});
+
+  useEffect(() => {
+    listPolicies()
+      .then(setPolicies)
+      .catch(() => {
+        // Compliance badge is optional enrichment.
+      });
+  }, []);
 
   async function toggleAgentStatus(agent: AgentListItem) {
     const nextStatus = agent.status === "active" ? "inactive" : "active";
@@ -75,7 +88,15 @@ export function AgentsPageContent({
       <div className="space-y-1">
         <h2 className="text-lg font-semibold">Registered Agents</h2>
         <p className="text-sm text-muted-foreground">
-          {agents.length}/{maxAgents} agents registered via API
+          {agents.length}/{maxAgents} agents registered via API. Set spend rules
+          in{" "}
+          <Link
+            href="/merchant/compliance"
+            className="font-medium text-foreground underline-offset-4 hover:underline"
+          >
+            Compliance Engine
+          </Link>
+          .
         </p>
       </div>
 
@@ -97,11 +118,17 @@ export function AgentsPageContent({
                   <TableHead>Wallet</TableHead>
                   <TableHead className="text-right">Links</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Compliance</TableHead>
                   <TableHead className="text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {agents.map((agent) => (
+                {agents.map((agent) => {
+                  const compliance = getComplianceStatus(
+                    agent,
+                    policies[agent.id] ?? null,
+                  );
+                  return (
                   <TableRow key={agent.id}>
                     <TableCell className="text-sm font-medium">
                       {agent.name}
@@ -127,6 +154,18 @@ export function AgentsPageContent({
                         {agent.status}
                       </Badge>
                     </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant="secondary"
+                        className={
+                          compliance === "compliant"
+                            ? "bg-emerald-50 text-emerald-800"
+                            : "bg-rose-50 text-rose-800"
+                        }
+                      >
+                        {compliance === "compliant" ? "Ready" : "Blocked"}
+                      </Badge>
+                    </TableCell>
                     <TableCell className="text-right">
                       <Button
                         type="button"
@@ -139,7 +178,8 @@ export function AgentsPageContent({
                       </Button>
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           )}

@@ -42,12 +42,14 @@ export async function POST(request: Request) {
     amount?: number;
     tokenId?: string;
     networkId?: string;
+    approvalId?: string;
   };
 
   const externalAgentId = body.agentId?.trim();
   const payerAddress = body.payerAddress?.trim();
   const txHash = body.txHash?.trim();
   const type = body.type;
+  const approvalId = body.approvalId?.trim();
 
   if (!externalAgentId || !payerAddress || !txHash || !type) {
     return NextResponse.json(
@@ -74,9 +76,13 @@ export async function POST(request: Request) {
       txHash,
       linkUsername,
       linkPublicId: linkId,
+      approvalId,
     });
 
     if (!result.ok) {
+      if ("policyResponse" in result && result.policyResponse) {
+        return result.policyResponse;
+      }
       const code = "code" in result ? result.code : undefined;
       const status = mapAgentPayErrorStatus(code);
 
@@ -130,9 +136,13 @@ export async function POST(request: Request) {
       amount,
       tokenId,
       networkId,
+      approvalId,
     });
 
     if (!result.ok) {
+      if ("policyResponse" in result && result.policyResponse) {
+        return result.policyResponse;
+      }
       const code = "code" in result ? result.code : undefined;
       const status = mapAgentPayErrorStatus(code);
 

@@ -10,7 +10,7 @@ export type SecurityContext = {
   date: string;
 };
 
-export type SecurityActorType = "user" | "agent" | "api_key";
+export type SecurityActorType = "user" | "agent" | "api_key" | "system";
 
 export type SecurityAuditDoc = {
   _id?: ObjectId;

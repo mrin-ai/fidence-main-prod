@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { TokenUsdInfo } from "@/components/token-usd-info";
 import {
   getNetworkById,
   getTokenById,
@@ -72,12 +73,17 @@ export function InvoicePaymentActions({
       <CardContent className="space-y-4">
         <div className="rounded-lg border border-border/60 bg-secondary/10 px-3 py-2">
           <p className="text-xs text-muted-foreground">Amount</p>
-          <p className="font-mono text-sm tabular-nums">
+          <p className="inline-flex items-center gap-1 font-mono text-sm tabular-nums">
             {paymentLink.amount.toLocaleString("en-US", {
               maximumFractionDigits: 2,
             })}{" "}
             {token?.symbol ?? paymentLink.tokenId.toUpperCase()} on{" "}
             {network?.label ?? paymentLink.networkId}
+            <TokenUsdInfo
+              amount={paymentLink.amount}
+              tokenId={paymentLink.tokenId}
+              symbol={token?.symbol}
+            />
           </p>
         </div>
 

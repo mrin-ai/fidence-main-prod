@@ -24,6 +24,7 @@ import {
   LayoutDashboardIcon,
   Link2Icon,
   ReceiptIcon,
+  ShieldCheckIcon,
   StoreIcon,
   WalletIcon,
 } from "lucide-react"
@@ -98,6 +99,11 @@ const data = {
               title: "Registered agents",
               url: "/merchant/agents",
               icon: <BotIcon />,
+            },
+            {
+              title: "Compliance Engine",
+              url: "/merchant/compliance",
+              icon: <ShieldCheckIcon />,
             },
           ],
         },

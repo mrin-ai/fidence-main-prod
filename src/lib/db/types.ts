@@ -244,6 +244,9 @@ export type DashboardOverview = {
   paymentLinks: Array<{
     id: string;
     amount: string;
+    tokenAmount: number;
+    tokenId: string;
+    tokenSymbol: string;
     status: PaymentLinkStatus;
     url: string;
     publicId: string;
@@ -253,6 +256,9 @@ export type DashboardOverview = {
     label: string;
     date: string;
     amount: string;
+    tokenAmount: number;
+    tokenId: string | null;
+    tokenSymbol: string;
     direction: "in" | "out";
     txHash?: string;
     explorerUrl?: string;

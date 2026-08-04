@@ -14,4 +14,9 @@ export const COLLECTIONS = {
   agents: "agents",
   securityAudit: "security_audit",
   dbMeta: "db_meta",
+  agentPolicies: "agent_policies",
+  policyDecisions: "policy_decisions",
+  agentSpendDaily: "agent_spend_daily",
+  agentSpendMonthly: "agent_spend_monthly",
+  paymentApprovals: "payment_approvals",
 } as const;

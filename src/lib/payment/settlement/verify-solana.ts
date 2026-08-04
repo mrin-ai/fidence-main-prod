@@ -85,19 +85,29 @@ async function verifySolanaTransfer(
 
 export const solanaSettlementVerifier: PaymentSettlementVerifier = {
   async verifySettlement(intent: SettlementIntent, txHash: string) {
+    const detailed = await this.verifySettlementDetailed(intent, txHash);
+    return detailed.ok;
+  },
+
+  async verifySettlementDetailed(intent: SettlementIntent, txHash: string) {
     const signature = txHash.trim();
     if (!isValidSolanaSignatureFormat(signature)) {
-      return false;
+      return { ok: false as const };
     }
 
     if (isFormatOnlySettlementVerification()) {
-      return true;
+      return { ok: true as const, observedAmount: intent.amount };
     }
 
     try {
-      return await verifySolanaTransfer(intent, signature);
+      const ok = await verifySolanaTransfer(intent, signature);
+      // Solana verifier currently validates min amount; expose intent as observed
+      // until decoded transfer amounts are returned from the RPC path.
+      return ok
+        ? { ok: true as const, observedAmount: intent.amount }
+        : { ok: false as const };
     } catch {
-      return false;
+      return { ok: false as const };
     }
   },
 };

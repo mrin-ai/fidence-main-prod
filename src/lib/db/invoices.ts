@@ -25,6 +25,7 @@ import {
 } from "@/lib/email/invoice-emails";
 import type { InvoiceFormData } from "@/lib/invoice/schema";
 import { invoiceReference } from "@/lib/invoice/schema";
+import { resolveInvoicePaymentTokenAmount } from "@/lib/coingecko/invoice-payment-amount";
 import { calculateInvoiceTotal } from "@/lib/invoice/calculate-totals";
 import { getTokenById } from "@/lib/create-payment-link-data";
 import { resolveInvoicePaymentExpiry } from "@/lib/invoice/invoice-payment-link";
@@ -301,13 +302,18 @@ export async function saveInvoiceWithPaymentLink(input: {
   data: InvoiceFormData;
   invoiceId?: string;
 }) {
-  const amount = calculateInvoiceTotal(input.data);
-  if (amount <= 0) {
+  const fiatTotal = calculateInvoiceTotal(input.data);
+  if (fiatTotal <= 0) {
     throw new Error("Invoice total must be greater than zero");
   }
 
   const expiresAt = resolveInvoicePaymentExpiry(input.data);
   const { tokenId, networkId } = input.data.paymentLink;
+  const tokenAmount = await resolveInvoicePaymentTokenAmount({
+    fiatTotal,
+    fiatCurrency: input.data.invoiceDetails.currency,
+    tokenId,
+  });
   const db = await getDb();
 
   if (input.invoiceId) {
@@ -355,7 +361,7 @@ export async function saveInvoiceWithPaymentLink(input: {
       recipientAddress: input.recipientAddress,
       invoiceId: existing._id,
       paymentLinkId: existing.paymentLinkId,
-      amount,
+      amount: tokenAmount,
       tokenId,
       networkId,
       expiresAt,
@@ -391,7 +397,7 @@ export async function saveInvoiceWithPaymentLink(input: {
     username: input.username,
     recipientAddress: input.recipientAddress,
     invoiceId: invoiceObjectId,
-    amount,
+    amount: tokenAmount,
     tokenId,
     networkId,
     expiresAt,

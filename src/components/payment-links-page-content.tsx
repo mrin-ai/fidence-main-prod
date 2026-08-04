@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CommerceSourceToggle } from "@/components/merchant/commerce-source-toggle";
+import { TokenUsdInfo } from "@/components/token-usd-info";
 import type { CommerceSource } from "@/lib/db/merchant-types";
 import {
   Pagination,
@@ -299,7 +300,14 @@ export function PaymentLinksPageContent({
                   {paginatedLinks.map((link) => (
                     <TableRow key={link.id}>
                       <TableCell className="font-mono text-sm font-medium tabular-nums">
-                        {link.amountLabel}
+                        <span className="inline-flex items-center gap-1">
+                          {link.amountLabel}
+                          <TokenUsdInfo
+                            amount={link.amount}
+                            tokenId={link.tokenId}
+                            symbol={link.tokenSymbol}
+                          />
+                        </span>
                       </TableCell>
                       {sourceMode === "agent" ? (
                         <TableCell className="font-mono text-xs">

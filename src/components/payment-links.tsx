@@ -13,6 +13,7 @@ import { toast } from "sonner"
 
 import { useCreatePaymentLink } from "@/components/create-payment-link-sheet"
 import { EmptyStateLottie } from "@/components/empty-state-lottie"
+import { TokenUsdInfo } from "@/components/token-usd-info"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -42,6 +43,9 @@ import { cn } from "@/lib/utils"
 type PaymentLink = {
   id: string
   amount: string
+  tokenAmount: number
+  tokenId: string
+  tokenSymbol: string
   status: PaymentLinkStatus
   url: string
 }
@@ -119,7 +123,14 @@ export function PaymentLinks({
                 <Link2Icon className="size-3.5" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium tabular-nums">{link.amount}</p>
+                <div className="flex items-center gap-1">
+                  <p className="text-sm font-medium tabular-nums">{link.amount}</p>
+                  <TokenUsdInfo
+                    amount={link.tokenAmount}
+                    tokenId={link.tokenId}
+                    symbol={link.tokenSymbol}
+                  />
+                </div>
                 <p className="truncate font-mono text-[10px] text-muted-foreground">
                   {link.url}
                 </p>

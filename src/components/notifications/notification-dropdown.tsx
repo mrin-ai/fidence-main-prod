@@ -5,7 +5,12 @@ import Link from "next/link";
 import { BellIcon, BellOffIcon, Loader2Icon } from "lucide-react";
 
 import type { ActivityItem } from "@/components/activity/activity-list";
+import { TokenUsdInfo } from "@/components/token-usd-info";
 import { Button } from "@/components/ui/button";
+import {
+  parseTokenAmountFromText,
+  TOKEN_AMOUNT_ACTIVITY_TYPES,
+} from "@/lib/coingecko/parse-token-from-text";
 import {
   Popover,
   PopoverContent,
@@ -29,14 +34,30 @@ function NotificationList({ activities }: { activities: ActivityItem[] }) {
 
   return (
     <ul className="divide-y divide-border/50">
-      {activities.map((activity) => (
-        <li key={activity.id} className="px-4 py-3">
-          <p className="text-sm leading-snug text-foreground">
-            {activity.summary}
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">{activity.meta}</p>
-        </li>
-      ))}
+      {activities.map((activity) => {
+        const tokenDetails = TOKEN_AMOUNT_ACTIVITY_TYPES.has(activity.type)
+          ? parseTokenAmountFromText(activity.summary)
+          : null;
+
+        return (
+          <li key={activity.id} className="px-4 py-3">
+            <div className="flex items-start gap-1.5">
+              <p className="min-w-0 flex-1 text-sm leading-snug text-foreground">
+                {activity.summary}
+              </p>
+              {tokenDetails ? (
+                <TokenUsdInfo
+                  amount={tokenDetails.amount}
+                  tokenId={tokenDetails.tokenId}
+                  symbol={tokenDetails.symbol}
+                  className="mt-0.5"
+                />
+              ) : null}
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">{activity.meta}</p>
+          </li>
+        );
+      })}
     </ul>
   );
 }

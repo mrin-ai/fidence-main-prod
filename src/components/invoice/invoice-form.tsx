@@ -32,8 +32,7 @@ import {
   InvoiceFieldLabel,
   InvoiceFormRow,
 } from "@/components/invoice/invoice-form-field";
-import { InvoiceItemsSection } from "@/components/invoice/invoice-items-section";
-import { InvoicePaymentLinkSection } from "@/components/invoice/invoice-payment-link-section";
+import { InvoiceItemsAndPaymentSection } from "@/components/invoice/invoice-items-and-payment-section";
 import { currenciesWithSymbols } from "@/lib/invoice/currency";
 import {
   invoiceFormDefaultValues,
@@ -260,10 +259,15 @@ export function InvoiceFormPanel({
           </AccordionContent>
         </AccordionItem>
 
-        <AccordionItem value="invoice-items">
-          <AccordionTrigger className="px-4">Invoice Items</AccordionTrigger>
+        <AccordionItem value="items-and-payment">
+          <AccordionTrigger className="px-4">
+            Items &amp; payment <span className="ml-1 text-destructive">*</span>
+          </AccordionTrigger>
           <AccordionContent className="px-4 pb-4">
-            <InvoiceItemsSection form={form} />
+            <InvoiceItemsAndPaymentSection
+              form={form}
+              savedPaymentLink={savedPaymentLink}
+            />
           </AccordionContent>
         </AccordionItem>
 
@@ -300,18 +304,6 @@ export function InvoiceFormPanel({
               form={form}
               name="metadata.paymentInformation"
               label="Payment Information"
-            />
-          </AccordionContent>
-        </AccordionItem>
-
-        <AccordionItem value="payment-link">
-          <AccordionTrigger className="px-4">
-            Payment link <span className="ml-1 text-destructive">*</span>
-          </AccordionTrigger>
-          <AccordionContent className="px-4 pb-4">
-            <InvoicePaymentLinkSection
-              form={form}
-              savedPaymentLink={savedPaymentLink}
             />
           </AccordionContent>
         </AccordionItem>

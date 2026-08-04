@@ -67,7 +67,7 @@ export async function recordProfilePayment(input: {
   }
 
   const verifier = getSettlementVerifier();
-  const verified = await verifier.verifySettlement(
+  const verified = await verifier.verifySettlementDetailed(
     {
       recipientAddress: normalizedRecipientAddress,
       amount: input.amount,
@@ -78,9 +78,15 @@ export async function recordProfilePayment(input: {
     normalizedTxHash,
   );
 
-  if (!verified) {
+  if (!verified.ok) {
     return { ok: false as const, error: "Payment verification failed" };
   }
+
+  // Prefer observed on-chain amount for accounting (closes under-report).
+  const settledAmount =
+    Number.isFinite(verified.observedAmount) && verified.observedAmount > 0
+      ? verified.observedAmount
+      : input.amount;
 
   const label = `Profile payment from ${normalizedPayerAddress.slice(0, 6)}…${normalizedPayerAddress.slice(-4)}`;
 
@@ -88,7 +94,7 @@ export async function recordProfilePayment(input: {
     workspaceId: input.workspaceId,
     type: "profile_payment",
     label,
-    amount: input.amount,
+    amount: settledAmount,
     symbol: token?.symbol?.toLowerCase() ?? input.tokenId,
     networkId: input.networkId,
     txHash: normalizedTxHash,
@@ -102,7 +108,7 @@ export async function recordProfilePayment(input: {
 
   await logProfilePaymentReceivedActivity({
     workspaceId: input.workspaceId,
-    amount: input.amount,
+    amount: settledAmount,
     tokenSymbol: token?.symbol ?? input.tokenId.toUpperCase(),
     username: input.username,
   });
@@ -110,14 +116,14 @@ export async function recordProfilePayment(input: {
   await incrementDailyStat(
     input.workspaceId,
     "receivedAmount",
-    input.amount,
+    settledAmount,
     now,
   );
 
   await recordPaymentSentForPayer({
     payerAddress: normalizedPayerAddress,
     merchantWorkspaceId: input.workspaceId,
-    amount: input.amount,
+    amount: settledAmount,
     tokenId: input.tokenId,
     networkId: input.networkId,
     txHash: normalizedTxHash,
@@ -136,5 +142,6 @@ export async function recordProfilePayment(input: {
     ok: true as const,
     transactionId: result.insertedId.toString(),
     duplicate: false,
+    observedAmount: settledAmount,
   };
 }

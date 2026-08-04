@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 
+import { actorFromSecurity } from "@/lib/compliance/actor";
+import {
+  evaluateAndRecordPolicy,
+  policyDeniedResponse,
+} from "@/lib/compliance/evaluate-and-record";
 import { requireActiveAgent } from "@/lib/db/agents";
 import { createPaymentLink } from "@/lib/db/payment-links";
 import {
@@ -70,6 +75,27 @@ export async function POST(request: Request) {
     );
   }
 
+  const policyResult = await evaluateAndRecordPolicy({
+    workspaceId: context.workspace._id,
+    agent: agentResult.agent,
+    action: "payment_links.create",
+    amount,
+    tokenId,
+    networkId,
+    actor: actorFromSecurity(context.security, {
+      actorType: "agent",
+      agentId: agentResult.agent._id.toString(),
+      agentPublicId: agentResult.agent.publicId,
+      externalAgentId: agentResult.agent.externalAgentId,
+    }),
+    security: context.security,
+    contentGuardArgs: body,
+  });
+
+  if (policyResult.verdict !== "allow") {
+    return policyDeniedResponse(policyResult);
+  }
+
   const recipient = requireRecipientAddress(context.owner, networkId);
   if (!recipient.ok) {
     return NextResponse.json(
@@ -105,6 +131,7 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     ...link,
+    receiptId: policyResult.receiptId,
     agent: {
       publicId: agentResult.agent.publicId,
       externalAgentId: agentResult.agent.externalAgentId,

@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 
 import { EmptyStateLottie } from "@/components/empty-state-lottie";
+import { TokenUsdInfo } from "@/components/token-usd-info";
 import { truncateAddress } from "@/lib/profile-url";
 import { cn } from "@/lib/utils";
 
@@ -61,14 +62,21 @@ export function TransactionList({
             </div>
 
             <div className="shrink-0 text-right">
-              <p
-                className={cn(
-                  "text-sm font-semibold tabular-nums",
-                  isOutgoing ? "text-amber-700" : "text-emerald-600",
-                )}
-              >
-                {tx.amount}
-              </p>
+              <div className="flex items-center justify-end gap-1">
+                <p
+                  className={cn(
+                    "text-sm font-semibold tabular-nums",
+                    isOutgoing ? "text-amber-700" : "text-emerald-600",
+                  )}
+                >
+                  {tx.amount}
+                </p>
+                <TokenUsdInfo
+                  amount={tx.tokenAmount}
+                  tokenId={tx.tokenId}
+                  symbol={tx.tokenSymbol}
+                />
+              </div>
               {tx.explorerUrl && tx.txHash ? (
                 <a
                   href={tx.explorerUrl}

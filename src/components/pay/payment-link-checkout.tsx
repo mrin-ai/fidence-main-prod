@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import type { PublicPaymentLink } from "@/lib/payment-link-types";
 import { getTxExplorerUrl } from "@/lib/block-explorer";
 import { PayPageNavbar } from "@/components/pay/pay-page-navbar";
+import { TokenUsdInfo } from "@/components/token-usd-info";
 import { useOnchainPayment } from "@/components/pay/use-onchain-payment";
 import { useSolanaPayment } from "@/components/pay/use-solana-payment";
 import { Badge } from "@/components/ui/badge";
@@ -65,8 +66,16 @@ function PaidReceipt({
       <div className="space-y-2">
         <p className="text-sm font-medium text-emerald-700">Payment complete</p>
         <p className="text-4xl font-semibold tracking-tight tabular-nums">
-          {link.amount}{" "}
-          <span className="text-2xl text-muted-foreground">{link.tokenSymbol}</span>
+          <span className="inline-flex items-center justify-center gap-2">
+            {link.amount}{" "}
+            <span className="text-2xl text-muted-foreground">{link.tokenSymbol}</span>
+            <TokenUsdInfo
+              amount={link.amount}
+              tokenId={link.tokenId}
+              symbol={link.tokenSymbol}
+              className="size-5"
+            />
+          </span>
         </p>
         <p className="text-sm text-muted-foreground">
           {link.invoiceReference
@@ -270,9 +279,17 @@ export function PaymentLinkCheckout({
                 ) : (
                   <div className="space-y-1 text-center">
                     <p className="text-4xl font-semibold tracking-tight tabular-nums">
-                      {link.amount}{" "}
-                      <span className="text-2xl text-muted-foreground">
-                        {link.tokenSymbol}
+                      <span className="inline-flex items-center justify-center gap-2">
+                        {link.amount}{" "}
+                        <span className="text-2xl text-muted-foreground">
+                          {link.tokenSymbol}
+                        </span>
+                        <TokenUsdInfo
+                          amount={link.amount}
+                          tokenId={link.tokenId}
+                          symbol={link.tokenSymbol}
+                          className="size-5"
+                        />
                       </span>
                     </p>
                     <p className="text-sm text-muted-foreground">

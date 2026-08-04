@@ -67,6 +67,9 @@ export async function GET(request: Request) {
       );
     }
 
+    const amountRaw = searchParams.get("amount");
+    const amount = amountRaw != null ? Number(amountRaw) : undefined;
+
     const result = await preflightAgentProfilePayment({
       context,
       externalAgentId: agentId,
@@ -74,6 +77,7 @@ export async function GET(request: Request) {
       tokenId,
       networkId,
       payerAddress,
+      amount,
     });
 
     return NextResponse.json(result);

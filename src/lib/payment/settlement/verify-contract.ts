@@ -5,4 +5,8 @@ export const contractSettlementVerifier: PaymentSettlementVerifier = {
     // TODO: wire smart contract verification when backend is ready
     return false;
   },
+
+  async verifySettlementDetailed(_intent: SettlementIntent, _txHash: string) {
+    return { ok: false as const };
+  },
 };

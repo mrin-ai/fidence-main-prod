@@ -18,6 +18,11 @@ import {
   WalletIcon,
 } from "lucide-react";
 
+import { TokenUsdInfo } from "@/components/token-usd-info";
+import {
+  parseTokenAmountFromText,
+  TOKEN_AMOUNT_ACTIVITY_TYPES,
+} from "@/lib/coingecko/parse-token-from-text";
 import type { ActivityStatus } from "@/lib/db/types";
 import { cn } from "@/lib/utils";
 
@@ -181,6 +186,9 @@ export function ActivityList({
     <div className={cn("flex flex-col gap-4", className)}>
       {activities.map((activity) => {
         const visual = getActivityVisual(activity.type, activity.status);
+        const tokenDetails = TOKEN_AMOUNT_ACTIVITY_TYPES.has(activity.type)
+          ? parseTokenAmountFromText(activity.summary)
+          : null;
 
         return (
           <div key={activity.id} className="flex items-start gap-3">
@@ -193,9 +201,19 @@ export function ActivityList({
               {visual.icon}
             </div>
             <div className="min-w-0 flex-1 space-y-1">
-              <p className="text-sm leading-snug text-foreground/90">
-                {activity.summary}
-              </p>
+              <div className="flex items-start gap-1.5">
+                <p className="min-w-0 flex-1 text-sm leading-snug text-foreground/90">
+                  {activity.summary}
+                </p>
+                {tokenDetails ? (
+                  <TokenUsdInfo
+                    amount={tokenDetails.amount}
+                    tokenId={tokenDetails.tokenId}
+                    symbol={tokenDetails.symbol}
+                    className="mt-0.5"
+                  />
+                ) : null}
+              </div>
               <p className="font-mono text-[0.6875rem] text-muted-foreground">
                 {activity.meta}
               </p>

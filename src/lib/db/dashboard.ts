@@ -1,5 +1,7 @@
 import { ObjectId } from "mongodb";
 
+import { getTokenById } from "@/lib/create-payment-link-data";
+import { resolveTokenIdFromSymbol } from "@/lib/coingecko/resolve-token-id";
 import { listWorkspaceActivities } from "@/lib/db/activity-feed";
 import { buildProfileUrl } from "@/lib/profile-url";
 import { getTxExplorerUrl } from "@/lib/block-explorer";
@@ -140,13 +142,21 @@ export async function getDashboardOverview(
         rewards: buildSparkline(sparklines.rewards),
       },
     },
-    paymentLinks: paymentLinks.map((link) => ({
-      id: link._id.toString(),
-      amount: formatTokenAmount(link.amount, link.tokenId),
-      status: link.status,
-      url: link.url,
-      publicId: link.publicId,
-    })),
+    paymentLinks: paymentLinks.map((link) => {
+      const token = getTokenById(link.tokenId);
+      const symbol = token?.symbol ?? link.tokenId.toUpperCase();
+
+      return {
+        id: link._id.toString(),
+        amount: formatTokenAmount(link.amount, symbol),
+        tokenAmount: link.amount,
+        tokenId: link.tokenId,
+        tokenSymbol: symbol,
+        status: link.status,
+        url: link.url,
+        publicId: link.publicId,
+      };
+    }),
     transactions: transactions.map((tx) => {
       const isOutgoing = tx.type === "payment_sent";
       const explorerUrl =
@@ -159,6 +169,9 @@ export async function getDashboardOverview(
         label: tx.label,
         date: formatDate(tx.occurredAt),
         amount: `${isOutgoing ? "-" : "+"}${formatTokenAmount(tx.amount, tx.symbol)}`,
+        tokenAmount: tx.amount,
+        tokenId: resolveTokenIdFromSymbol(tx.symbol),
+        tokenSymbol: tx.symbol.toUpperCase(),
         direction: isOutgoing ? ("out" as const) : ("in" as const),
         txHash: tx.txHash,
         explorerUrl,

@@ -1,8 +1,15 @@
+import { actorFromSecurity } from "@/lib/compliance/actor";
+import { evaluateAndRecordPolicy } from "@/lib/compliance/evaluate-and-record";
+import { evaluatePolicy } from "@/lib/compliance/evaluate-policy";
+import { POLICY_CODES } from "@/lib/compliance/codes";
+import { toPolicyAmountUsd } from "@/lib/compliance/valuation";
 import {
   agentHasWallet,
   getAgentByExternalId,
   getAgentWallets,
 } from "@/lib/db/agents";
+import { getAgentPolicy, toEvaluablePolicy } from "@/lib/db/agent-policies";
+import { getAgentSpendTotals } from "@/lib/db/agent-spend";
 import type { MerchantApiContext } from "@/lib/db/merchant-api";
 import { getPaymentLinkByUsernameAndPublicId } from "@/lib/db/payment-links";
 import { getWorkspaceForUser } from "@/lib/db/auth";
@@ -12,6 +19,7 @@ import { normalizeUsername } from "@/lib/db/profile";
 import { resolveRecipientAddress } from "@/lib/db/wallets";
 import { supportsOnChainPayment } from "@/lib/payment-contracts";
 import type { UserDoc } from "@/lib/db/types";
+import type { AgentDoc } from "@/lib/db/merchant-types";
 
 export type PreflightCheck = {
   ok: boolean;
@@ -99,6 +107,114 @@ async function checkAgent(
   return { checks, agent };
 }
 
+async function appendPolicyChecks(input: {
+  context: MerchantApiContext;
+  agent: AgentDoc;
+  action: "pay.link" | "pay.profile";
+  amount?: number;
+  tokenId: string;
+  networkId: string;
+  checks: Record<string, PreflightCheck>;
+}) {
+  const amountKnown =
+    input.amount !== undefined && Number.isFinite(input.amount) && input.amount > 0;
+
+  if (!amountKnown) {
+    const [policyDoc, spend] = await Promise.all([
+      getAgentPolicy(input.context.workspace._id, input.agent._id),
+      getAgentSpendTotals(input.context.workspace._id, input.agent._id),
+    ]);
+    const soft = evaluatePolicy({
+      agentStatus: input.agent.status,
+      action: input.action,
+      amountUsd: 0,
+      networkId: input.networkId,
+      tokenId: input.tokenId,
+      policy: policyDoc ? toEvaluablePolicy(policyDoc) : null,
+      spentDailyUsd: spend.spentDailyUsd,
+      spentMonthlyUsd: spend.spentMonthlyUsd,
+    });
+
+    input.checks.policy_active = soft.codes.includes(POLICY_CODES.NO_ACTIVE_POLICY)
+      ? check(false, "No active compliance policy", POLICY_CODES.NO_ACTIVE_POLICY)
+      : check(true, "Active compliance policy");
+    input.checks.policy_action = soft.codes.includes(POLICY_CODES.ACTION_NOT_ALLOWED)
+      ? check(false, "Pay action not allowed by policy", POLICY_CODES.ACTION_NOT_ALLOWED)
+      : check(true, "Pay action allowed by policy");
+    input.checks.policy_network = soft.codes.includes(POLICY_CODES.NETWORK_NOT_ALLOWED)
+      ? check(false, "Network not allowed by policy", POLICY_CODES.NETWORK_NOT_ALLOWED)
+      : check(true, "Network allowed by policy");
+    input.checks.policy_token = soft.codes.includes(POLICY_CODES.TOKEN_NOT_ALLOWED)
+      ? check(false, "Token not allowed by policy", POLICY_CODES.TOKEN_NOT_ALLOWED)
+      : check(true, "Token allowed by policy");
+    input.checks.policy_amount = check(
+      false,
+      "Amount required for full policy preflight",
+      "AMOUNT_REQUIRED",
+    );
+    return;
+  }
+
+  const valuation = toPolicyAmountUsd(input.amount!, input.tokenId);
+  if (!valuation.ok) {
+    input.checks.policy_amount = check(
+      false,
+      "USD valuation unavailable for this token",
+      valuation.code,
+    );
+  }
+
+  const evaluated = await evaluateAndRecordPolicy({
+    workspaceId: input.context.workspace._id,
+    agent: input.agent,
+    action: input.action,
+    amount: input.amount!,
+    tokenId: input.tokenId,
+    networkId: input.networkId,
+    actor: actorFromSecurity(input.context.security, {
+      actorType: "agent",
+      agentId: input.agent._id.toString(),
+      agentPublicId: input.agent.publicId,
+      externalAgentId: input.agent.externalAgentId,
+    }),
+    security: input.context.security,
+    skipReceiptOnAllow: true,
+  });
+
+  input.checks.policy_active = evaluated.codes.includes(POLICY_CODES.NO_ACTIVE_POLICY)
+    ? check(false, "No active compliance policy", POLICY_CODES.NO_ACTIVE_POLICY)
+    : check(true, "Active compliance policy");
+  input.checks.policy_action = evaluated.codes.includes(POLICY_CODES.ACTION_NOT_ALLOWED)
+    ? check(false, "Pay action not allowed by policy", POLICY_CODES.ACTION_NOT_ALLOWED)
+    : check(true, "Pay action allowed by policy");
+  input.checks.policy_network = evaluated.codes.includes(POLICY_CODES.NETWORK_NOT_ALLOWED)
+    ? check(false, "Network not allowed by policy", POLICY_CODES.NETWORK_NOT_ALLOWED)
+    : check(true, "Network allowed by policy");
+  input.checks.policy_token = evaluated.codes.includes(POLICY_CODES.TOKEN_NOT_ALLOWED)
+    ? check(false, "Token not allowed by policy", POLICY_CODES.TOKEN_NOT_ALLOWED)
+    : check(true, "Token allowed by policy");
+
+  const amountDenied =
+    evaluated.codes.includes(POLICY_CODES.AMOUNT_ABOVE_MAX) ||
+    evaluated.codes.includes(POLICY_CODES.DAILY_CAP_EXCEEDED) ||
+    evaluated.codes.includes(POLICY_CODES.MONTHLY_CAP_EXCEEDED) ||
+    evaluated.codes.includes(POLICY_CODES.AMOUNT_VALUATION_UNAVAILABLE);
+
+  input.checks.policy_amount = amountDenied
+    ? check(
+        false,
+        evaluated.codes[0] ?? "Amount denied by policy",
+        evaluated.codes[0],
+      )
+    : evaluated.verdict === "require_approval"
+      ? check(
+          true,
+          "Amount requires human approval before pay",
+          POLICY_CODES.APPROVAL_REQUIRED,
+        )
+      : check(true, "Amount within policy limits");
+}
+
 export async function preflightAgentLinkPayment(input: {
   context: MerchantApiContext;
   externalAgentId: string;
@@ -173,6 +289,16 @@ export async function preflightAgentLinkPayment(input: {
     return { ready: allReady(checks), type: "link", checks };
   }
 
+  await appendPolicyChecks({
+    context: input.context,
+    agent,
+    action: "pay.link",
+    amount: link.amount,
+    tokenId: link.tokenId,
+    networkId: link.networkId,
+    checks,
+  });
+
   return { ready: allReady(checks), type: "link", checks };
 }
 
@@ -183,6 +309,7 @@ export async function preflightAgentProfilePayment(input: {
   tokenId: string;
   networkId: string;
   payerAddress?: string;
+  amount?: number;
 }): Promise<AgentPayPreflightResult> {
   const { checks, agent } = await checkAgent(
     input.context,
@@ -250,6 +377,16 @@ export async function preflightAgentProfilePayment(input: {
   if (!agent) {
     return { ready: allReady(checks), type: "profile", checks };
   }
+
+  await appendPolicyChecks({
+    context: input.context,
+    agent,
+    action: "pay.profile",
+    amount: input.amount,
+    tokenId: input.tokenId,
+    networkId: input.networkId,
+    checks,
+  });
 
   return { ready: allReady(checks), type: "profile", checks };
 }

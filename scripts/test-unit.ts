@@ -22,10 +22,28 @@ import {
   PAYAGENT_TOKEN_SYMBOL,
 } from "../src/lib/payagent-token";
 import { isReservedPaymentPathSegment } from "../src/lib/payment-link-url";
+import { evaluatePolicy } from "../src/lib/compliance/evaluate-policy";
+import { toPolicyAmountUsd } from "../src/lib/compliance/valuation";
+import { POLICY_CODES } from "../src/lib/compliance/codes";
+import { redactSecretsForLogs } from "../src/lib/compliance/content-guard";
 
 type TestCase = {
   name: string;
   run: () => void;
+};
+
+const samplePolicy = {
+  id: "pol_1",
+  status: "active" as const,
+  policyVersion: 2,
+  maxAmountPerPayment: 50,
+  dailySpendCap: 200,
+  monthlySpendCap: 1000 as number | null,
+  allowedNetworkIds: ["ethereum", "base"],
+  allowedTokenIds: ["usdc", "usdt"],
+  allowCreatePaymentLinks: true,
+  allowPay: true,
+  requireApprovalAbove: 40 as number | null,
 };
 
 const tests: TestCase[] = [
@@ -108,6 +126,140 @@ const tests: TestCase[] = [
       assertEqual(capLeaderboardLimit(0), 1);
       assertEqual(capLeaderboardLimit(50), 50);
       assertEqual(capLeaderboardLimit(500), 100);
+    },
+  },
+  {
+    name: "toPolicyAmountUsd treats USDC/USDT as 1:1",
+    run: () => {
+      const usdc = toPolicyAmountUsd(12.5, "usdc");
+      assertTrue(usdc.ok);
+      if (usdc.ok) assertEqual(usdc.amountUsd, 12.5);
+      const usdt = toPolicyAmountUsd(1, "USDT");
+      assertTrue(usdt.ok);
+    },
+  },
+  {
+    name: "toPolicyAmountUsd fails closed for ETH/SOL/LCX",
+    run: () => {
+      const eth = toPolicyAmountUsd(1, "eth");
+      assertTrue(!eth.ok);
+      if (!eth.ok) assertEqual(eth.code, POLICY_CODES.AMOUNT_VALUATION_UNAVAILABLE);
+    },
+  },
+  {
+    name: "evaluatePolicy denies when no active policy",
+    run: () => {
+      const result = evaluatePolicy({
+        agentStatus: "active",
+        action: "payment_links.create",
+        amountUsd: 10,
+        networkId: "base",
+        tokenId: "usdc",
+        policy: null,
+        spentDailyUsd: 0,
+        spentMonthlyUsd: 0,
+      });
+      assertEqual(result.verdict, "deny");
+      assertEqual(result.codes[0], POLICY_CODES.NO_ACTIVE_POLICY);
+    },
+  },
+  {
+    name: "evaluatePolicy allows within caps",
+    run: () => {
+      const result = evaluatePolicy({
+        agentStatus: "active",
+        action: "payment_links.create",
+        amountUsd: 10,
+        networkId: "base",
+        tokenId: "usdc",
+        policy: samplePolicy,
+        spentDailyUsd: 20,
+        spentMonthlyUsd: 100,
+      });
+      assertEqual(result.verdict, "allow");
+      assertEqual(result.remainingDailyUsd, 180);
+    },
+  },
+  {
+    name: "evaluatePolicy denies daily cap exceeded",
+    run: () => {
+      const result = evaluatePolicy({
+        agentStatus: "active",
+        action: "pay.link",
+        amountUsd: 50,
+        networkId: "base",
+        tokenId: "usdc",
+        policy: { ...samplePolicy, requireApprovalAbove: null },
+        spentDailyUsd: 160,
+        spentMonthlyUsd: 0,
+      });
+      assertEqual(result.verdict, "deny");
+      assertEqual(result.codes[0], POLICY_CODES.DAILY_CAP_EXCEEDED);
+    },
+  },
+  {
+    name: "evaluatePolicy counts outstanding unpaid link exposure",
+    run: () => {
+      const result = evaluatePolicy({
+        agentStatus: "active",
+        action: "payment_links.create",
+        amountUsd: 50,
+        networkId: "base",
+        tokenId: "usdc",
+        policy: samplePolicy,
+        spentDailyUsd: 0,
+        spentMonthlyUsd: 0,
+        outstandingUsd: 180,
+      });
+      assertEqual(result.verdict, "deny");
+      assertEqual(result.codes[0], POLICY_CODES.DAILY_CAP_EXCEEDED);
+    },
+  },
+  {
+    name: "evaluatePolicy requires approval above threshold",
+    run: () => {
+      const result = evaluatePolicy({
+        agentStatus: "active",
+        action: "pay.link",
+        amountUsd: 45,
+        networkId: "base",
+        tokenId: "usdc",
+        policy: samplePolicy,
+        spentDailyUsd: 0,
+        spentMonthlyUsd: 0,
+      });
+      assertEqual(result.verdict, "require_approval");
+      assertEqual(result.codes[0], POLICY_CODES.APPROVAL_REQUIRED);
+    },
+  },
+  {
+    name: "evaluatePolicy skips approval when already consumed",
+    run: () => {
+      const result = evaluatePolicy({
+        agentStatus: "active",
+        action: "pay.link",
+        amountUsd: 45,
+        networkId: "base",
+        tokenId: "usdc",
+        policy: samplePolicy,
+        spentDailyUsd: 0,
+        spentMonthlyUsd: 0,
+        approvalConsumed: true,
+      });
+      assertEqual(result.verdict, "allow");
+    },
+  },
+  {
+    name: "redactSecretsForLogs keeps IP and strips bearer tokens",
+    run: () => {
+      const redacted = redactSecretsForLogs({
+        ip: "203.0.113.10",
+        authorization: "Bearer secret-token-value",
+        note: "Bearer abc.def.ghi",
+      }) as Record<string, string>;
+      assertEqual(redacted.ip, "203.0.113.10");
+      assertEqual(redacted.authorization, "[REDACTED]");
+      assertTrue(redacted.note.includes("[REDACTED]"));
     },
   },
 ];

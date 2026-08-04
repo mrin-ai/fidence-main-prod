@@ -14,14 +14,16 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 
-function MethodBadge({ method }: { method: "GET" | "POST" }) {
+function MethodBadge({ method }: { method: "GET" | "POST" | "PUT" }) {
   return (
     <Badge
       variant="outline"
       className={
         method === "GET"
           ? "font-mono text-[10px] uppercase tracking-wide text-emerald-700"
-          : "font-mono text-[10px] uppercase tracking-wide text-blue-700"
+          : method === "PUT"
+            ? "font-mono text-[10px] uppercase tracking-wide text-violet-700"
+            : "font-mono text-[10px] uppercase tracking-wide text-blue-700"
       }
     >
       {method}
@@ -89,6 +91,17 @@ function ErrorCodesTable() {
     { code: "RECIPIENT_WALLET_MISSING", meaning: "Recipient has no verified wallet on network" },
     { code: "TOKEN_NETWORK_UNSUPPORTED", meaning: "tokenId + networkId combo not supported" },
     { code: "WALLET_NOT_VERIFIED_FOR_NETWORK", meaning: "Merchant has no verified receiving wallet" },
+    { code: "NO_ACTIVE_POLICY", meaning: "Agent has no active compliance policy (fail closed)" },
+    { code: "ACTION_NOT_ALLOWED", meaning: "Policy disallows create-link or pay" },
+    { code: "NETWORK_NOT_ALLOWED", meaning: "Network not on the agent allowlist" },
+    { code: "TOKEN_NOT_ALLOWED", meaning: "Token not on the agent allowlist" },
+    { code: "AMOUNT_ABOVE_MAX", meaning: "Amount exceeds maxAmountPerPayment" },
+    { code: "DAILY_CAP_EXCEEDED", meaning: "Daily USD spend cap would be exceeded" },
+    { code: "MONTHLY_CAP_EXCEEDED", meaning: "Monthly USD spend cap would be exceeded" },
+    { code: "APPROVAL_REQUIRED", meaning: "Pay parked for human approval (HTTP 202)" },
+    { code: "AMOUNT_VALUATION_UNAVAILABLE", meaning: "Non-stablecoin USD price unavailable" },
+    { code: "CONFIRM_WIDE_OPEN_REQUIRED", meaning: "dailySpendCap ≥ 10000 needs confirmWideOpen" },
+    { code: "SETTLEMENT_AMOUNT_UNKNOWN", meaning: "Could not read on-chain transfer amount" },
   ];
 
   return (
@@ -132,6 +145,7 @@ export function MerchantApiDocs({ baseUrl }: { baseUrl: string }) {
           <ol className="mt-2 list-decimal space-y-1 pl-5 text-muted-foreground">
             <li>Register agent</li>
             <li>Add wallet (must hold on-chain balance)</li>
+            <li>Activate a compliance policy (portal, API, or CLI)</li>
             <li>Create payment links or pay profiles</li>
             <li>Send tx from agent wallet, then report via pay endpoint</li>
           </ol>
@@ -251,6 +265,64 @@ export function MerchantApiDocs({ baseUrl }: { baseUrl: string }) {
             </AccordionContent>
           </AccordionItem>
 
+          <AccordionItem value="compliance">
+            <AccordionTrigger className="px-1 hover:no-underline">
+              <div className="flex flex-wrap items-center gap-2">
+                <MethodBadge method="GET" />
+                <MethodBadge method="PUT" />
+                <span className="font-mono text-sm">/api/v1/compliance/*</span>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="space-y-4 px-1">
+              <p className="text-sm text-muted-foreground">
+                Money APIs fail closed without an <span className="font-medium">active</span>{" "}
+                policy. Agents cannot edit their own policies — use the workspace
+                API key, portal, or{" "}
+                <span className="font-mono text-xs">npm run compliance:cli</span>.
+                Caps are USD; USDC/USDT are 1:1. ETH/SOL/LCX deny until valuation
+                exists. Every decision stores actor IP server-side (not returned
+                to agents).
+              </p>
+              <FieldList
+                fields={[
+                  { name: "GET /catalog", description: "Networks/tokens/actions with letter keys for CLI" },
+                  { name: "GET /agents", description: "Agents + policy/compliance summary" },
+                  { name: "GET|PUT /agents/:agentId/policy", description: "agentId = externalAgentId" },
+                  { name: "GET /agents/:agentId/decisions", description: "Per-agent decision receipts" },
+                  { name: "GET /audit", description: "Workspace audit search (?ip=&actorType=)" },
+                  { name: "GET /approvals/:id", description: "Poll pending/approved payment approvals" },
+                ]}
+              />
+              <CodeBlock
+                code={`curl -X PUT ${baseUrl}/api/v1/compliance/agents/checkout-bot/policy \\
+  -H "${authHeader}" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "status": "active",
+    "maxAmountPerPayment": 50,
+    "dailySpendCap": 200,
+    "monthlySpendCap": null,
+    "allowedNetworkIds": ["ethereum", "base", "sepolia"],
+    "allowedTokenIds": ["usdc", "usdt"],
+    "allowCreatePaymentLinks": true,
+    "allowPay": true,
+    "requireApprovalAbove": null
+  }'`}
+              />
+              <CodeBlock
+                code={`# Policy denied (HTTP 403)
+{
+  "ok": false,
+  "error": "POLICY_DENIED",
+  "code": "NO_ACTIVE_POLICY",
+  "codes": ["NO_ACTIVE_POLICY"],
+  "receiptId": "dec_...",
+  "message": "Agent has no active compliance policy"
+}`}
+              />
+            </AccordionContent>
+          </AccordionItem>
+
           <AccordionItem value="payment-links">
             <AccordionTrigger className="px-1 hover:no-underline">
               <div className="flex flex-wrap items-center gap-2">
@@ -260,8 +332,8 @@ export function MerchantApiDocs({ baseUrl }: { baseUrl: string }) {
             </AccordionTrigger>
             <AccordionContent className="space-y-4 px-1">
               <p className="text-sm text-muted-foreground">
-                Create a payment link for a registered agent. Appears under
-                Payment Links → Agent mode.
+                Create a payment link for a registered agent. Requires an active
+                compliance policy. Appears under Payment Links → Agent mode.
               </p>
               <FieldList
                 fields={[
@@ -322,6 +394,7 @@ export function MerchantApiDocs({ baseUrl }: { baseUrl: string }) {
                   { name: "recipientUsername", description: 'Required when type=profile' },
                   { name: "tokenId", description: 'Required when type=profile' },
                   { name: "networkId", description: 'Required when type=profile' },
+                  { name: "amount", description: "Recommended for type=profile policy checks" },
                 ]}
               />
               <CodeBlock
@@ -456,6 +529,11 @@ export function MerchantApiDocs({ baseUrl }: { baseUrl: string }) {
               sending funds to confirm the agent, wallet, and recipient are ready.
             </li>
             <li>Disabled agents cannot use the API until re-enabled.</li>
+            <li>
+              Agents need an active compliance policy before create-link or pay.
+              High-value pays may return HTTP 202 with <span className="font-mono">approvalId</span>;
+              after merchant approval, retry pay with that id.
+            </li>
             <li>Rotating your API key invalidates the previous key immediately.</li>
             <li>Payment signing and wallet funding are handled by your agent, not PayAgent.</li>
           </ul>

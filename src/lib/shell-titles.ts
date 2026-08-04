@@ -11,6 +11,7 @@ const SHELL_TITLES: Record<string, string> = {
   "/settings": "Settings",
   "/merchant/api-credentials": "API Credentials",
   "/merchant/agents": "Registered Agents",
+  "/merchant/compliance": "Compliance Engine",
 };
 
 const HIDDEN_HEADER_PATHS = new Set(["/settings"]);
@@ -18,6 +19,10 @@ const HIDDEN_HEADER_PATHS = new Set(["/settings"]);
 export function getShellTitle(pathname: string) {
   if (SHELL_TITLES[pathname]) {
     return SHELL_TITLES[pathname];
+  }
+
+  if (pathname.startsWith("/merchant/compliance/")) {
+    return "Agent Policy";
   }
 
   if (pathname.startsWith("/merchant/")) {

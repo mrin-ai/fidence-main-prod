@@ -7,6 +7,7 @@ import {
   ChevronDownIcon,
 } from "lucide-react"
 
+import { TokenUsdInfo } from "@/components/token-usd-info"
 import { buttonVariants } from "@/components/ui/button"
 import {
   Card,
@@ -36,6 +37,9 @@ export function RecentTransactions({
     label: string
     date: string
     amount: string
+    tokenAmount: number
+    tokenId: string | null
+    tokenSymbol: string
     direction: "in" | "out"
     txHash?: string
     explorerUrl?: string
@@ -100,7 +104,7 @@ export function RecentTransactions({
                     <p className="text-sm font-medium leading-snug">{tx.label}</p>
                     <p className="text-xs text-muted-foreground">{tx.date}</p>
                   </div>
-                  <div className="shrink-0 text-right">
+                  <div className="flex shrink-0 items-center gap-1 text-right">
                     <p
                       className={cn(
                         "text-sm font-semibold tabular-nums",
@@ -109,6 +113,11 @@ export function RecentTransactions({
                     >
                       {tx.amount}
                     </p>
+                    <TokenUsdInfo
+                      amount={tx.tokenAmount}
+                      tokenId={tx.tokenId}
+                      symbol={tx.tokenSymbol}
+                    />
                   </div>
                   {tx.explorerUrl ? (
                     <a

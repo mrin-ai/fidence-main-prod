@@ -41,3 +41,22 @@ export async function enforceMerchantBatchRateLimit(workspaceId: ObjectId) {
 
   return null;
 }
+
+/** Policy writes: lower volume than pay traffic */
+export const COMPLIANCE_POLICY_RATE_LIMIT = {
+  max: 60,
+  windowMs: 60_000,
+} as const;
+
+export async function enforceCompliancePolicyRateLimit(workspaceId: ObjectId) {
+  const result = await checkRateLimit(
+    `compliance-policy:${workspaceId.toString()}`,
+    COMPLIANCE_POLICY_RATE_LIMIT,
+  );
+
+  if (!result.allowed) {
+    return rateLimitResponse(result);
+  }
+
+  return null;
+}

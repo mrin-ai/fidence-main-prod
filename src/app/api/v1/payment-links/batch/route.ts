@@ -1,6 +1,14 @@
 import { NextResponse } from "next/server";
 
+import { actorFromSecurity } from "@/lib/compliance/actor";
+import type { PolicyCode } from "@/lib/compliance/codes";
+import {
+  evaluateAndRecordPolicy,
+  policyDeniedResponse,
+} from "@/lib/compliance/evaluate-and-record";
+import { toPolicyAmountUsd } from "@/lib/compliance/valuation";
 import { requireActiveAgent } from "@/lib/db/agents";
+import { getAgentOutstandingLinkExposureUsd } from "@/lib/db/agent-spend";
 import { createPaymentLinksBatch } from "@/lib/db/payment-links";
 import {
   getMerchantApiContext,
@@ -78,6 +86,13 @@ export async function POST(request: Request) {
     );
   }
 
+  const actor = actorFromSecurity(context.security, {
+    actorType: "agent",
+    agentId: agentResult.agent._id.toString(),
+    agentPublicId: agentResult.agent.publicId,
+    externalAgentId: agentResult.agent.externalAgentId,
+  });
+
   const parsedLinks: Array<{
     amount: number;
     tokenId: string;
@@ -85,6 +100,19 @@ export async function POST(request: Request) {
     expiresAt: Date;
     recipientAddress: string;
   }> = [];
+
+  const itemDenies: Array<{
+    index: number;
+    code: string;
+    codes: PolicyCode[];
+    receiptId: string | null;
+    message: string;
+  }> = [];
+
+  let runningOutstandingUsd = await getAgentOutstandingLinkExposureUsd(
+    context.workspace._id,
+    agentResult.agent._id,
+  );
 
   for (const [index, link] of rawLinks.entries()) {
     const amount = Number(link.amount);
@@ -122,6 +150,35 @@ export async function POST(request: Request) {
       );
     }
 
+    const policyResult = await evaluateAndRecordPolicy({
+      workspaceId: context.workspace._id,
+      agent: agentResult.agent,
+      action: "payment_links.batch_item",
+      amount,
+      tokenId,
+      networkId,
+      actor,
+      security: context.security,
+      contentGuardArgs: link,
+      outstandingUsd: runningOutstandingUsd,
+    });
+
+    if (policyResult.verdict !== "allow") {
+      itemDenies.push({
+        index,
+        code: policyResult.codes[0] ?? "POLICY_DENIED",
+        codes: policyResult.codes,
+        receiptId: policyResult.receiptId,
+        message: `links[${index}] denied by policy`,
+      });
+      continue;
+    }
+
+    const itemUsd = toPolicyAmountUsd(amount, tokenId);
+    if (itemUsd.ok) {
+      runningOutstandingUsd += itemUsd.amountUsd;
+    }
+
     parsedLinks.push({
       amount,
       tokenId,
@@ -129,6 +186,37 @@ export async function POST(request: Request) {
       expiresAt,
       recipientAddress: recipient.recipientAddress,
     });
+  }
+
+  if (itemDenies.length > 0) {
+    await logSecurityEvent({
+      workspaceId: context.workspace._id,
+      actorType: "agent",
+      actorId: agentResult.agent.publicId,
+      agentId: agentResult.agent._id,
+      action: "agent_policy_denied",
+      resourceType: "payment_link_batch",
+      resourceId: String(itemDenies.length),
+      security: context.security,
+    });
+
+    const denied = policyDeniedResponse(
+      {
+        verdict: "deny",
+        codes: itemDenies[0].codes,
+        policyVersion: null,
+        policyId: null,
+        receiptId: itemDenies[0].receiptId,
+        amountUsd: null,
+        bypassed: false,
+      },
+      403,
+    );
+    const payload = await denied.json();
+    return NextResponse.json(
+      { ...payload, items: itemDenies },
+      { status: 403 },
+    );
   }
 
   const created = await createPaymentLinksBatch({

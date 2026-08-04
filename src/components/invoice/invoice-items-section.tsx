@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { GripVerticalIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import type { UseFormReturn } from "react-hook-form";
 import { toast } from "sonner";
 
@@ -99,49 +99,63 @@ export function InvoiceItemsSection({
   }
 
   return (
-    <div className="flex flex-col gap-3">
-      {items.map((item, index) => (
-        <div
-          key={`${item.name}-${index}`}
-          className="flex items-start gap-3 rounded-lg border border-border/50 bg-secondary/20 p-3"
-        >
-          <GripVerticalIcon className="mt-1 size-4 shrink-0 text-muted-foreground" />
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium">{item.name}</p>
-            {item.description ? (
-              <p className="text-xs text-muted-foreground">{item.description}</p>
-            ) : null}
-            <p className="mt-1 font-mono text-xs text-muted-foreground">
-              {formatCurrency(item.unitPrice, currency)} × {item.quantity} qty
-            </p>
-          </div>
-          <div className="flex flex-col items-end gap-2">
-            <p className="font-mono text-sm font-medium">
-              {formatCurrency(item.quantity * item.unitPrice, currency)}
-            </p>
-            <div className="flex gap-1">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => openEdit(index)}
-              >
-                <PencilIcon className="size-3.5" />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => removeItem(index)}
-              >
-                <Trash2Icon className="size-3.5" />
-              </Button>
+    <div className="flex flex-col gap-2">
+      {items.map((item, index) => {
+        const lineTotal = item.quantity * item.unitPrice;
+
+        return (
+          <div
+            key={`${item.name}-${index}`}
+            className="group flex gap-3 rounded-lg border border-border/60 bg-card px-3 py-2.5 transition-colors hover:bg-muted/20"
+          >
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium leading-snug">
+                {item.name}
+              </p>
+              <p className="mt-0.5 truncate text-xs leading-snug text-muted-foreground">
+                {item.description ? `${item.description} · ` : null}
+                {formatCurrency(item.unitPrice, currency)} × {item.quantity}
+              </p>
+            </div>
+
+            <div className="flex shrink-0 items-start gap-2.5 pt-0.5">
+              <p className="font-mono text-sm font-semibold tabular-nums">
+                {formatCurrency(lineTotal, currency)}
+              </p>
+              <div className="ml-1 flex items-center gap-1 border-l border-border/50 pl-2.5">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-xs"
+                  className="size-7 shrink-0 p-0 active:translate-y-0 text-muted-foreground hover:bg-muted hover:text-foreground"
+                  aria-label={`Edit ${item.name}`}
+                  onClick={() => openEdit(index)}
+                >
+                  <PencilIcon className="size-3.5" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-xs"
+                  className="size-7 shrink-0 p-0 active:translate-y-0 text-muted-foreground hover:bg-muted hover:text-destructive"
+                  aria-label={`Remove ${item.name}`}
+                  onClick={() => removeItem(index)}
+                >
+                  <Trash2Icon className="size-3.5" />
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
 
-      <Button type="button" variant="outline" className="w-full" onClick={openCreate}>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="h-8 w-full border-dashed"
+        onClick={openCreate}
+      >
         <PlusIcon data-icon="inline-start" />
         Add item
       </Button>

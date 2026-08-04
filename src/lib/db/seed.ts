@@ -145,8 +145,10 @@ export async function runDbMigrations() {
 
 export async function ensureDbIndexes() {
   const db = await getDb();
+  const { ensureComplianceIndexes } = await import("@/lib/db/compliance-indexes");
 
   await Promise.all([
+    ensureComplianceIndexes(),
     db.collection(COLLECTIONS.users).createIndex({ email: 1 }, { unique: true, sparse: true }),
     db.collection(COLLECTIONS.users).createIndex({ username: 1 }, { unique: true, sparse: true }),
     db.collection(COLLECTIONS.users).createIndex({ walletAddresses: 1 }),

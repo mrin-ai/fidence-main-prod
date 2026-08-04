@@ -36,12 +36,14 @@ import { PAYAGENT_TOKEN_CHAIN } from "@/lib/payagent-token";
 import { truncateAddress } from "@/lib/profile-url";
 import { cn } from "@/lib/utils";
 
-const TABLE_CELL = "px-3";
-const TABLE_NUMERIC = "px-3 text-right";
+const LEADERBOARD_COLUMN_WIDTHS = ["6%", "14%", "16%", "16%", "16%", "16%", "16%"] as const;
 
-function formatAmount(amount: number) {
-  return amount.toLocaleString("en-US", { maximumFractionDigits: 2 });
-}
+const TABLE_HEAD =
+  "px-4 py-3.5 align-middle last:pr-6 font-medium text-muted-foreground";
+const TABLE_CELL = "px-4 py-3.5 align-middle last:pr-6";
+const TABLE_CELL_CENTER = cn(TABLE_CELL, "text-center");
+const TABLE_HEAD_LEADING = "py-3.5 pl-4 pr-2 align-middle font-medium text-muted-foreground";
+const TABLE_CELL_LEADING = "py-3.5 pl-4 pr-2 align-middle";
 
 function formatAsOf(iso: string) {
   return new Date(iso).toLocaleString("en-US", {
@@ -76,6 +78,76 @@ function RankBadge({ rank }: { rank: number }) {
     <span className="inline-flex size-7 items-center justify-center text-sm tabular-nums text-muted-foreground">
       {rank}
     </span>
+  );
+}
+
+/** UI-only placeholders until trust/reputation backend ships. */
+function placeholderTrustScore(publicId: string) {
+  let hash = 0;
+  for (let i = 0; i < publicId.length; i += 1) {
+    hash = (hash + publicId.charCodeAt(i) * (i + 1)) % 100;
+  }
+  return 55 + (hash % 40);
+}
+
+function placeholderReputation(publicId: string) {
+  const score = placeholderTrustScore(publicId);
+  if (score >= 85) {
+    return {
+      label: "Excellent",
+      className: "border-emerald-500/20 bg-emerald-500/10 text-emerald-700",
+    };
+  }
+  if (score >= 72) {
+    return {
+      label: "Trusted",
+      className: "border-sky-500/20 bg-sky-500/10 text-sky-700",
+    };
+  }
+  if (score >= 60) {
+    return {
+      label: "Established",
+      className: "border-violet-500/20 bg-violet-500/10 text-violet-700",
+    };
+  }
+  return {
+    label: "New",
+    className: "border-slate-500/20 bg-slate-500/10 text-slate-600",
+  };
+}
+
+function TrustScoreCell({ publicId }: { publicId: string }) {
+  const score = placeholderTrustScore(publicId);
+
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <span className="inline-flex cursor-default items-center gap-1.5 tabular-nums">
+            <span className="font-medium">{score}</span>
+            <span className="text-xs text-muted-foreground">/ 100</span>
+          </span>
+        }
+      />
+      <TooltipContent>Placeholder score — backend coming soon</TooltipContent>
+    </Tooltip>
+  );
+}
+
+function ReputationBadge({ publicId }: { publicId: string }) {
+  const reputation = placeholderReputation(publicId);
+
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Badge variant="outline" className={cn("capitalize", reputation.className)}>
+            {reputation.label}
+          </Badge>
+        }
+      />
+      <TooltipContent>Placeholder reputation — backend coming soon</TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -228,7 +300,7 @@ export function LeaderboardContent({
               <CardTitle>Top agents</CardTitle>
             </div>
             <CardDescription>
-              Ranked by combined sent and received volume.
+              Ranked by trust score and on-chain activity.
             </CardDescription>
           </CardHeader>
           <CardContent className="px-0">
@@ -237,29 +309,30 @@ export function LeaderboardContent({
                 No agents on the leaderboard yet.
               </p>
             ) : (
-              <Table className="table-fixed">
+              <Table className="table-fixed w-full">
                 <colgroup>
-                  <col className="w-[8%]" />
-                  <col className="w-[14%]" />
-                  <col className="w-[10%]" />
-                  <col className="w-[10%]" />
-                  <col className="w-[11%]" />
-                  <col className="w-[11%]" />
-                  <col className="w-[12%]" />
-                  <col className="w-[10%]" />
-                  <col className="w-[14%]" />
+                  {LEADERBOARD_COLUMN_WIDTHS.map((width, index) => (
+                    <col
+                      key={`leaderboard-col-${index}`}
+                      style={{ width }}
+                    />
+                  ))}
                 </colgroup>
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
-                    <TableHead className={TABLE_CELL}>Rank</TableHead>
-                    <TableHead className={TABLE_CELL}>Agent ID</TableHead>
-                    <TableHead className={TABLE_NUMERIC}>Volume</TableHead>
-                    <TableHead className={TABLE_NUMERIC}>Links paid</TableHead>
-                    <TableHead className={TABLE_NUMERIC}>Received</TableHead>
-                    <TableHead className={TABLE_NUMERIC}>Sent</TableHead>
-                    <TableHead className={TABLE_CELL}>Verified</TableHead>
-                    <TableHead className={TABLE_CELL}>Status</TableHead>
-                    <TableHead className={TABLE_CELL}>On-chain</TableHead>
+                    <TableHead className={TABLE_HEAD_LEADING}>Rank</TableHead>
+                    <TableHead className={TABLE_HEAD_LEADING}>Agent ID</TableHead>
+                    <TableHead className={cn(TABLE_HEAD, "text-center")}>
+                      Trust score
+                    </TableHead>
+                    <TableHead className={cn(TABLE_HEAD, "text-center")}>
+                      Reputation
+                    </TableHead>
+                    <TableHead className={cn(TABLE_HEAD, "text-center")}>
+                      Verified
+                    </TableHead>
+                    <TableHead className={cn(TABLE_HEAD, "text-center")}>Status</TableHead>
+                    <TableHead className={TABLE_HEAD}>On-chain</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -270,50 +343,38 @@ export function LeaderboardContent({
                         row.rank <= 3 && "bg-muted/30",
                       )}
                     >
-                      <TableCell className={TABLE_CELL}>
+                      <TableCell className={TABLE_CELL_LEADING}>
                         <RankBadge rank={row.rank} />
                       </TableCell>
-                      <TableCell className={TABLE_CELL}>
+                      <TableCell className={TABLE_CELL_LEADING}>
                         <Badge variant="outline" className="max-w-full truncate font-mono font-normal">
                           {row.publicId}
                         </Badge>
                       </TableCell>
-                      <TableCell className={cn(TABLE_NUMERIC, "font-medium tabular-nums")}>
-                        {formatAmount(row.totalValue)}
+                      <TableCell className={TABLE_CELL_CENTER}>
+                        <div className="flex justify-center">
+                          <TrustScoreCell publicId={row.publicId} />
+                        </div>
                       </TableCell>
-                      <TableCell className={cn(TABLE_NUMERIC, "tabular-nums")}>
-                        <span className="font-medium">{row.linksPaid}</span>
-                        <span className="text-muted-foreground">
-                          {" "}
-                          / {row.linksCreated}
-                        </span>
+                      <TableCell className={TABLE_CELL_CENTER}>
+                        <div className="flex justify-center">
+                          <ReputationBadge publicId={row.publicId} />
+                        </div>
                       </TableCell>
-                      <TableCell className={TABLE_NUMERIC}>
-                        <Badge
-                          variant="outline"
-                          className="border-emerald-500/20 bg-emerald-500/10 text-emerald-700"
-                        >
-                          +{formatAmount(row.amountReceived)}
-                        </Badge>
+                      <TableCell className={TABLE_CELL_CENTER}>
+                        <div className="flex justify-center">
+                          <VerificationBadge verified={row.verified} />
+                        </div>
                       </TableCell>
-                      <TableCell className={TABLE_NUMERIC}>
-                        <Badge
-                          variant="outline"
-                          className="border-amber-500/20 bg-amber-500/10 text-amber-700"
-                        >
-                          -{formatAmount(row.amountPaid)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className={TABLE_CELL}>
-                        <VerificationBadge verified={row.verified} />
-                      </TableCell>
-                      <TableCell className={TABLE_CELL}>
-                        <Badge
-                          variant={row.status === "active" ? "default" : "secondary"}
-                          className="capitalize"
-                        >
-                          {row.status}
-                        </Badge>
+                      <TableCell className={TABLE_CELL_CENTER}>
+                        <div className="flex justify-center">
+                          <Badge
+                            variant={row.status === "active" ? "default" : "secondary"}
+                            className="capitalize"
+                          >
+                            {row.status}
+                          </Badge>
+                        </div>
                       </TableCell>
                       <TableCell className={TABLE_CELL}>
                         <OnChainTxLinks transactions={row.transactions} />

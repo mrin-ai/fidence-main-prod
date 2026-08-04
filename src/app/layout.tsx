@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google";
+import { TokenPricesProvider } from "@/components/token-prices-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 import { Web3Providers } from "@/components/providers/web3-providers";
@@ -129,7 +130,9 @@ export default async function RootLayout({
           }}
         />
         <Web3Providers cookie={cookie}>
-          <TooltipProvider>{children}</TooltipProvider>
+          <TooltipProvider>
+            <TokenPricesProvider>{children}</TokenPricesProvider>
+          </TooltipProvider>
           <Toaster richColors closeButton />
         </Web3Providers>
       </body>

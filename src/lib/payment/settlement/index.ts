@@ -1,7 +1,11 @@
 import { contractSettlementVerifier } from "./verify-contract";
 import { solanaSettlementVerifier } from "./verify-solana";
 import { wagmiSettlementVerifier } from "./verify-wagmi";
-import type { PaymentSettlementVerifier, SettlementIntent } from "./types";
+import type {
+  PaymentSettlementVerifier,
+  SettlementIntent,
+  SettlementVerifyResult,
+} from "./types";
 
 function getEvmSettlementVerifier(): PaymentSettlementVerifier {
   const mode = process.env.PAYMENT_SETTLEMENT_VERIFY_MODE ?? "wagmi";
@@ -21,7 +25,20 @@ export function getSettlementVerifier(): PaymentSettlementVerifier {
       }
       return evmSettlementVerifier.verifySettlement(intent, txHash);
     },
+    async verifySettlementDetailed(
+      intent: SettlementIntent,
+      txHash: string,
+    ): Promise<SettlementVerifyResult> {
+      if (intent.networkId === "solana") {
+        return solanaSettlementVerifier.verifySettlementDetailed(intent, txHash);
+      }
+      return evmSettlementVerifier.verifySettlementDetailed(intent, txHash);
+    },
   };
 }
 
-export type { SettlementIntent, PaymentSettlementVerifier } from "./types";
+export type {
+  SettlementIntent,
+  PaymentSettlementVerifier,
+  SettlementVerifyResult,
+} from "./types";
