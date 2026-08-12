@@ -191,7 +191,7 @@ export function useOnchainPayment() {
 
         const publicClient = getNetworkPublicClient(input.networkId);
         if (!publicClient) {
-          throw new Error("This network is not configured in PayAgent.");
+          throw new Error("This network is not configured in Fidence.");
         }
 
         const walletClient = createPaymentWalletClient({

@@ -6,7 +6,7 @@ import {
   policyDeniedResponse,
 } from "@/lib/compliance/evaluate-and-record";
 import { POLICY_CODES } from "@/lib/compliance/codes";
-import { toPolicyAmountUsd } from "@/lib/compliance/valuation";
+import { toPolicyAmountUsdAsync } from "@/lib/compliance/valuation-async";
 import {
   agentHasWallet,
   requireActiveAgent,
@@ -120,7 +120,7 @@ export async function gateAgentPayPolicy(input: {
     externalAgentId: input.agent.externalAgentId,
   });
 
-  const valuation = toPolicyAmountUsd(input.amount, input.tokenId);
+  const valuation = await toPolicyAmountUsdAsync(input.amount, input.tokenId);
   if (!valuation.ok) {
     const evaluated = await evaluateAndRecordPolicy({
       workspaceId: input.context.workspace._id,
@@ -142,7 +142,7 @@ export async function gateAgentPayPolicy(input: {
   let approvalClaimed = false;
   if (input.approvalId) {
     const claimAmount = input.approvalClaimAmount ?? input.amount;
-    const claimValuation = toPolicyAmountUsd(claimAmount, input.tokenId);
+    const claimValuation = await toPolicyAmountUsdAsync(claimAmount, input.tokenId);
     if (!claimValuation.ok) {
       return {
         ok: false,
@@ -310,11 +310,53 @@ export async function recordAgentPaymentLink(input: {
   );
   if (!walletCheck.ok) return walletCheck;
 
+  const activeRecheck = await requireActiveAgent(
+    input.context.workspace._id,
+    input.externalAgentId,
+  );
+  if (!activeRecheck.ok) return activeRecheck;
+
+  const normalizedPayerAddress = normalizePaymentAddress(
+    input.payerAddress,
+    link.networkId,
+  );
+  const normalizedTxHash = normalizeTxHash(input.txHash, link.networkId);
+
+  const verified = await getSettlementVerifier().verifySettlementDetailed(
+    {
+      recipientAddress: link.recipientAddress ?? "",
+      amount: link.amount,
+      tokenId: link.tokenId,
+      networkId: link.networkId,
+      payerAddress: normalizedPayerAddress,
+    },
+    normalizedTxHash,
+  );
+
+  if (!verified.ok) {
+    return {
+      ok: false as const,
+      error: "Payment verification failed",
+      code: "SETTLEMENT_FAILED" as const,
+    };
+  }
+
+  if (!Number.isFinite(verified.observedAmount) || verified.observedAmount <= 0) {
+    return {
+      ok: false as const,
+      error: "Could not determine on-chain settlement amount",
+      code: POLICY_CODES.SETTLEMENT_AMOUNT_UNKNOWN,
+    };
+  }
+
+  const observedAmount = verified.observedAmount;
+
   const gate = await gateAgentPayPolicy({
     context: input.context,
     agent: walletCheck.agent,
     action: "pay.link",
-    amount: link.amount,
+    amount: observedAmount,
+    approvalClaimAmount: link.amount,
     tokenId: link.tokenId,
     networkId: link.networkId,
     approvalId: input.approvalId,
@@ -345,24 +387,10 @@ export async function recordAgentPaymentLink(input: {
     }
     return {
       ok: false as const,
-      policyResponse: Response.json(
-        {
-          ok: false,
-          error: "POLICY_DENIED",
-          code: spend.code,
-          codes: [spend.code],
-          message: spend.code,
-        },
-        { status: 403 },
-      ),
+      error: "Agent spend cap exceeded",
+      code: spend.code,
     };
   }
-
-  const normalizedPayerAddress = normalizePaymentAddress(
-    input.payerAddress,
-    link.networkId,
-  );
-  const normalizedTxHash = normalizeTxHash(input.txHash, link.networkId);
 
   const result = await markPaymentLinkPaid({
     username: input.linkUsername,
@@ -372,6 +400,9 @@ export async function recordAgentPaymentLink(input: {
     paidVia: "agent",
     payerAgentId: walletCheck.agent._id,
     payerAgentPublicId: walletCheck.agent.publicId,
+    payerWorkspaceId: input.context.workspace._id,
+    preVerified: true,
+    observedAmount,
   });
 
   if (!result.ok) {
@@ -386,14 +417,49 @@ export async function recordAgentPaymentLink(input: {
         approvalId: input.approvalId,
       });
     }
-    return { ok: false as const, error: result.error };
+    return { ok: false as const, error: result.error, code: "code" in result ? result.code : undefined };
+  }
+
+  if ("duplicate" in result && result.duplicate) {
+    await decrementAgentSpend({
+      workspaceId: input.context.workspace._id,
+      agentId: walletCheck.agent._id,
+      amountUsd: gate.amountUsd,
+    });
+    if (input.approvalId && gate.approvalClaimed) {
+      await consumePaymentApproval({
+        workspaceId: input.context.workspace._id,
+        approvalId: input.approvalId,
+      });
+    }
+    return {
+      ok: true as const,
+      duplicate: true as const,
+      link: result.link,
+      agent: {
+        publicId: walletCheck.agent.publicId,
+        externalAgentId: walletCheck.agent.externalAgentId,
+      },
+    };
   }
 
   if (input.approvalId && gate.approvalClaimed) {
-    await consumePaymentApproval({
+    const consumed = await consumePaymentApproval({
       workspaceId: input.context.workspace._id,
       approvalId: input.approvalId,
     });
+    if (!consumed.ok) {
+      await decrementAgentSpend({
+        workspaceId: input.context.workspace._id,
+        agentId: walletCheck.agent._id,
+        amountUsd: gate.amountUsd,
+      });
+      return {
+        ok: false as const,
+        error: consumed.error,
+        code: consumed.code,
+      };
+    }
   }
 
   await logSecurityEvent({
@@ -531,16 +597,8 @@ export async function recordAgentProfilePayment(input: {
     }
     return {
       ok: false as const,
-      policyResponse: Response.json(
-        {
-          ok: false,
-          error: "POLICY_DENIED",
-          code: spend.code,
-          codes: [spend.code],
-          message: spend.code,
-        },
-        { status: 403 },
-      ),
+      error: "Agent spend cap exceeded",
+      code: spend.code,
     };
   }
 
@@ -558,6 +616,7 @@ export async function recordAgentProfilePayment(input: {
     payerAgentId: walletCheck.agent._id,
     payerAgentPublicId: walletCheck.agent.publicId,
     payerWorkspaceId: input.context.workspace._id,
+    preVerified: true,
   });
 
   if (!result.ok) {
@@ -572,27 +631,49 @@ export async function recordAgentProfilePayment(input: {
         approvalId: input.approvalId,
       });
     }
-    return { ok: false as const, error: result.error };
+    return { ok: false as const, error: result.error, code: "code" in result ? result.code : undefined };
   }
 
   if (result.duplicate) {
-    // Duplicate tx: roll back the reserve; prior payment already counted.
     await decrementAgentSpend({
       workspaceId: input.context.workspace._id,
       agentId: walletCheck.agent._id,
       amountUsd: gate.amountUsd,
     });
-    if (gate.approvalClaimed && input.approvalId) {
-      await releasePaymentApprovalClaim({
+    if (input.approvalId && gate.approvalClaimed) {
+      await consumePaymentApproval({
         workspaceId: input.context.workspace._id,
         approvalId: input.approvalId,
       });
     }
-  } else if (input.approvalId && gate.approvalClaimed) {
-    await consumePaymentApproval({
+    return {
+      ok: true as const,
+      transactionId: result.transactionId,
+      duplicate: true,
+      agent: {
+        publicId: walletCheck.agent.publicId,
+        externalAgentId: walletCheck.agent.externalAgentId,
+      },
+    };
+  }
+
+  if (input.approvalId && gate.approvalClaimed) {
+    const consumed = await consumePaymentApproval({
       workspaceId: input.context.workspace._id,
       approvalId: input.approvalId,
     });
+    if (!consumed.ok) {
+      await decrementAgentSpend({
+        workspaceId: input.context.workspace._id,
+        agentId: walletCheck.agent._id,
+        amountUsd: gate.amountUsd,
+      });
+      return {
+        ok: false as const,
+        error: consumed.error,
+        code: consumed.code,
+      };
+    }
   }
 
   await logSecurityEvent({

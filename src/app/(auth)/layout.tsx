@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/carousel";
 import { useState, useEffect } from "react";
 import Autoplay from "embla-carousel-autoplay";
-import { LcxLogo } from "@/components/lcx-logo";
+import { FidenceLogo } from "@/components/fidence-logo";
 import { BlinkingSquares } from "@/components/blinking-squares";
 import {
   CreditCard,
@@ -22,13 +22,13 @@ import {
 const testimonials = [
   {
     content:
-      "PayAgent made it effortless to spin up payment links for our global customer base. Settlement is fast and the dashboard gives us full visibility.",
+      "Fidence made it effortless to spin up payment links for our global customer base. Settlement is fast and the dashboard gives us full visibility.",
     author: "Sarah Chen",
     role: "Head of Payments, Nova Commerce",
   },
   {
     content:
-      "We replaced three tools with PayAgent. QR payments, invoicing, and rewards all live in one place — our ops team loves it.",
+      "We replaced three tools with Fidence. QR payments, invoicing, and rewards all live in one place — our ops team loves it.",
     author: "Marcus Webb",
     role: "COO, Stackline",
   },
@@ -94,7 +94,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             fadeDirection="left"
             gridSize={72}
             fillPercent={45}
-            squareColor="#0066ff"
+            squareColor="#d5c515"
             colorMode="single"
           />
         </div>
@@ -105,7 +105,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             href="/"
             className="group mb-12 inline-flex w-fit items-center transition-transform duration-300 hover:scale-[1.02]"
           >
-            <LcxLogo className="h-14 w-auto xl:h-16" priority />
+            <FidenceLogo className="h-14 xl:h-16" showWordmark />
           </Link>
 
           <div className="flex flex-1 flex-col justify-center">
@@ -215,7 +215,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       <div className="flex flex-1 flex-col bg-background lg:w-[55%] lg:border-l lg:border-border/50 xl:w-[50%]">
         <header className="flex h-16 items-center justify-between border-b border-border/50 px-6 lg:hidden">
           <Link href="/" className="flex items-center">
-            <LcxLogo className="h-9 w-auto" />
+            <FidenceLogo className="h-9 w-auto" />
           </Link>
           <div className="flex items-center gap-4 text-[10px] text-muted-foreground">
             <span className="font-mono">$50M+ processed</span>

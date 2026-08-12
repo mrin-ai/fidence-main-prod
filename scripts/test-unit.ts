@@ -26,6 +26,12 @@ import { evaluatePolicy } from "../src/lib/compliance/evaluate-policy";
 import { toPolicyAmountUsd } from "../src/lib/compliance/valuation";
 import { POLICY_CODES } from "../src/lib/compliance/codes";
 import { redactSecretsForLogs } from "../src/lib/compliance/content-guard";
+import {
+  getSettlementVerifyMode,
+  isContractSettlementVerification,
+  isFormatOnlySettlementVerification,
+} from "../src/lib/payment/settlement/mode";
+import { validateWebhookUrl } from "../src/lib/webhooks/validate-url";
 
 type TestCase = {
   name: string;
@@ -139,7 +145,7 @@ const tests: TestCase[] = [
     },
   },
   {
-    name: "toPolicyAmountUsd fails closed for ETH/SOL/LCX",
+    name: "toPolicyAmountUsd fails closed for ETH/SOL",
     run: () => {
       const eth = toPolicyAmountUsd(1, "eth");
       assertTrue(!eth.ok);
@@ -260,6 +266,69 @@ const tests: TestCase[] = [
       assertEqual(redacted.ip, "203.0.113.10");
       assertEqual(redacted.authorization, "[REDACTED]");
       assertTrue(redacted.note.includes("[REDACTED]"));
+    },
+  },
+  {
+    name: "settlement mode: unset is full verify (not format-only)",
+    run: () => {
+      const prev = process.env.PAYMENT_SETTLEMENT_VERIFY_MODE;
+      delete process.env.PAYMENT_SETTLEMENT_VERIFY_MODE;
+      assertEqual(getSettlementVerifyMode(), null);
+      assertEqual(isFormatOnlySettlementVerification(), false);
+      if (prev) process.env.PAYMENT_SETTLEMENT_VERIFY_MODE = prev;
+    },
+  },
+  {
+    name: "settlement mode: wagmi is full verify (not format-only)",
+    run: () => {
+      const prev = process.env.PAYMENT_SETTLEMENT_VERIFY_MODE;
+      process.env.PAYMENT_SETTLEMENT_VERIFY_MODE = "wagmi";
+      assertEqual(getSettlementVerifyMode(), "wagmi");
+      assertEqual(isFormatOnlySettlementVerification(), false);
+      if (prev) process.env.PAYMENT_SETTLEMENT_VERIFY_MODE = prev;
+      else delete process.env.PAYMENT_SETTLEMENT_VERIFY_MODE;
+    },
+  },
+  {
+    name: "settlement mode: format skips on-chain verify",
+    run: () => {
+      const prev = process.env.PAYMENT_SETTLEMENT_VERIFY_MODE;
+      process.env.PAYMENT_SETTLEMENT_VERIFY_MODE = "format";
+      assertEqual(isFormatOnlySettlementVerification(), true);
+      if (prev) process.env.PAYMENT_SETTLEMENT_VERIFY_MODE = prev;
+      else delete process.env.PAYMENT_SETTLEMENT_VERIFY_MODE;
+    },
+  },
+  {
+    name: "settlement mode: contract routes to contract verifier",
+    run: () => {
+      const prev = process.env.PAYMENT_SETTLEMENT_VERIFY_MODE;
+      process.env.PAYMENT_SETTLEMENT_VERIFY_MODE = "contract";
+      assertEqual(isContractSettlementVerification(), true);
+      if (prev) process.env.PAYMENT_SETTLEMENT_VERIFY_MODE = prev;
+      else delete process.env.PAYMENT_SETTLEMENT_VERIFY_MODE;
+    },
+  },
+  {
+    name: "validateWebhookUrl allows public https",
+    run: () => {
+      const result = validateWebhookUrl("https://example.com/webhooks/fidence");
+      assertEqual(result.ok, true);
+    },
+  },
+  {
+    name: "validateWebhookUrl rejects localhost",
+    run: () => {
+      const result = validateWebhookUrl("http://localhost:3000/hook");
+      assertEqual(result.ok, false);
+      if (!result.ok) assertEqual(result.code, "WEBHOOK_URL_FORBIDDEN");
+    },
+  },
+  {
+    name: "validateWebhookUrl rejects metadata IP",
+    run: () => {
+      const result = validateWebhookUrl("http://169.254.169.254/latest/meta-data");
+      assertEqual(result.ok, false);
     },
   },
 ];

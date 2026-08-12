@@ -1,4 +1,5 @@
 import { contractSettlementVerifier } from "./verify-contract";
+import { isContractSettlementVerification } from "./mode";
 import { solanaSettlementVerifier } from "./verify-solana";
 import { wagmiSettlementVerifier } from "./verify-wagmi";
 import type {
@@ -8,8 +9,7 @@ import type {
 } from "./types";
 
 function getEvmSettlementVerifier(): PaymentSettlementVerifier {
-  const mode = process.env.PAYMENT_SETTLEMENT_VERIFY_MODE ?? "wagmi";
-  if (mode === "contract") {
+  if (isContractSettlementVerification()) {
     return contractSettlementVerifier;
   }
   return wagmiSettlementVerifier;

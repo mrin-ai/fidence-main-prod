@@ -1,11 +1,7 @@
 import { getAddress } from "viem";
 import { arbitrum, base, mainnet, polygon, sepolia } from "wagmi/chains";
 
-import {
-  getEvmChainIdForNetwork,
-  getEvmNetworkIdForChainId,
-} from "@/lib/evm-networks";
-import { getLcxTokenContractAddress, LCX_TOKEN_DECIMALS } from "@/lib/lcx-token";
+import { getEvmChainIdForNetwork, getEvmNetworkIdForChainId } from "@/lib/evm-networks";
 import { supportsSolanaPayment } from "@/lib/payment/solana-contracts";
 
 export const erc20TransferAbi = [
@@ -96,16 +92,6 @@ export function getNetworkIdForChainId(chainId: number) {
 }
 
 export function getTokenContract(networkId: string, tokenId: string) {
-  if (tokenId === "lcx") {
-    const address = getLcxTokenContractAddress(networkId);
-    if (!address) return null;
-
-    return {
-      address: getAddress(address),
-      decimals: LCX_TOKEN_DECIMALS,
-    };
-  }
-
   const contract = tokenContracts[networkId]?.[tokenId];
   if (!contract) return null;
 

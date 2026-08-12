@@ -1,9 +1,6 @@
 import { supportsOnChainPayment } from "@/lib/payment-contracts"
 import { testnetsEnabled } from "@/lib/testnets"
 
-/** LCX Token 2.0 — https://chain.lcx.com/token */
-export const LCX_TOKEN_SYMBOL = "LCX"
-
 export type PaymentToken = {
   id: string
   label: string
@@ -21,11 +18,10 @@ export const paymentTokens: PaymentToken[] = [
   { id: "usdc", label: "USD Coin", symbol: "USDC" },
   { id: "usdt", label: "Tether", symbol: "USDT" },
   { id: "eth", label: "Ethereum", symbol: "ETH" },
-  { id: "lcx", label: "LCX Token", symbol: LCX_TOKEN_SYMBOL },
   { id: "sol", label: "Solana", symbol: "SOL" },
 ]
 
-const evmPaymentTokenIds = ["usdc", "usdt", "eth", "lcx"] as const
+const evmPaymentTokenIds = ["usdc", "usdt", "eth"] as const
 
 const productionPaymentNetworks: PaymentNetwork[] = [
   { id: "ethereum", label: "Ethereum", tokenIds: [...evmPaymentTokenIds] },
@@ -95,7 +91,6 @@ const tokenIconById: Record<string, string> = {
   usdc: "/tokens/usdc.svg",
   usdt: "/tokens/usdt.svg",
   eth: "/tokens/eth.svg",
-  lcx: "/tokens/lcx.png",
   sol: "/tokens/sol.svg",
 }
 
@@ -105,12 +100,10 @@ export function getPaymentTokenIcon(id: string) {
 
 export function getPaymentTokenIconSize(tokenId: string) {
   if (tokenId === "eth") return 18
-  if (tokenId === "lcx") return 22
   return 16
 }
 
 export function getPaymentTokenIconClassName(tokenId: string) {
-  if (tokenId === "lcx") return "size-[22px] shrink-0 object-contain"
   if (tokenId === "eth") return "size-[18px] shrink-0 object-contain"
   return "size-4 shrink-0 object-contain"
 }

@@ -60,3 +60,22 @@ export async function enforceCompliancePolicyRateLimit(workspaceId: ObjectId) {
 
   return null;
 }
+
+/** Compliance read endpoints (catalog, audit, decisions, approvals list) */
+export const COMPLIANCE_READ_RATE_LIMIT = {
+  max: 120,
+  windowMs: 60_000,
+} as const;
+
+export async function enforceComplianceReadRateLimit(workspaceId: ObjectId) {
+  const result = await checkRateLimit(
+    `compliance-read:${workspaceId.toString()}`,
+    COMPLIANCE_READ_RATE_LIMIT,
+  );
+
+  if (!result.allowed) {
+    return rateLimitResponse(result);
+  }
+
+  return null;
+}

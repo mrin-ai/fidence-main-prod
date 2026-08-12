@@ -1,4 +1,4 @@
-import { ObjectId } from "mongodb";
+import { ObjectId, type Db } from "mongodb";
 import { buildPaymentLinkUrl, generatePublicId } from "@/lib/payment-link-url";
 import { getDb } from "@/lib/db/client";
 import { COLLECTIONS } from "@/lib/db/collections";
@@ -121,8 +121,8 @@ export async function migrateRemoveWorkspaceDemoData() {
   };
 }
 
-export async function runDbMigrations() {
-  const db = await getDb();
+export async function runDbMigrations(dbInput?: Db) {
+  const db = dbInput ?? (await getDb());
   const existing = await db.collection<DbMetaDoc>(COLLECTIONS.dbMeta).findOne({
     _id: MIGRATIONS_META_ID,
   });
@@ -143,8 +143,8 @@ export async function runDbMigrations() {
   return { skipped: false as const };
 }
 
-export async function ensureDbIndexes() {
-  const db = await getDb();
+export async function ensureDbIndexes(dbInput?: Db) {
+  const db = dbInput ?? (await getDb());
   const { ensureComplianceIndexes } = await import("@/lib/db/compliance-indexes");
 
   await Promise.all([
@@ -200,9 +200,16 @@ export async function ensureDbIndexes() {
       { workspaceId: 1, date: -1 },
       { unique: true },
     ),
+    (async () => {
+      try {
+        await db.collection(COLLECTIONS.apiKeys).dropIndex("workspaceId_1");
+      } catch {
+        // Legacy unique index may already be removed.
+      }
+    })(),
     db.collection(COLLECTIONS.apiKeys).createIndex(
-      { workspaceId: 1 },
-      { unique: true },
+      { workspaceId: 1, keyType: 1, environment: 1 },
+      { unique: true, sparse: true },
     ),
     db.collection(COLLECTIONS.apiKeys).createIndex({ keyHash: 1 }, { unique: true }),
     db.collection(COLLECTIONS.agents).createIndex(
@@ -237,6 +244,19 @@ export async function ensureDbIndexes() {
     db.collection(COLLECTIONS.securityAudit).createIndex({
       agentId: 1,
       action: 1,
+    }),
+    db.collection(COLLECTIONS.idempotencyKeys).createIndex(
+      { workspaceId: 1, key: 1, route: 1 },
+      { unique: true },
+    ),
+    db.collection(COLLECTIONS.idempotencyKeys).createIndex(
+      { expiresAt: 1 },
+      { expireAfterSeconds: 0 },
+    ),
+    db.collection(COLLECTIONS.webhookEndpoints).createIndex({ workspaceId: 1 }),
+    db.collection(COLLECTIONS.webhookDeliveries).createIndex({
+      status: 1,
+      nextRetryAt: 1,
     }),
   ]);
 }

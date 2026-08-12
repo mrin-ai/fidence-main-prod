@@ -21,6 +21,7 @@ import { buildCommerceSourceFilter } from "@/lib/db/commerce-source";
 import type { CommerceSource } from "@/lib/db/merchant-types";
 import { incrementAgentLinkCount } from "@/lib/db/agents";
 import { recordPaymentSentForPayer } from "@/lib/db/payment-sent";
+import { findTransactionByWorkspaceTxHash } from "@/lib/db/transaction-txhash";
 import { incrementDailyStat } from "@/lib/db/workspace-stats";
 import {
   incrementAgentPaymentStats,
@@ -214,6 +215,25 @@ export async function createPaymentLink(input: {
     if (status === "pending") {
       await incrementDailyStat(input.workspaceId, "linksPending", 1, now);
     }
+  }
+
+  try {
+    const { enqueueWebhookEvent } = await import("@/lib/webhooks/dispatch");
+    await enqueueWebhookEvent({
+      workspaceId: input.workspaceId,
+      event: "payment_link.created",
+      payload: {
+        publicId,
+        url,
+        amount: input.amount,
+        tokenId: input.tokenId,
+        networkId: input.networkId,
+        status,
+        agentPublicId: input.agentPublicId ?? null,
+      },
+    });
+  } catch {
+    // Non-blocking
   }
 
   return {
@@ -504,6 +524,10 @@ export async function markPaymentLinkPaid(input: {
   paidVia?: "human" | "agent";
   payerAgentId?: import("mongodb").ObjectId;
   payerAgentPublicId?: string;
+  payerWorkspaceId?: import("mongodb").ObjectId;
+  /** Skip on-chain verify when caller already verified (agent path). */
+  preVerified?: boolean;
+  observedAmount?: number;
 }) {
   const db = await getDb();
   const now = new Date();
@@ -515,7 +539,7 @@ export async function markPaymentLinkPaid(input: {
   });
 
   if (!link) {
-    return { ok: false as const, error: "Payment link not found" };
+    return { ok: false as const, error: "Payment link not found", code: "LINK_NOT_FOUND" as const };
   }
 
   const payerAddress = normalizePaymentAddress(
@@ -524,82 +548,178 @@ export async function markPaymentLinkPaid(input: {
   );
   const normalizedTxHash = normalizeTxHash(input.txHash, link.networkId);
 
+  const existingTx = await findTransactionByWorkspaceTxHash(
+    link.workspaceId,
+    normalizedTxHash,
+    link.networkId,
+  );
+  if (existingTx) {
+    const synced = await syncExpiredStatus(link);
+    if (synced.status === "paid" && synced.paidTxHash === normalizedTxHash) {
+      const merchant = await db.collection<UserDoc>(COLLECTIONS.users).findOne({
+        _id: synced.createdBy,
+      });
+      if (!merchant) {
+        return { ok: false as const, error: "Merchant not found" };
+      }
+      let invoiceReference: string | undefined;
+      if (synced.invoiceId) {
+        const invoice = await db.collection<InvoiceDoc>(COLLECTIONS.invoices).findOne({
+          _id: synced.invoiceId,
+        });
+        invoiceReference = invoice?.reference;
+      }
+      return {
+        ok: true as const,
+        duplicate: true as const,
+        link: toPublicPaymentLink(synced, merchant, invoiceReference),
+      };
+    }
+    return {
+      ok: false as const,
+      error: "Transaction hash already used for another payment",
+      code: "TX_ALREADY_USED" as const,
+    };
+  }
+
   const syncedLink = await syncExpiredStatus(link);
   const status = resolveStatus(syncedLink, now);
 
   if (status === "paid") {
-    return { ok: false as const, error: "This link has already been paid" };
+    return {
+      ok: false as const,
+      error: "This link has already been paid",
+      code: "LINK_ALREADY_PAID" as const,
+    };
   }
 
   if (status === "expired") {
-    return { ok: false as const, error: "This payment link has expired" };
+    return { ok: false as const, error: "This payment link has expired", code: "LINK_EXPIRED" as const };
   }
 
   if (status === "cancelled") {
-    return { ok: false as const, error: "This payment link is no longer active" };
+    return { ok: false as const, error: "This payment link is no longer active", code: "LINK_CANCELLED" as const };
   }
 
   if (!syncedLink.recipientAddress) {
     return { ok: false as const, error: "Payment link has no recipient address" };
   }
 
-  const verifier = getSettlementVerifier();
-  const verified = await verifier.verifySettlement(
-    {
-      recipientAddress: syncedLink.recipientAddress,
-      amount: syncedLink.amount,
-      tokenId: syncedLink.tokenId,
-      networkId: syncedLink.networkId,
-      payerAddress,
-    },
-    normalizedTxHash,
-  );
+  if (!input.preVerified) {
+    const verifier = getSettlementVerifier();
+    const verified = await verifier.verifySettlement(
+      {
+        recipientAddress: syncedLink.recipientAddress,
+        amount: syncedLink.amount,
+        tokenId: syncedLink.tokenId,
+        networkId: syncedLink.networkId,
+        payerAddress,
+      },
+      normalizedTxHash,
+    );
 
-  if (!verified) {
-    return { ok: false as const, error: "Payment verification failed" };
+    if (!verified) {
+      return { ok: false as const, error: "Payment verification failed", code: "SETTLEMENT_FAILED" as const };
+    }
   }
 
+  const settledAmount = input.observedAmount ?? syncedLink.amount;
   const token = getTokenById(syncedLink.tokenId);
 
-  await db.collection<PaymentLinkDoc>(COLLECTIONS.paymentLinks).updateOne(
-    { _id: syncedLink._id, status: "pending" },
-    {
-      $set: {
-        status: "paid",
-        paidAt: now,
-        paidBy: payerAddress,
-        paidTxHash: normalizedTxHash,
-        updatedAt: now,
+  const updatedLink = await db
+    .collection<PaymentLinkDoc>(COLLECTIONS.paymentLinks)
+    .findOneAndUpdate(
+      { _id: syncedLink._id, status: "pending" },
+      {
+        $set: {
+          status: "paid",
+          paidAt: now,
+          paidBy: payerAddress,
+          paidTxHash: normalizedTxHash,
+          updatedAt: now,
+        },
       },
-    },
-  );
+      { returnDocument: "after" },
+    );
 
-  await db.collection(COLLECTIONS.transactions).insertOne({
-    workspaceId: syncedLink.workspaceId,
-    paymentLinkId: syncedLink._id,
-    type: "payment_received",
-    label: syncedLink.source === "agent" && syncedLink.agentPublicId
-      ? `Agent payment received · ${syncedLink.agentPublicId}`
-      : syncedLink.invoiceId
-        ? `Invoice payment`
-        : `Payment from ${payerAddress.slice(0, 6)}…${payerAddress.slice(-4)}`,
-    amount: syncedLink.amount,
-    symbol: token?.symbol?.toLowerCase() ?? syncedLink.tokenId,
-    networkId: syncedLink.networkId,
-    txHash: normalizedTxHash,
-    ...(syncedLink.source ? { source: syncedLink.source } : {}),
-    ...(syncedLink.agentId ? { agentId: syncedLink.agentId } : {}),
-    status: "confirmed",
-    occurredAt: now,
-    createdAt: now,
-  });
+  if (!updatedLink) {
+    const current = await db.collection<PaymentLinkDoc>(COLLECTIONS.paymentLinks).findOne({
+      _id: syncedLink._id,
+    });
+    if (current?.status === "paid" && current.paidTxHash === normalizedTxHash) {
+      const merchant = await db.collection<UserDoc>(COLLECTIONS.users).findOne({
+        _id: current.createdBy,
+      });
+      if (!merchant) {
+        return { ok: false as const, error: "Merchant not found" };
+      }
+      let invoiceReference: string | undefined;
+      if (current.invoiceId) {
+        const invoice = await db.collection<InvoiceDoc>(COLLECTIONS.invoices).findOne({
+          _id: current.invoiceId,
+        });
+        invoiceReference = invoice?.reference;
+      }
+      return {
+        ok: true as const,
+        duplicate: true as const,
+        link: toPublicPaymentLink(current, merchant, invoiceReference),
+      };
+    }
+    return {
+      ok: false as const,
+      error: "This link has already been paid",
+      code: "LINK_ALREADY_PAID" as const,
+    };
+  }
+
+  try {
+    await db.collection(COLLECTIONS.transactions).insertOne({
+      workspaceId: syncedLink.workspaceId,
+      paymentLinkId: syncedLink._id,
+      type: "payment_received",
+      label: syncedLink.source === "agent" && syncedLink.agentPublicId
+        ? `Agent payment received · ${syncedLink.agentPublicId}`
+        : syncedLink.invoiceId
+          ? `Invoice payment`
+          : `Payment from ${payerAddress.slice(0, 6)}…${payerAddress.slice(-4)}`,
+      amount: settledAmount,
+      symbol: token?.symbol?.toLowerCase() ?? syncedLink.tokenId,
+      networkId: syncedLink.networkId,
+      txHash: normalizedTxHash,
+      ...(syncedLink.source ? { source: syncedLink.source } : {}),
+      ...(syncedLink.agentId ? { agentId: syncedLink.agentId } : {}),
+      status: "confirmed",
+      occurredAt: now,
+      createdAt: now,
+    });
+  } catch (error) {
+    const isDuplicate =
+      error instanceof Error &&
+      "code" in error &&
+      (error as { code?: number }).code === 11000;
+    if (isDuplicate) {
+      const merchant = await db.collection<UserDoc>(COLLECTIONS.users).findOne({
+        _id: syncedLink.createdBy,
+      });
+      if (!merchant) {
+        return { ok: false as const, error: "Merchant not found" };
+      }
+      return {
+        ok: true as const,
+        duplicate: true as const,
+        link: toPublicPaymentLink(updatedLink, merchant),
+      };
+    }
+    throw error;
+  }
 
   if (!syncedLink.invoiceId) {
     await incrementDailyStat(syncedLink.workspaceId, "linksPaid", 1, now);
     await incrementDailyStat(
       syncedLink.workspaceId,
       "receivedAmount",
-      syncedLink.amount,
+      settledAmount,
       now,
     );
   }
@@ -622,13 +742,13 @@ export async function markPaymentLinkPaid(input: {
       await logAgentPaymentReceivedActivity({
         workspaceId: syncedLink.workspaceId,
         agentPublicId: syncedLink.agentPublicId,
-        amount: syncedLink.amount,
+        amount: settledAmount,
         tokenSymbol: token?.symbol ?? syncedLink.tokenId.toUpperCase(),
       });
     } else {
       await logPaymentReceivedActivity({
         workspaceId: syncedLink.workspaceId,
-        amount: syncedLink.amount,
+        amount: settledAmount,
         tokenSymbol: token?.symbol ?? syncedLink.tokenId.toUpperCase(),
       });
     }
@@ -641,7 +761,7 @@ export async function markPaymentLinkPaid(input: {
         await logInvoicePaidActivity({
           workspaceId: syncedLink.workspaceId,
           reference: invoice.reference,
-          amount: syncedLink.amount,
+          amount: settledAmount,
           tokenSymbol: token?.symbol ?? syncedLink.tokenId.toUpperCase(),
         });
       }
@@ -652,7 +772,7 @@ export async function markPaymentLinkPaid(input: {
         );
         await notifyInvoiceCreatorOfPayment({
           invoiceId: syncedLink.invoiceId,
-          amount: syncedLink.amount,
+          amount: settledAmount,
           tokenSymbol: token?.symbol ?? syncedLink.tokenId.toUpperCase(),
           paymentUrl: buildPaymentLinkUrl(
             syncedLink.username,
@@ -667,7 +787,7 @@ export async function markPaymentLinkPaid(input: {
 
   if (syncedLink.agentId) {
     await incrementAgentPaymentStats(syncedLink.agentId, {
-      received: syncedLink.amount,
+      received: settledAmount,
     });
   }
 
@@ -678,7 +798,7 @@ export async function markPaymentLinkPaid(input: {
   await recordPaymentSentForPayer({
     payerAddress,
     merchantWorkspaceId: syncedLink.workspaceId,
-    amount: syncedLink.amount,
+    amount: settledAmount,
     tokenId: syncedLink.tokenId,
     networkId: syncedLink.networkId,
     txHash: normalizedTxHash,
@@ -686,6 +806,7 @@ export async function markPaymentLinkPaid(input: {
       ? `@${merchant.username}`
       : syncedLink.username,
     paymentLinkId: syncedLink._id,
+    payerWorkspaceId: input.payerWorkspaceId,
     payerAttribution:
       input.paidVia === "agent" && input.payerAgentId
         ? {
@@ -696,31 +817,54 @@ export async function markPaymentLinkPaid(input: {
         : { source: "human" },
   });
 
-  const updated = await db.collection<PaymentLinkDoc>(COLLECTIONS.paymentLinks).findOne({
-    _id: syncedLink._id,
-  });
-
-  if (!updated) {
-    return { ok: false as const, error: "Failed to load updated payment link" };
-  }
-
   if (!merchant) {
     return { ok: false as const, error: "Merchant not found" };
   }
 
   await invalidatePaymentLinkCache(normalizedUsername, input.publicId);
 
+  try {
+    const { enqueueWebhookEvent } = await import("@/lib/webhooks/dispatch");
+    await enqueueWebhookEvent({
+      workspaceId: syncedLink.workspaceId,
+      event: "payment_link.paid",
+      payload: {
+        publicId: syncedLink.publicId,
+        username: syncedLink.username,
+        amount: settledAmount,
+        tokenId: syncedLink.tokenId,
+        networkId: syncedLink.networkId,
+        txHash: normalizedTxHash,
+        payerAddress,
+      },
+    });
+    if (input.paidVia === "agent") {
+      await enqueueWebhookEvent({
+        workspaceId: syncedLink.workspaceId,
+        event: "agent.payment_recorded",
+        payload: {
+          type: "link",
+          publicId: syncedLink.publicId,
+          txHash: normalizedTxHash,
+          agentPublicId: input.payerAgentPublicId ?? null,
+        },
+      });
+    }
+  } catch {
+    // Non-blocking
+  }
+
   let invoiceReference: string | undefined;
-  if (updated.invoiceId) {
+  if (updatedLink.invoiceId) {
     const invoice = await db.collection<InvoiceDoc>(COLLECTIONS.invoices).findOne({
-      _id: updated.invoiceId,
+      _id: updatedLink.invoiceId,
     });
     invoiceReference = invoice?.reference;
   }
 
   return {
     ok: true as const,
-    link: toPublicPaymentLink(updated, merchant, invoiceReference),
+    link: toPublicPaymentLink(updatedLink, merchant, invoiceReference),
   };
 }
 

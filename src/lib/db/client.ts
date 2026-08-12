@@ -46,9 +46,47 @@ const readClientPromise = useReadReplica
   ? connectClient(readUri!, readClientOptions, "__mongoReadClientPromise")
   : null;
 
+let dbBootstrapPromise: Promise<void> | null = null;
+let isBootstrapping = false;
+
+async function ensureDatabaseReady(db: Db) {
+  if (dbBootstrapPromise) {
+    await dbBootstrapPromise;
+    return;
+  }
+
+  dbBootstrapPromise = (async () => {
+    isBootstrapping = true;
+    try {
+      const { runDbMigrations, ensureDbIndexes } = await import("@/lib/db/seed");
+      await runDbMigrations(db);
+      await ensureDbIndexes(db);
+    } finally {
+      isBootstrapping = false;
+    }
+  })().catch((error) => {
+    dbBootstrapPromise = null;
+    throw error;
+  });
+
+  await dbBootstrapPromise;
+}
+
 export async function getDb(): Promise<Db> {
   const client = await clientPromise;
-  return client.db(dbName);
+  const db = client.db(dbName);
+
+  if (isBootstrapping) {
+    return db;
+  }
+
+  if (!dbBootstrapPromise) {
+    await ensureDatabaseReady(db);
+  } else {
+    await dbBootstrapPromise;
+  }
+
+  return db;
 }
 
 /** Prefer secondary when MONGODB_READ_URI is configured (read replica). */

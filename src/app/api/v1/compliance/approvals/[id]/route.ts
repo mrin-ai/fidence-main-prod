@@ -2,15 +2,22 @@ import { NextResponse } from "next/server";
 
 import {
   getMerchantApiContext,
+  getWorkspaceId,
   merchantApiUnauthorized,
 } from "@/lib/db/merchant-api";
 import { getPaymentApproval } from "@/lib/db/payment-approvals";
+import { enforceComplianceReadRateLimit } from "@/lib/merchant-api/rate-limit";
 
 type Params = { params: Promise<{ id: string }> };
 
 export async function GET(request: Request, { params }: Params) {
   const context = await getMerchantApiContext(request);
   if (!context) return merchantApiUnauthorized();
+
+  const rateLimited = await enforceComplianceReadRateLimit(
+    getWorkspaceId(context),
+  );
+  if (rateLimited) return rateLimited;
 
   const { id } = await params;
   const approval = await getPaymentApproval(context.workspace._id, id);

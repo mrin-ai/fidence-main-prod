@@ -2,7 +2,7 @@ import { actorFromSecurity } from "@/lib/compliance/actor";
 import { evaluateAndRecordPolicy } from "@/lib/compliance/evaluate-and-record";
 import { evaluatePolicy } from "@/lib/compliance/evaluate-policy";
 import { POLICY_CODES } from "@/lib/compliance/codes";
-import { toPolicyAmountUsd } from "@/lib/compliance/valuation";
+import { toPolicyAmountUsdAsync } from "@/lib/compliance/valuation-async";
 import {
   agentHasWallet,
   getAgentByExternalId,
@@ -39,6 +39,23 @@ function check(ok: boolean, message: string, code?: string): PreflightCheck {
 
 function allReady(checks: Record<string, PreflightCheck>) {
   return Object.values(checks).every((item) => item.ok);
+}
+
+function agentWalletVerified(agent: AgentDoc, payerAddress?: string, networkId?: string) {
+  if (process.env.AGENT_REQUIRE_VERIFIED_WALLET !== "true") {
+    return true;
+  }
+  const wallets = getAgentWallets(agent);
+  if (!payerAddress || !networkId) {
+    return wallets.some((w) => w.verifiedAt);
+  }
+  const normalized = payerAddress.trim().toLowerCase();
+  return wallets.some(
+    (w) =>
+      w.networkId === networkId &&
+      w.address.toLowerCase() === normalized &&
+      Boolean(w.verifiedAt),
+  );
 }
 
 async function checkAgent(
@@ -104,6 +121,16 @@ async function checkAgent(
     checks.agent_wallet = check(true, `${wallets.length} wallet(s) configured`);
   }
 
+  if (payerAddress && networkId && agentHasWallet(agent, payerAddress, networkId)) {
+    checks.agent_wallet_verified = agentWalletVerified(agent, payerAddress, networkId)
+      ? check(true, "Agent wallet is verified")
+      : check(
+          false,
+          "Agent wallet must be cryptographically verified before pay",
+          "AGENT_WALLET_UNVERIFIED",
+        );
+  }
+
   return { checks, agent };
 }
 
@@ -115,6 +142,7 @@ async function appendPolicyChecks(input: {
   tokenId: string;
   networkId: string;
   checks: Record<string, PreflightCheck>;
+  dryRun?: boolean;
 }) {
   const amountKnown =
     input.amount !== undefined && Number.isFinite(input.amount) && input.amount > 0;
@@ -155,13 +183,35 @@ async function appendPolicyChecks(input: {
     return;
   }
 
-  const valuation = toPolicyAmountUsd(input.amount!, input.tokenId);
+  const valuation = await toPolicyAmountUsdAsync(input.amount!, input.tokenId);
   if (!valuation.ok) {
     input.checks.policy_amount = check(
       false,
       "USD valuation unavailable for this token",
       valuation.code,
     );
+    return;
+  }
+
+  if (input.dryRun) {
+    const [policyDoc, spend] = await Promise.all([
+      getAgentPolicy(input.context.workspace._id, input.agent._id),
+      getAgentSpendTotals(input.context.workspace._id, input.agent._id),
+    ]);
+    const evaluated = evaluatePolicy({
+      agentStatus: input.agent.status,
+      action: input.action,
+      amountUsd: valuation.amountUsd,
+      networkId: input.networkId,
+      tokenId: input.tokenId,
+      policy: policyDoc ? toEvaluablePolicy(policyDoc) : null,
+      spentDailyUsd: spend.spentDailyUsd,
+      spentMonthlyUsd: spend.spentMonthlyUsd,
+    });
+    input.checks.policy_amount = evaluated.verdict === "deny"
+      ? check(false, evaluated.codes[0] ?? "Denied", evaluated.codes[0])
+      : check(true, "Amount within policy limits (dry run)");
+    return;
   }
 
   const evaluated = await evaluateAndRecordPolicy({
@@ -221,6 +271,7 @@ export async function preflightAgentLinkPayment(input: {
   linkUsername: string;
   linkPublicId: string;
   payerAddress?: string;
+  dryRun?: boolean;
 }): Promise<AgentPayPreflightResult> {
   const link = await getPaymentLinkByUsernameAndPublicId(
     input.linkUsername,
@@ -297,6 +348,7 @@ export async function preflightAgentLinkPayment(input: {
     tokenId: link.tokenId,
     networkId: link.networkId,
     checks,
+    dryRun: input.dryRun,
   });
 
   return { ready: allReady(checks), type: "link", checks };
@@ -310,6 +362,7 @@ export async function preflightAgentProfilePayment(input: {
   networkId: string;
   payerAddress?: string;
   amount?: number;
+  dryRun?: boolean;
 }): Promise<AgentPayPreflightResult> {
   const { checks, agent } = await checkAgent(
     input.context,
@@ -386,6 +439,7 @@ export async function preflightAgentProfilePayment(input: {
     tokenId: input.tokenId,
     networkId: input.networkId,
     checks,
+    dryRun: input.dryRun,
   });
 
   return { ready: allReady(checks), type: "profile", checks };

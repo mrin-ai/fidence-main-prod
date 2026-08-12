@@ -8,7 +8,11 @@ import {
 } from "@/lib/compliance/evaluate-and-record";
 import { toPolicyAmountUsd } from "@/lib/compliance/valuation";
 import { requireActiveAgent } from "@/lib/db/agents";
-import { getAgentOutstandingLinkExposureUsd } from "@/lib/db/agent-spend";
+import {
+  decrementAgentLinkExposureHold,
+  getAgentOutstandingLinkExposureUsd,
+  incrementAgentLinkExposureHold,
+} from "@/lib/db/agent-spend";
 import { createPaymentLinksBatch } from "@/lib/db/payment-links";
 import {
   getMerchantApiContext,
@@ -99,6 +103,7 @@ export async function POST(request: Request) {
     networkId: string;
     expiresAt: Date;
     recipientAddress: string;
+    exposureUsd: number;
   }> = [];
 
   const itemDenies: Array<{
@@ -114,16 +119,38 @@ export async function POST(request: Request) {
     agentResult.agent._id,
   );
 
+  const workspaceId = context.workspace._id;
+  const agentObjectId = agentResult.agent._id;
+
+  async function releaseParsedHolds() {
+    for (const item of parsedLinks) {
+      await decrementAgentLinkExposureHold({
+        workspaceId,
+        agentId: agentObjectId,
+        amountUsd: item.exposureUsd,
+      });
+    }
+  }
+
   for (const [index, link] of rawLinks.entries()) {
     const amount = Number(link.amount);
     const tokenId = link.tokenId?.trim();
     const networkId = link.networkId?.trim();
     const expiresAt = link.expiresAt ? new Date(link.expiresAt) : null;
 
-    if (!amount || amount <= 0 || !tokenId || !networkId || !expiresAt) {
+    if (
+      !amount ||
+      amount <= 0 ||
+      !Number.isFinite(amount) ||
+      !tokenId ||
+      !networkId ||
+      !expiresAt ||
+      Number.isNaN(expiresAt.getTime()) ||
+      expiresAt.getTime() <= Date.now()
+    ) {
       return NextResponse.json(
         {
-          error: `links[${index}] requires amount, tokenId, networkId, and expiresAt`,
+          error: `links[${index}] requires valid amount, tokenId, networkId, and future expiresAt`,
         },
         { status: 400 },
       );
@@ -150,6 +177,35 @@ export async function POST(request: Request) {
       );
     }
 
+    const itemUsd = toPolicyAmountUsd(amount, tokenId);
+    if (!itemUsd.ok) {
+      return NextResponse.json(
+        {
+          error: `links[${index}] amount valuation unavailable`,
+          code: itemUsd.code,
+        },
+        { status: 400 },
+      );
+    }
+
+    const hold = await incrementAgentLinkExposureHold({
+      workspaceId: context.workspace._id,
+      agentId: agentResult.agent._id,
+      amountUsd: itemUsd.amountUsd,
+    });
+    if (!hold.ok) {
+      await releaseParsedHolds();
+      return NextResponse.json(
+        { error: `links[${index}] could not reserve exposure`, code: hold.code },
+        { status: 400 },
+      );
+    }
+
+    runningOutstandingUsd = await getAgentOutstandingLinkExposureUsd(
+      context.workspace._id,
+      agentResult.agent._id,
+    );
+
     const policyResult = await evaluateAndRecordPolicy({
       workspaceId: context.workspace._id,
       agent: agentResult.agent,
@@ -164,6 +220,11 @@ export async function POST(request: Request) {
     });
 
     if (policyResult.verdict !== "allow") {
+      await decrementAgentLinkExposureHold({
+        workspaceId: context.workspace._id,
+        agentId: agentResult.agent._id,
+        amountUsd: itemUsd.amountUsd,
+      });
       itemDenies.push({
         index,
         code: policyResult.codes[0] ?? "POLICY_DENIED",
@@ -174,21 +235,18 @@ export async function POST(request: Request) {
       continue;
     }
 
-    const itemUsd = toPolicyAmountUsd(amount, tokenId);
-    if (itemUsd.ok) {
-      runningOutstandingUsd += itemUsd.amountUsd;
-    }
-
     parsedLinks.push({
       amount,
       tokenId,
       networkId,
       expiresAt,
       recipientAddress: recipient.recipientAddress,
+      exposureUsd: itemUsd.amountUsd,
     });
   }
 
   if (itemDenies.length > 0) {
+    await releaseParsedHolds();
     await logSecurityEvent({
       workspaceId: context.workspace._id,
       actorType: "agent",
@@ -225,8 +283,16 @@ export async function POST(request: Request) {
     username: context.owner.username!,
     agentId: agentResult.agent._id,
     agentPublicId: agentResult.agent.publicId,
-    links: parsedLinks,
+    links: parsedLinks.map(({ exposureUsd: _exposureUsd, ...link }) => link),
   });
+
+  for (const item of parsedLinks) {
+    await decrementAgentLinkExposureHold({
+      workspaceId: context.workspace._id,
+      agentId: agentResult.agent._id,
+      amountUsd: item.exposureUsd,
+    });
+  }
 
   await logSecurityEvent({
     workspaceId: context.workspace._id,

@@ -5,7 +5,7 @@ export const REFERRAL_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
 export const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
 
 export function buildSignInMessage(address: string, timestamp: number) {
-  return `Sign in to PayAgent\n\nWallet: ${address}\nTimestamp: ${timestamp}`;
+  return `Sign in to Fidence\n\nWallet: ${address}\nTimestamp: ${timestamp}`;
 }
 
 export function normalizeEvmWalletAddress(address: string) {
@@ -17,11 +17,11 @@ export function buildWalletVerifyMessage(
   networkId: string,
   timestamp: number,
 ) {
-  return `Verify wallet for PayAgent\n\nNetwork: ${networkId}\nWallet: ${address}\nTimestamp: ${timestamp}`;
+  return `Verify wallet for Fidence\n\nNetwork: ${networkId}\nWallet: ${address}\nTimestamp: ${timestamp}`;
 }
 
 export function formatWalletVerifyPreview(address: string, networkId: string) {
-  return `Verify wallet for PayAgent\n\nNetwork: ${networkId}\nWallet: ${address}\nTimestamp: (generated when you sign)`;
+  return `Verify wallet for Fidence\n\nNetwork: ${networkId}\nWallet: ${address}\nTimestamp: (generated when you sign)`;
 }
 
 export function parseWalletVerifyTimestamp(message: string): number | null {
@@ -32,7 +32,7 @@ export function parseWalletVerifyTimestamp(message: string): number | null {
 }
 
 export function parseWalletVerifyFields(message: string) {
-  if (!message.startsWith("Verify wallet for PayAgent")) {
+  if (!message.startsWith("Verify wallet for Fidence")) {
     return null;
   }
 

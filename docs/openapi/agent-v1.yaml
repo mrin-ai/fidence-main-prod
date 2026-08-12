@@ -1,0 +1,322 @@
+openapi: 3.1.0
+info:
+  title: Fidence Merchant API v1
+  version: 1.0.0
+  description: |
+    Minimal OpenAPI spec listing Fidence agent and merchant API routes under `/api/v1`.
+    Authenticate with `Authorization: Bearer fid_live_...` unless noted otherwise.
+servers:
+  - url: https://payagent.co/api/v1
+    description: Production
+  - url: http://localhost:3000/api/v1
+    description: Local development
+tags:
+  - name: Agents
+  - name: Payment Links
+  - name: Pay
+  - name: Invoices
+  - name: Webhooks
+  - name: Compliance
+  - name: Meta
+security:
+  - bearerAuth: []
+paths:
+  /agents/register:
+    post:
+      tags: [Agents]
+      summary: Register an agent
+      operationId: registerAgent
+      responses:
+        "200":
+          description: Agent registered
+  /agents/wallet:
+    post:
+      tags: [Agents]
+      summary: Bind a payer wallet to an agent
+      operationId: bindAgentWallet
+      responses:
+        "200":
+          description: Wallet bound
+  /agents/wallet/verify:
+    post:
+      tags: [Agents]
+      summary: Verify agent wallet ownership
+      operationId: verifyAgentWallet
+      responses:
+        "200":
+          description: Wallet verified
+  /agents/profile:
+    get:
+      tags: [Agents]
+      summary: Get agent profile and wallets
+      operationId: getAgentProfile
+      responses:
+        "200":
+          description: Agent profile
+  /agents/{agentId}:
+    patch:
+      tags: [Agents]
+      summary: Update agent metadata or status
+      operationId: patchAgent
+      parameters:
+        - $ref: "#/components/parameters/agentId"
+      responses:
+        "200":
+          description: Agent updated
+  /agents/{agentId}/transactions:
+    get:
+      tags: [Agents]
+      summary: List agent transactions
+      operationId: listAgentTransactions
+      parameters:
+        - $ref: "#/components/parameters/agentId"
+      responses:
+        "200":
+          description: Transaction list
+  /payment-links:
+    get:
+      tags: [Payment Links]
+      summary: List payment links
+      operationId: listPaymentLinks
+      responses:
+        "200":
+          description: Payment link list
+    post:
+      tags: [Payment Links]
+      summary: Create a payment link
+      operationId: createPaymentLink
+      responses:
+        "200":
+          description: Payment link created
+  /payment-links/batch:
+    post:
+      tags: [Payment Links]
+      summary: Create multiple payment links
+      operationId: createPaymentLinksBatch
+      responses:
+        "200":
+          description: Batch created
+  /payment-links/{linkId}:
+    get:
+      tags: [Payment Links]
+      summary: Get a payment link
+      operationId: getPaymentLink
+      parameters:
+        - name: linkId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Payment link
+  /pay/preflight:
+    get:
+      tags: [Pay]
+      summary: Preflight agent pay readiness
+      operationId: payPreflight
+      responses:
+        "200":
+          description: Preflight result
+  /pay:
+    post:
+      tags: [Pay]
+      summary: Record an agent payment after on-chain settlement
+      operationId: recordAgentPay
+      responses:
+        "200":
+          description: Payment recorded
+        "202":
+          description: Approval required
+  /invoices:
+    post:
+      tags: [Invoices]
+      summary: Create an invoice
+      operationId: createInvoice
+      responses:
+        "200":
+          description: Invoice created
+  /invoices/{id}:
+    get:
+      tags: [Invoices]
+      summary: Get an invoice
+      operationId: getInvoice
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Invoice
+  /webhooks:
+    get:
+      tags: [Webhooks]
+      summary: List webhook endpoints
+      operationId: listWebhooks
+      responses:
+        "200":
+          description: Webhook list
+    post:
+      tags: [Webhooks]
+      summary: Create a webhook endpoint
+      operationId: createWebhook
+      responses:
+        "200":
+          description: Webhook created
+  /webhooks/{id}:
+    patch:
+      tags: [Webhooks]
+      summary: Update a webhook endpoint
+      operationId: patchWebhook
+      parameters:
+        - $ref: "#/components/parameters/webhookId"
+      responses:
+        "200":
+          description: Webhook updated
+    delete:
+      tags: [Webhooks]
+      summary: Delete a webhook endpoint
+      operationId: deleteWebhook
+      parameters:
+        - $ref: "#/components/parameters/webhookId"
+      responses:
+        "200":
+          description: Webhook deleted
+  /webhooks/{id}/test:
+    post:
+      tags: [Webhooks]
+      summary: Send a test webhook delivery
+      operationId: testWebhook
+      parameters:
+        - $ref: "#/components/parameters/webhookId"
+      responses:
+        "200":
+          description: Test delivery queued
+  /compliance/catalog:
+    get:
+      tags: [Compliance]
+      summary: List policy catalog keys
+      operationId: getComplianceCatalog
+      responses:
+        "200":
+          description: Catalog
+  /compliance/agents:
+    get:
+      tags: [Compliance]
+      summary: List agents with policy summary
+      operationId: listComplianceAgents
+      responses:
+        "200":
+          description: Agent list
+  /compliance/agents/{agentId}/policy:
+    get:
+      tags: [Compliance]
+      summary: Get agent policy
+      operationId: getAgentPolicy
+      parameters:
+        - $ref: "#/components/parameters/agentId"
+      responses:
+        "200":
+          description: Policy document
+    put:
+      tags: [Compliance]
+      summary: Create or update agent policy
+      operationId: putAgentPolicy
+      parameters:
+        - $ref: "#/components/parameters/agentId"
+      responses:
+        "200":
+          description: Policy saved
+  /compliance/agents/{agentId}/decisions:
+    get:
+      tags: [Compliance]
+      summary: List policy decisions for an agent
+      operationId: listAgentDecisions
+      parameters:
+        - $ref: "#/components/parameters/agentId"
+      responses:
+        "200":
+          description: Decision receipts
+  /compliance/audit:
+    get:
+      tags: [Compliance]
+      summary: Query compliance audit log
+      operationId: getComplianceAudit
+      responses:
+        "200":
+          description: Audit entries
+  /compliance/approvals:
+    get:
+      tags: [Compliance]
+      summary: List pending approvals
+      operationId: listApprovals
+      responses:
+        "200":
+          description: Approval list
+  /compliance/approvals/{id}:
+    get:
+      tags: [Compliance]
+      summary: Get approval status
+      operationId: getApproval
+      parameters:
+        - $ref: "#/components/parameters/approvalId"
+      responses:
+        "200":
+          description: Approval status
+  /compliance/approvals/{id}/approve:
+    post:
+      tags: [Compliance]
+      summary: Approve a pending payment
+      operationId: approvePayment
+      parameters:
+        - $ref: "#/components/parameters/approvalId"
+      responses:
+        "200":
+          description: Approved
+  /compliance/approvals/{id}/reject:
+    post:
+      tags: [Compliance]
+      summary: Reject a pending payment
+      operationId: rejectPayment
+      parameters:
+        - $ref: "#/components/parameters/approvalId"
+      responses:
+        "200":
+          description: Rejected
+  /openapi.json:
+    get:
+      tags: [Meta]
+      summary: OpenAPI document
+      operationId: getOpenApiJson
+      security: []
+      responses:
+        "200":
+          description: OpenAPI JSON
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: fid_live_...
+  parameters:
+    agentId:
+      name: agentId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: External agent id (e.g. checkout-bot)
+    webhookId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+    approvalId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string

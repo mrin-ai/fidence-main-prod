@@ -45,7 +45,6 @@ export const COMPLIANCE_TOKENS = [
   { id: "usdt", label: "USDT" },
   { id: "eth", label: "ETH" },
   { id: "sol", label: "SOL" },
-  { id: "lcx", label: "LCX" },
 ] as const;
 
 export const WIDE_OPEN_DAILY_CAP = 10_000;

@@ -53,7 +53,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
     }
 
-    if (!message.startsWith("Sign in to PayAgent")) {
+    if (!message.startsWith("Sign in to Fidence")) {
       return NextResponse.json({ error: "Invalid sign-in message" }, { status: 401 });
     }
 

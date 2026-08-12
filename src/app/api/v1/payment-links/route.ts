@@ -5,7 +5,12 @@ import {
   evaluateAndRecordPolicy,
   policyDeniedResponse,
 } from "@/lib/compliance/evaluate-and-record";
+import { toPolicyAmountUsd } from "@/lib/compliance/valuation";
 import { requireActiveAgent } from "@/lib/db/agents";
+import {
+  decrementAgentLinkExposureHold,
+  incrementAgentLinkExposureHold,
+} from "@/lib/db/agent-spend";
 import { createPaymentLink } from "@/lib/db/payment-links";
 import {
   getMerchantApiContext,
@@ -16,6 +21,58 @@ import { requireRecipientAddress } from "@/lib/db/wallets";
 import { logSecurityEvent } from "@/lib/db/security-audit";
 import { enforceMerchantApiRateLimit } from "@/lib/merchant-api/rate-limit";
 import { supportsOnChainPayment } from "@/lib/payment-contracts";
+import { resolveWorkspaceAgent } from "@/lib/db/agent-policies";
+import {
+  listPaymentLinksPaginated,
+} from "@/lib/db/payment-links";
+import type { PaymentLinkStatus } from "@/lib/db/types";
+
+export async function GET(request: Request) {
+  const context = await getMerchantApiContext(request);
+  if (!context) return merchantApiUnauthorized();
+
+  const rateLimited = await enforceMerchantApiRateLimit(getWorkspaceId(context));
+  if (rateLimited) return rateLimited;
+
+  const url = new URL(request.url);
+  const agentKey = url.searchParams.get("agentId")?.trim();
+  const status = url.searchParams.get("status")?.trim() as
+    | PaymentLinkStatus
+    | "all"
+    | undefined;
+  const page = Number(url.searchParams.get("page") ?? 1);
+  const limit = Number(url.searchParams.get("limit") ?? 20);
+
+  let agentPublicId: string | undefined;
+  if (agentKey) {
+    const agent = await resolveWorkspaceAgent(context.workspace._id, agentKey);
+    if (!agent) {
+      return NextResponse.json({ error: "Agent not found" }, { status: 404 });
+    }
+    agentPublicId = agent.publicId;
+  }
+
+  const result = await listPaymentLinksPaginated(context.workspace._id, {
+    page,
+    limit,
+    status: status ?? "all",
+    source: agentKey ? "agent" : undefined,
+  });
+
+  const links = agentPublicId
+    ? result.items.filter((item) => item.agentPublicId === agentPublicId)
+    : result.items;
+
+  return NextResponse.json({
+    links,
+    page: result.page,
+    limit: result.limit,
+    total: agentPublicId ? links.length : result.total,
+    totalPages: agentPublicId
+      ? Math.max(1, Math.ceil(links.length / result.limit))
+      : result.totalPages,
+  });
+}
 
 export async function POST(request: Request) {
   const context = await getMerchantApiContext(request);
@@ -75,6 +132,26 @@ export async function POST(request: Request) {
     );
   }
 
+  const exposureUsd = toPolicyAmountUsd(amount, tokenId);
+  if (!exposureUsd.ok) {
+    return NextResponse.json(
+      { error: "Amount valuation unavailable for policy", code: exposureUsd.code },
+      { status: 400 },
+    );
+  }
+
+  const hold = await incrementAgentLinkExposureHold({
+    workspaceId: context.workspace._id,
+    agentId: agentResult.agent._id,
+    amountUsd: exposureUsd.amountUsd,
+  });
+  if (!hold.ok) {
+    return NextResponse.json(
+      { error: "Could not reserve link exposure", code: hold.code },
+      { status: 400 },
+    );
+  }
+
   const policyResult = await evaluateAndRecordPolicy({
     workspaceId: context.workspace._id,
     agent: agentResult.agent,
@@ -93,11 +170,21 @@ export async function POST(request: Request) {
   });
 
   if (policyResult.verdict !== "allow") {
+    await decrementAgentLinkExposureHold({
+      workspaceId: context.workspace._id,
+      agentId: agentResult.agent._id,
+      amountUsd: exposureUsd.amountUsd,
+    });
     return policyDeniedResponse(policyResult);
   }
 
   const recipient = requireRecipientAddress(context.owner, networkId);
   if (!recipient.ok) {
+    await decrementAgentLinkExposureHold({
+      workspaceId: context.workspace._id,
+      agentId: agentResult.agent._id,
+      amountUsd: exposureUsd.amountUsd,
+    });
     return NextResponse.json(
       { error: recipient.error, code: recipient.code },
       { status: 400 },
@@ -116,6 +203,12 @@ export async function POST(request: Request) {
     source: "agent",
     agentId: agentResult.agent._id,
     agentPublicId: agentResult.agent.publicId,
+  });
+
+  await decrementAgentLinkExposureHold({
+    workspaceId: context.workspace._id,
+    agentId: agentResult.agent._id,
+    amountUsd: exposureUsd.amountUsd,
   });
 
   await logSecurityEvent({

@@ -1,6 +1,6 @@
 {
-  "name": "PayAgent",
-  "short_name": "PayAgent",
+  "name": "Fidence",
+  "short_name": "Fidence",
   "icons": [
     {
       "src": "/favicon/favicon.svg",
@@ -9,7 +9,7 @@
       "purpose": "any"
     }
   ],
-  "theme_color": "#365EF7",
+  "theme_color": "#d5c515",
   "background_color": "#ffffff",
   "display": "standalone",
   "start_url": "/"

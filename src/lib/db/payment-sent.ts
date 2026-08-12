@@ -7,7 +7,7 @@ import { getDb } from "@/lib/db/client";
 import { COLLECTIONS } from "@/lib/db/collections";
 import { incrementDailyStat } from "@/lib/db/workspace-stats";
 import { incrementAgentPaymentStats } from "@/lib/db/agents";
-import type { CommerceSource } from "@/lib/db/merchant-types";
+import type { AgentDoc, CommerceSource } from "@/lib/db/merchant-types";
 import {
   normalizePaymentAddress,
   normalizeTxHash,
@@ -30,11 +30,37 @@ export async function getWorkspaceForWalletAddress(
     : address.trim();
 
   const user = await db.collection<UserDoc>(COLLECTIONS.users).findOne({
-    walletAddresses: normalized,
+    $or: [
+      { walletAddresses: normalized },
+      { "verifiedWallets.address": normalized },
+    ],
   });
 
-  if (!user) return null;
-  return getWorkspaceForUser(user._id);
+  if (user) {
+    return getWorkspaceForUser(user._id);
+  }
+
+  const agent = await db.collection<AgentDoc>(COLLECTIONS.agents).findOne({
+    $or: [
+      { walletAddress: normalized },
+      {
+        wallets: {
+          $elemMatch: {
+            address: normalized,
+            ...(networkId ? { networkId } : {}),
+          },
+        },
+      },
+    ],
+  });
+
+  if (!agent) return null;
+
+  const workspace = await db.collection(COLLECTIONS.workspaces).findOne({
+    _id: agent.workspaceId,
+  });
+
+  return workspace;
 }
 
 export async function recordPaymentSentForPayer(input: {
@@ -46,17 +72,19 @@ export async function recordPaymentSentForPayer(input: {
   txHash: string;
   merchantLabel: string;
   paymentLinkId?: ObjectId;
+  payerWorkspaceId?: ObjectId;
   payerAttribution?: PayerAttribution;
 }) {
-  const payerWorkspace = await getWorkspaceForWalletAddress(
-    input.payerAddress,
-    input.networkId,
-  );
-  if (!payerWorkspace) {
+  const payerWorkspaceDoc =
+    input.payerWorkspaceId != null
+      ? { _id: input.payerWorkspaceId }
+      : await getWorkspaceForWalletAddress(input.payerAddress, input.networkId);
+
+  if (!payerWorkspaceDoc) {
     return { recorded: false as const, reason: "payer_not_registered" as const };
   }
 
-  if (payerWorkspace._id.equals(input.merchantWorkspaceId)) {
+  if (payerWorkspaceDoc._id.equals(input.merchantWorkspaceId)) {
     return { recorded: false as const, reason: "same_workspace" as const };
   }
 
@@ -68,7 +96,7 @@ export async function recordPaymentSentForPayer(input: {
   const token = getTokenById(input.tokenId);
 
   const existing = await db.collection<TransactionDoc>(COLLECTIONS.transactions).findOne({
-    workspaceId: payerWorkspace._id,
+    workspaceId: payerWorkspaceDoc._id,
     txHash: normalizedTxHash,
     type: "payment_sent",
   });
@@ -79,7 +107,7 @@ export async function recordPaymentSentForPayer(input: {
 
   try {
     await db.collection(COLLECTIONS.transactions).insertOne({
-      workspaceId: payerWorkspace._id,
+      workspaceId: payerWorkspaceDoc._id,
       ...(input.paymentLinkId ? { paymentLinkId: input.paymentLinkId } : {}),
       type: "payment_sent",
       label:
@@ -112,14 +140,14 @@ export async function recordPaymentSentForPayer(input: {
 
   if (payerAttribution.source === "agent" && payerAttribution.agentPublicId) {
     await logAgentPaymentSentActivity({
-      workspaceId: payerWorkspace._id,
+      workspaceId: payerWorkspaceDoc._id,
       agentPublicId: payerAttribution.agentPublicId,
       amount: input.amount,
       tokenSymbol: token?.symbol ?? input.tokenId.toUpperCase(),
     });
   } else {
     await logPaymentSentActivity({
-      workspaceId: payerWorkspace._id,
+      workspaceId: payerWorkspaceDoc._id,
       amount: input.amount,
       tokenSymbol: token?.symbol ?? input.tokenId.toUpperCase(),
       merchantLabel: input.merchantLabel,
@@ -127,7 +155,7 @@ export async function recordPaymentSentForPayer(input: {
   }
 
   await incrementDailyStat(
-    payerWorkspace._id,
+    payerWorkspaceDoc._id,
     "sentAmount",
     input.amount,
     now,
@@ -139,5 +167,5 @@ export async function recordPaymentSentForPayer(input: {
     });
   }
 
-  return { recorded: true as const, workspaceId: payerWorkspace._id };
+  return { recorded: true as const, workspaceId: payerWorkspaceDoc._id };
 }

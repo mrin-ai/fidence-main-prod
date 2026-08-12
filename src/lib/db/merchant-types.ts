@@ -36,6 +36,8 @@ export type AgentWallet = {
   networkId: string;
   address: string;
   addedAt: Date;
+  verifiedAt?: Date;
+  verificationMethod?: "eip191" | "solana";
 };
 
 export type AgentDoc = {
@@ -51,11 +53,16 @@ export type AgentDoc = {
   linksCreated: number;
   amountPaid: number;
   amountReceived: number;
+  /** In-flight link create exposure (released after insert or on failure). */
+  linkExposureHoldUsd?: number;
   registeredAt: Date;
   lastActiveAt: Date;
   createdAt: Date;
   updatedAt: Date;
 };
+
+export type ApiKeyType = "workspace" | "admin" | "agent";
+export type ApiKeyEnvironment = "live" | "test";
 
 export type ApiKeyDoc = {
   _id: ObjectId;
@@ -64,6 +71,11 @@ export type ApiKeyDoc = {
   keyHash: string;
   keyPrefix: string;
   keyLast4: string;
+  keyType?: ApiKeyType;
+  environment?: ApiKeyEnvironment;
+  permissions?: string[];
+  agentId?: ObjectId;
+  name?: string;
   createdAt: Date;
   updatedAt: Date;
   lastUsedAt?: Date;

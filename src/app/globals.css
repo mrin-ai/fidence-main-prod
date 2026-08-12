@@ -54,89 +54,120 @@
   color-scheme: light;
 
   /* Brand palette */
-  --brand-primary: #2b6bff;
-  --brand-secondary: #eef3ff;
-  --brand-tertiary: #d6e4ff;
+  --brand-primary: #d5c515;
+  --brand-secondary: #f8f4dc;
+  --brand-tertiary: #ebe4a8;
   --brand-white: #ffffff;
 
   /* Surfaces */
   --background: oklch(1 0 0);
-  --foreground: oklch(0.207 0.038 265.1);
+  --foreground: oklch(0.207 0.038 95);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.207 0.038 265.1);
+  --card-foreground: oklch(0.207 0.038 95);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.207 0.038 265.1);
+  --popover-foreground: oklch(0.207 0.038 95);
 
   /* Brand-mapped tokens */
-  --primary: oklch(0.579 0.23 263.3);
-  --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.964 0.017 267.8);
-  --secondary-foreground: oklch(0.469 0.207 264.1);
-  --accent: oklch(0.917 0.04 263.7);
-  --accent-foreground: oklch(0.469 0.207 264.1);
-  --muted: oklch(0.975 0.01 264);
-  --muted-foreground: oklch(0.528 0.056 264.5);
+  --primary: oklch(0.819 0.168 102.5);
+  --primary-foreground: oklch(0.18 0.025 102);
+  --secondary: oklch(0.965 0.032 102);
+  --secondary-foreground: oklch(0.48 0.105 102);
+  --accent: oklch(0.895 0.068 102);
+  --accent-foreground: oklch(0.48 0.105 102);
+  --muted: oklch(0.975 0.012 102);
+  --muted-foreground: oklch(0.52 0.04 95);
 
   /* UI */
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.911 0.028 263.4);
-  --input: oklch(0.911 0.028 263.4);
-  --ring: oklch(0.579 0.23 263.3 / 35%);
+  --border: oklch(0.905 0.025 102);
+  --input: oklch(0.905 0.025 102);
+  --ring: oklch(0.819 0.168 102.5 / 35%);
 
-  /* Charts — blue family derived from primary */
-  --chart-1: oklch(0.579 0.23 263.3);
-  --chart-2: oklch(0.679 0.17 263.3);
-  --chart-3: oklch(0.779 0.11 263.3);
-  --chart-4: oklch(0.469 0.207 264.1);
-  --chart-5: oklch(0.917 0.04 263.7);
+  /* Charts — golden family derived from primary */
+  --chart-1: oklch(0.819 0.168 102.5);
+  --chart-2: oklch(0.72 0.13 102.5);
+  --chart-3: oklch(0.62 0.095 102.5);
+  --chart-4: oklch(0.48 0.105 102.5);
+  --chart-5: oklch(0.895 0.068 102);
 
   --radius: 0.625rem;
 
   /* Sidebar */
   --sidebar: oklch(1 0 0);
-  --sidebar-foreground: oklch(0.207 0.038 265.1);
-  --sidebar-primary: oklch(0.579 0.23 263.3);
-  --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: oklch(0.964 0.017 267.8);
-  --sidebar-accent-foreground: oklch(0.469 0.207 264.1);
-  --sidebar-border: oklch(0.911 0.028 263.4);
-  --sidebar-ring: oklch(0.579 0.23 263.3 / 35%);
+  --sidebar-foreground: oklch(0.207 0.038 95);
+  --sidebar-primary: oklch(0.819 0.168 102.5);
+  --sidebar-primary-foreground: oklch(0.18 0.025 102);
+  --sidebar-accent: oklch(0.965 0.032 102);
+  --sidebar-accent-foreground: oklch(0.48 0.105 102);
+  --sidebar-border: oklch(0.905 0.025 102);
+  --sidebar-ring: oklch(0.819 0.168 102.5 / 35%);
 }
 
-/* LCX auth — light theme with electric blue accents (see docs/LCX_AUTH_STYLE.md) */
+/* Fidence auth — light theme with golden accents */
+.fidence-auth {
+  color-scheme: light;
+
+  --fidence-gold: #d5c515;
+  --fidence-gold-muted: #a89810;
+  --brand-primary: var(--fidence-gold);
+
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.207 0.038 95);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.207 0.038 95);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.207 0.038 95);
+
+  --primary: oklch(0.819 0.168 102.5);
+  --primary-foreground: oklch(0.18 0.025 102);
+  --secondary: oklch(0.965 0.032 102);
+  --secondary-foreground: oklch(0.48 0.105 102);
+  --accent: oklch(0.895 0.068 102);
+  --accent-foreground: oklch(0.48 0.105 102);
+  --muted: oklch(0.975 0.012 102);
+  --muted-foreground: oklch(0.52 0.04 95);
+
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.905 0.025 102);
+  --input: oklch(0.905 0.025 102);
+  --ring: oklch(0.819 0.168 102.5 / 35%);
+}
+
+/* Backward compatibility for existing class usage */
 .lcx-auth {
   color-scheme: light;
 
-  --lcx-blue: #0066ff;
-  --lcx-blue-muted: #0047b3;
-  --brand-primary: var(--lcx-blue);
+  --fidence-gold: #d5c515;
+  --fidence-gold-muted: #a89810;
+  --brand-primary: var(--fidence-gold);
 
   --background: oklch(1 0 0);
-  --foreground: oklch(0.207 0.038 265.1);
+  --foreground: oklch(0.207 0.038 95);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.207 0.038 265.1);
+  --card-foreground: oklch(0.207 0.038 95);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.207 0.038 265.1);
+  --popover-foreground: oklch(0.207 0.038 95);
 
-  --primary: oklch(0.579 0.23 263.3);
-  --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.964 0.017 267.8);
-  --secondary-foreground: oklch(0.469 0.207 264.1);
-  --accent: oklch(0.917 0.04 263.7);
-  --accent-foreground: oklch(0.469 0.207 264.1);
-  --muted: oklch(0.975 0.01 264);
-  --muted-foreground: oklch(0.528 0.056 264.5);
+  --primary: oklch(0.819 0.168 102.5);
+  --primary-foreground: oklch(0.18 0.025 102);
+  --secondary: oklch(0.965 0.032 102);
+  --secondary-foreground: oklch(0.48 0.105 102);
+  --accent: oklch(0.895 0.068 102);
+  --accent-foreground: oklch(0.48 0.105 102);
+  --muted: oklch(0.975 0.012 102);
+  --muted-foreground: oklch(0.52 0.04 95);
 
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.911 0.028 263.4);
-  --input: oklch(0.911 0.028 263.4);
-  --ring: oklch(0.579 0.23 263.3 / 35%);
+  --border: oklch(0.905 0.025 102);
+  --input: oklch(0.905 0.025 102);
+  --ring: oklch(0.819 0.168 102.5 / 35%);
 }
 
+.fidence-auth .pixel-grid-bg,
 .lcx-auth .pixel-grid-bg {
   background-image:
-    linear-gradient(to right, oklch(0.911 0.028 263.4 / 30%) 1px, transparent 1px),
-    linear-gradient(to bottom, oklch(0.911 0.028 263.4 / 30%) 1px, transparent 1px);
+    linear-gradient(to right, oklch(0.905 0.025 102 / 30%) 1px, transparent 1px),
+    linear-gradient(to bottom, oklch(0.905 0.025 102 / 30%) 1px, transparent 1px);
   background-size: 24px 24px;
 }
 
@@ -158,4 +189,11 @@
 }
 .wallet-adapter-modal {
   z-index: 10001 !important;
+}
+
+/* Global splash — fingerprint Lottie (stroke color baked into .lottie file) */
+.splash-lottie-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }

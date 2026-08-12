@@ -392,7 +392,7 @@ export function ProfilePaymentCheckout({
             href="/"
             className="font-semibold text-primary hover:underline"
           >
-            PayAgent
+            Fidence
           </Link>
         </p>
       </div>

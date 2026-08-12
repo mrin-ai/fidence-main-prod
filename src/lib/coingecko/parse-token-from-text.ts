@@ -1,7 +1,7 @@
 import { resolveTokenIdFromSymbol } from "@/lib/coingecko/resolve-token-id";
 
 const TOKEN_AMOUNT_PATTERN =
-  /(\d[\d,]*(?:\.\d+)?)\s+(USDC|USDT|ETH|SOL|LCX)\b/gi;
+  /(\d[\d,]*(?:\.\d+)?)\s+(USDC|USDT|ETH|SOL)\b/gi;
 
 export function parseTokenAmountFromText(text: string) {
   const matches = [...text.matchAll(TOKEN_AMOUNT_PATTERN)];

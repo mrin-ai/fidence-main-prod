@@ -6,7 +6,7 @@ import { getEvmWalletChains } from "@/lib/evm-networks";
 const customTransports = getEvmTransports();
 
 export const wagmiConfig = getDefaultConfig({
-  appName: "PayAgent",
+  appName: "Fidence",
   projectId:
     process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ??
     "00000000000000000000000000000000",

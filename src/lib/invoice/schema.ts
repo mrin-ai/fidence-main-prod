@@ -115,7 +115,7 @@ export const invoiceFormDefaultValues: InvoiceFormData = {
   },
   invoiceDetails: {
     theme: {
-      baseColor: "#2b6bff",
+      baseColor: "#d5c515",
       mode: "light",
       template: "default",
       font: "geist",

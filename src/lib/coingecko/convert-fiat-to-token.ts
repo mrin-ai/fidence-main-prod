@@ -46,7 +46,7 @@ export function convertFiatTotalToTokenAmount(input: {
 export function roundPaymentTokenAmount(tokenAmount: number, tokenId: string) {
   const normalized = tokenId.trim().toLowerCase();
   const decimals =
-    normalized === "eth" || normalized === "sol" ? 8 : normalized === "lcx" ? 6 : 2;
+    normalized === "eth" || normalized === "sol" ? 8 : 2;
   const factor = 10 ** decimals;
   return Math.ceil(tokenAmount * factor) / factor;
 }

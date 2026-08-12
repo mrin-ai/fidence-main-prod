@@ -30,6 +30,8 @@ export async function GET(request: Request) {
     );
   }
 
+  const dryRun = searchParams.get("dryRun") === "1";
+
   if (type === "link") {
     const linkUsername = searchParams.get("linkUsername")?.trim();
     const linkId = searchParams.get("linkId")?.trim();
@@ -47,6 +49,7 @@ export async function GET(request: Request) {
       linkUsername,
       linkPublicId: linkId,
       payerAddress,
+      dryRun,
     });
 
     return NextResponse.json(result);
@@ -78,6 +81,7 @@ export async function GET(request: Request) {
       networkId,
       payerAddress,
       amount,
+      dryRun,
     });
 
     return NextResponse.json(result);

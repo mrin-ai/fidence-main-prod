@@ -9,6 +9,7 @@ import {
   getWorkspaceId,
   merchantApiUnauthorized,
 } from "@/lib/db/merchant-api";
+import { withIdempotency } from "@/lib/merchant-api/idempotency";
 import { enforceMerchantApiRateLimit } from "@/lib/merchant-api/rate-limit";
 import { supportsOnChainPayment } from "@/lib/payment-contracts";
 
@@ -31,6 +32,19 @@ export async function POST(request: Request) {
   const rateLimited = await enforceMerchantApiRateLimit(getWorkspaceId(context));
   if (rateLimited) return rateLimited;
 
+  return withIdempotency({
+    workspaceId: context.workspace._id,
+    request,
+    route: "POST /api/v1/pay",
+    required: true,
+    handler: async () => handlePay(request, context),
+  });
+}
+
+async function handlePay(
+  request: Request,
+  context: NonNullable<Awaited<ReturnType<typeof getMerchantApiContext>>>,
+) {
   const body = (await request.json()) as {
     agentId?: string;
     payerAddress?: string;

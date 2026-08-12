@@ -23,7 +23,7 @@ function MethodBadge({ method }: { method: "GET" | "POST" | "PUT" }) {
           ? "font-mono text-[10px] uppercase tracking-wide text-emerald-700"
           : method === "PUT"
             ? "font-mono text-[10px] uppercase tracking-wide text-violet-700"
-            : "font-mono text-[10px] uppercase tracking-wide text-blue-700"
+            : "font-mono text-[10px] uppercase tracking-wide text-primary"
       }
     >
       {method}
@@ -135,7 +135,7 @@ export function MerchantApiDocs({ baseUrl }: { baseUrl: string }) {
         <CardTitle className="text-base">API reference</CardTitle>
         <p className="text-sm text-muted-foreground">
           Use your merchant API key to register agents, add wallets, create
-          links, and record payments. PayAgent verifies on-chain transactions —
+          links, and record payments. Fidence verifies on-chain transactions —
           your agent signs and funds payments from its own wallet.
         </p>
       </CardHeader>
@@ -279,7 +279,7 @@ export function MerchantApiDocs({ baseUrl }: { baseUrl: string }) {
                 policy. Agents cannot edit their own policies — use the workspace
                 API key, portal, or{" "}
                 <span className="font-mono text-xs">npm run compliance:cli</span>.
-                Caps are USD; USDC/USDT are 1:1. ETH/SOL/LCX deny until valuation
+                Caps are USD; USDC/USDT are 1:1. ETH/SOL deny until valuation
                 exists. Every decision stores actor IP server-side (not returned
                 to agents).
               </p>
@@ -433,7 +433,7 @@ export function MerchantApiDocs({ baseUrl }: { baseUrl: string }) {
             <AccordionContent className="space-y-4 px-1">
               <p className="text-sm text-muted-foreground">
                 Record a payment after your agent sends an on-chain transaction
-                from its registered wallet. PayAgent verifies the tx hash.
+                from its registered wallet. Fidence verifies the tx hash.
               </p>
               <FieldList
                 fields={[
@@ -535,7 +535,7 @@ export function MerchantApiDocs({ baseUrl }: { baseUrl: string }) {
               after merchant approval, retry pay with that id.
             </li>
             <li>Rotating your API key invalidates the previous key immediately.</li>
-            <li>Payment signing and wallet funding are handled by your agent, not PayAgent.</li>
+            <li>Payment signing and wallet funding are handled by your agent, not Fidence.</li>
           </ul>
         </div>
       </CardContent>

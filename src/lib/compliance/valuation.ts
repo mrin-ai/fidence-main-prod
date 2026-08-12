@@ -23,6 +23,6 @@ export function toPolicyAmountUsd(
     return { ok: true, amountUsd: amount };
   }
 
-  // ETH / SOL / LCX: no reliable mainnet oracle wired for enforcement yet.
+  // ETH / SOL: no reliable mainnet oracle wired for enforcement yet.
   return { ok: false, code: POLICY_CODES.AMOUNT_VALUATION_UNAVAILABLE };
 }

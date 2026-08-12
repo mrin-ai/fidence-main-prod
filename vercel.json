@@ -11,6 +11,14 @@
     {
       "path": "/api/internal/jobs/archive-activity",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/internal/jobs/drain-webhooks",
+      "schedule": "*/2 * * * *"
+    },
+    {
+      "path": "/api/internal/jobs/drain-approvals",
+      "schedule": "*/15 * * * *"
     }
   ]
 }

@@ -373,7 +373,7 @@ export function PaymentLinkCheckout({
         <p className="mt-6 text-center text-xs text-muted-foreground">
           Powered by{" "}
           <Link href="/" className="font-medium text-primary hover:underline">
-            PayAgent
+            Fidence
           </Link>
         </p>
       </div>

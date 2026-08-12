@@ -46,7 +46,7 @@ function formatTokenAmount(value?: bigint) {
   return `${formatUnits(value, PAYAGENT_TOKEN_DECIMALS)} ${PAYAGENT_TOKEN_SYMBOL}`;
 }
 
-export function PayagentTokenPage() {
+export function FidenceTokenPage() {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
@@ -221,7 +221,7 @@ export function PayagentTokenPage() {
         <div className="flex items-start justify-between gap-4">
           <div className="space-y-1">
             <h1 className="font-heading text-xl font-semibold tracking-tight">
-              PAYAGENT Token
+              Fidence Token
             </h1>
             <p className="text-sm text-muted-foreground">
               Sepolia testnet · {PAYAGENT_TOKEN_DECIMALS} decimals
@@ -298,9 +298,9 @@ export function PayagentTokenPage() {
         </div>
 
         {isConnected && walletBalance && walletBalance > BigInt(0) ? (
-          <Card className="border-blue-500/20 bg-blue-500/5">
+          <Card className="border-primary/20 bg-primary/5">
             <CardContent className="space-y-3 p-4">
-              <p className="text-sm text-blue-900">
+              <p className="text-sm text-primary">
                 Your tokens are on-chain, but Rabby/MetaMask do not auto-show custom
                 tokens. Add PAYAGENT manually on <strong>Sepolia</strong>.
               </p>

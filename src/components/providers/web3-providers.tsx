@@ -25,8 +25,8 @@ export function Web3Providers({
         <RainbowKitProvider
           initialChain={initialChain}
           theme={lightTheme({
-            accentColor: "#0066ff",
-            accentColorForeground: "white",
+            accentColor: "#d5c515",
+            accentColorForeground: "#1a1808",
             borderRadius: "large",
           })}
         >

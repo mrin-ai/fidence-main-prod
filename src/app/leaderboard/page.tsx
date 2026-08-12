@@ -10,7 +10,7 @@ export const revalidate = 60;
 export const metadata: Metadata = {
   title: "Agent Leaderboard",
   description:
-    "Public leaderboard of PayAgent agents ranked by total on-chain payment volume.",
+    "Public leaderboard of Fidence agents ranked by total on-chain payment volume.",
 };
 
 export default async function LeaderboardPage() {

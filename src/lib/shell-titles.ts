@@ -12,6 +12,7 @@ const SHELL_TITLES: Record<string, string> = {
   "/merchant/api-credentials": "API Credentials",
   "/merchant/agents": "Registered Agents",
   "/merchant/compliance": "Compliance Engine",
+  "/merchant/webhooks": "Webhooks",
 };
 
 const HIDDEN_HEADER_PATHS = new Set(["/settings"]);
@@ -33,7 +34,7 @@ export function getShellTitle(pathname: string) {
     return "Invoice";
   }
 
-  return "PayAgent";
+  return "Fidence";
 }
 
 export function shouldHideShellHeader(pathname: string) {

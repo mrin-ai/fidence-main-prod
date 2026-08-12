@@ -8,6 +8,7 @@ import type {
   AgentSpendDailyDoc,
   AgentSpendMonthlyDoc,
 } from "@/lib/db/compliance-types";
+import type { AgentDoc } from "@/lib/db/merchant-types";
 import type { PaymentLinkDoc } from "@/lib/db/types";
 
 export function utcDayKey(date = new Date()) {
@@ -198,31 +199,39 @@ export async function decrementAgentSpend(input: {
   const month = utcMonthKey(at);
   const now = at;
 
-  await db.collection<AgentSpendDailyDoc>(COLLECTIONS.agentSpendDaily).updateOne(
-    {
-      workspaceId: input.workspaceId,
-      agentId: input.agentId,
-      day,
-      amountUsd: { $gte: input.amountUsd },
-    },
-    {
-      $inc: { amountUsd: -input.amountUsd },
-      $set: { updatedAt: now },
-    },
-  );
+  const dailyResult = await db
+    .collection<AgentSpendDailyDoc>(COLLECTIONS.agentSpendDaily)
+    .updateOne(
+      {
+        workspaceId: input.workspaceId,
+        agentId: input.agentId,
+        day,
+        amountUsd: { $gte: input.amountUsd },
+      },
+      {
+        $inc: { amountUsd: -input.amountUsd },
+        $set: { updatedAt: now },
+      },
+    );
 
-  await db.collection<AgentSpendMonthlyDoc>(COLLECTIONS.agentSpendMonthly).updateOne(
-    {
-      workspaceId: input.workspaceId,
-      agentId: input.agentId,
-      month,
-      amountUsd: { $gte: input.amountUsd },
-    },
-    {
-      $inc: { amountUsd: -input.amountUsd },
-      $set: { updatedAt: now },
-    },
-  );
+  const monthlyResult = await db
+    .collection<AgentSpendMonthlyDoc>(COLLECTIONS.agentSpendMonthly)
+    .updateOne(
+      {
+        workspaceId: input.workspaceId,
+        agentId: input.agentId,
+        month,
+        amountUsd: { $gte: input.amountUsd },
+      },
+      {
+        $inc: { amountUsd: -input.amountUsd },
+        $set: { updatedAt: now },
+      },
+    );
+
+  if (dailyResult.modifiedCount === 0 && monthlyResult.modifiedCount === 0) {
+    return { ok: false as const, code: "SPEND_ROLLBACK_FAILED" as const };
+  }
 
   return { ok: true as const };
 }
@@ -230,6 +239,7 @@ export async function decrementAgentSpend(input: {
 /**
  * Sum USD exposure of unpaid pending payment links for an agent.
  * Non-stablecoin pending links contribute 0 here; create already fail-closes those.
+ * Includes in-flight create holds so concurrent creates cannot exceed caps.
  */
 export async function getAgentOutstandingLinkExposureUsd(
   workspaceId: ObjectId,
@@ -239,21 +249,85 @@ export async function getAgentOutstandingLinkExposureUsd(
   const db = await getDb();
   const now = new Date();
 
-  const links = await db
-    .collection<PaymentLinkDoc>(COLLECTIONS.paymentLinks)
-    .find({
-      workspaceId,
-      agentId,
-      status: "pending",
-      expiresAt: { $gt: now },
-    })
-    .project({ amount: 1, tokenId: 1 })
-    .toArray();
+  const [links, agent] = await Promise.all([
+    db
+      .collection<PaymentLinkDoc>(COLLECTIONS.paymentLinks)
+      .find({
+        workspaceId,
+        agentId,
+        status: "pending",
+        expiresAt: { $gt: now },
+      })
+      .project({ amount: 1, tokenId: 1 })
+      .toArray(),
+    db.collection<AgentDoc>(COLLECTIONS.agents).findOne(
+      { _id: agentId, workspaceId },
+      { projection: { linkExposureHoldUsd: 1 } },
+    ),
+  ]);
 
   let outstandingUsd = 0;
   for (const link of links) {
     const valuation = toPolicyAmountUsd(link.amount, link.tokenId);
     if (valuation.ok) outstandingUsd += valuation.amountUsd;
   }
+
+  const holdUsd = agent?.linkExposureHoldUsd ?? 0;
+  if (Number.isFinite(holdUsd) && holdUsd > 0) {
+    outstandingUsd += holdUsd;
+  }
+
   return outstandingUsd;
+}
+
+/** Reserve in-flight link-create exposure before policy evaluation + insert. */
+export async function incrementAgentLinkExposureHold(input: {
+  workspaceId: ObjectId;
+  agentId: ObjectId;
+  amountUsd: number;
+}) {
+  if (!Number.isFinite(input.amountUsd) || input.amountUsd <= 0) {
+    return { ok: false as const, code: "EXPOSURE_HOLD_INVALID" as const };
+  }
+
+  const db = await getDb();
+  const result = await db.collection<AgentDoc>(COLLECTIONS.agents).updateOne(
+    { _id: input.agentId, workspaceId: input.workspaceId },
+    {
+      $inc: { linkExposureHoldUsd: input.amountUsd },
+      $set: { updatedAt: new Date() },
+    },
+  );
+
+  if (result.matchedCount === 0) {
+    return { ok: false as const, code: "AGENT_NOT_FOUND" as const };
+  }
+
+  return { ok: true as const };
+}
+
+/** Release in-flight hold after link insert or when create is denied. */
+export async function decrementAgentLinkExposureHold(input: {
+  workspaceId: ObjectId;
+  agentId: ObjectId;
+  amountUsd: number;
+}) {
+  if (!Number.isFinite(input.amountUsd) || input.amountUsd <= 0) {
+    return { ok: false as const };
+  }
+
+  const db = await getDb();
+  const result = await db.collection<AgentDoc>(COLLECTIONS.agents).updateOne(
+    {
+      _id: input.agentId,
+      workspaceId: input.workspaceId,
+      linkExposureHoldUsd: { $gte: input.amountUsd },
+    },
+    {
+      $inc: { linkExposureHoldUsd: -input.amountUsd },
+      $set: { updatedAt: new Date() },
+    },
+  );
+
+  return { ok: result.modifiedCount > 0 };
 }

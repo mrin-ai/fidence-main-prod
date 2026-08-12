@@ -19,6 +19,7 @@ import { recordPolicyDecision } from "@/lib/db/policy-decisions";
 import { logActivity } from "@/lib/db/activity";
 import { logSecurityEvent } from "@/lib/db/security-audit";
 import type { SecurityContext, AgentDoc } from "@/lib/db/merchant-types";
+import { enqueueWebhookEvent } from "@/lib/webhooks/dispatch";
 
 const APPROVAL_TTL_MS = 24 * 60 * 60 * 1000;
 /** Stuck pay-gate claims older than this are released back to approved (or expired). */
@@ -33,6 +34,7 @@ type ApprovalPayloadMatch = {
   linkUsername?: string;
   linkPublicId?: string;
   recipientUsername?: string;
+  payerAddress?: string;
 };
 
 function matchesApprovalBindings(
@@ -72,6 +74,17 @@ function matchesApprovalBindings(
     return {
       ok: false as const,
       error: "Approval recipient mismatch",
+      code: "APPROVAL_MISMATCH",
+    };
+  }
+  if (
+    approval.payload.payerAddress &&
+    input.payloadMatch.payerAddress &&
+    approval.payload.payerAddress !== input.payloadMatch.payerAddress
+  ) {
+    return {
+      ok: false as const,
+      error: "Approval payer wallet mismatch",
       code: "APPROVAL_MISMATCH",
     };
   }
@@ -133,27 +146,19 @@ async function markExpired(doc: PaymentApprovalDoc) {
 async function expireIfNeeded(doc: PaymentApprovalDoc) {
   const now = Date.now();
 
-  // Stale claimed approvals: release back to approved so a retry can proceed,
-  // unless the overall approval TTL has elapsed.
   if (doc.status === "claimed" && doc.claimedAt) {
     const claimedAge = now - doc.claimedAt.getTime();
     if (claimedAge > CLAIM_STALE_MS) {
       if (doc.expiresAt.getTime() <= now) {
         return markExpired(doc);
       }
-      const db = await getDb();
-      const released = await db
-        .collection<PaymentApprovalDoc>(COLLECTIONS.paymentApprovals)
-        .findOneAndUpdate(
-          { _id: doc._id, status: "claimed" },
-          { $set: { status: "approved" }, $unset: { claimedAt: "" } },
-          { returnDocument: "after" },
-        );
-      return released ?? doc;
+      // Do not auto-release claimed approvals; pay must complete or fail explicitly.
     }
   }
 
-  if (doc.status !== "pending" && doc.status !== "approved") return doc;
+  if (doc.status !== "pending" && doc.status !== "approved" && doc.status !== "claimed") {
+    return doc;
+  }
   if (doc.expiresAt.getTime() > now) return doc;
   return markExpired(doc);
 }
@@ -209,6 +214,23 @@ export async function createPaymentApproval(input: {
     resourceType: "payment_approval",
     resourceId: approvalId,
     security: input.security,
+  });
+
+  await enqueueWebhookEvent({
+    workspaceId: input.workspaceId,
+    event: "compliance.approval_required",
+    payload: {
+      approvalId,
+      agentId: input.agentId.toString(),
+      agentPublicId: input.agentPublicId,
+      externalAgentId: input.externalAgentId,
+      status: "pending",
+      amountUsd: input.payload.amountUsd,
+      tokenId: input.payload.tokenId,
+      networkId: input.payload.networkId,
+      payload: input.payload,
+      poll: `/api/v1/compliance/approvals/${approvalId}`,
+    },
   });
 
   return doc;
@@ -442,6 +464,28 @@ export async function releasePaymentApprovalClaim(input: {
   return { ok: true as const, approval: released };
 }
 
+export async function drainExpiredApprovals(limit = 100) {
+  await ensureComplianceIndexes();
+  const db = await getDb();
+  const now = new Date();
+  const candidates = await db
+    .collection<PaymentApprovalDoc>(COLLECTIONS.paymentApprovals)
+    .find({
+      status: { $in: ["pending", "approved", "claimed"] },
+      expiresAt: { $lte: now },
+    })
+    .limit(limit)
+    .toArray();
+
+  let expired = 0;
+  for (const doc of candidates) {
+    const updated = await markExpired(doc);
+    if (updated.status === "expired") expired += 1;
+  }
+
+  return { processed: candidates.length, expired };
+}
+
 export async function consumePaymentApproval(input: {
   workspaceId: ObjectId;
   approvalId: string;
@@ -453,7 +497,7 @@ export async function consumePaymentApproval(input: {
       {
         workspaceId: input.workspaceId,
         approvalId: input.approvalId,
-        status: { $in: ["claimed", "approved"] },
+        status: "claimed",
       },
       {
         $set: { status: "consumed", resolvedAt: new Date() },

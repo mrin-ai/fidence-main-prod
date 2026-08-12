@@ -191,7 +191,7 @@ export function RewardsPageContent({
               {overview.paymentItems.length === 0 ? (
                 <EmptyStateLottie
                   title="No payment rewards yet"
-                  description="Earn 0.1% credits when you pay or receive confirmed payments through PayAgent."
+                  description="Earn 0.1% credits when you pay or receive confirmed payments through Fidence."
                 />
               ) : (
                 <Table>

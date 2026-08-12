@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { getSessionFromCookies } from "@/lib/db/auth";
+import { listVerifiedWallets } from "@/lib/db/wallets";
 import { buildProfileUrl } from "@/lib/profile-url";
 
 export async function requireShellSession(redirectPath?: string) {
@@ -22,6 +23,8 @@ export async function requireShellSession(redirectPath?: string) {
           session.user.role.slice(1)
         : "Owner",
       initials: session.user.initials,
+      username: session.user.username ?? null,
+      hasVerifiedWallet: listVerifiedWallets(session.user).length > 0,
     },
     workspace: {
       name: session.workspace.name,

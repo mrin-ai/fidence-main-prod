@@ -4,15 +4,22 @@ import { serializeDecision } from "@/lib/compliance/policy-api";
 import { resolveWorkspaceAgent } from "@/lib/db/agent-policies";
 import {
   getMerchantApiContext,
+  getWorkspaceId,
   merchantApiUnauthorized,
 } from "@/lib/db/merchant-api";
 import { listAgentPolicyDecisions } from "@/lib/db/policy-decisions";
+import { enforceComplianceReadRateLimit } from "@/lib/merchant-api/rate-limit";
 
 type Params = { params: Promise<{ agentId: string }> };
 
 export async function GET(request: Request, { params }: Params) {
   const context = await getMerchantApiContext(request);
   if (!context) return merchantApiUnauthorized();
+
+  const rateLimited = await enforceComplianceReadRateLimit(
+    getWorkspaceId(context),
+  );
+  if (rateLimited) return rateLimited;
 
   const { agentId } = await params;
   const agent = await resolveWorkspaceAgent(context.workspace._id, agentId);

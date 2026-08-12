@@ -4,7 +4,8 @@ import {
   getCachedMerchantContext,
   setCachedMerchantContext,
 } from "@/lib/cache/merchant-context-cache";
-import { extractBearerToken, hashApiKey, resolveApiKey } from "@/lib/db/api-keys";
+import { apiKeyHasPermission, extractBearerToken, hashApiKey, resolveApiKey } from "@/lib/db/api-keys";
+import type { ApiKeyDoc } from "@/lib/db/merchant-types";
 import { getDb } from "@/lib/db/client";
 import { COLLECTIONS } from "@/lib/db/collections";
 import type { SecurityContext } from "@/lib/db/merchant-types";
@@ -15,6 +16,7 @@ export type MerchantApiContext = {
   workspace: WorkspaceDoc;
   owner: UserDoc;
   security: SecurityContext;
+  apiKey: ApiKeyDoc;
 };
 
 export async function getMerchantApiContext(
@@ -26,8 +28,11 @@ export async function getMerchantApiContext(
   const keyHash = hashApiKey(rawKey);
   const cached = await getCachedMerchantContext(keyHash);
   if (cached?.owner.username) {
+    const apiKey = await resolveApiKey(rawKey);
+    if (!apiKey) return null;
     return {
       ...cached,
+      apiKey,
       security: extractSecurityContext(request),
     };
   }
@@ -48,13 +53,23 @@ export async function getMerchantApiContext(
 
   if (!owner?.username) return null;
 
-  const context = { workspace, owner };
-  await setCachedMerchantContext(keyHash, context);
+  const context = { workspace, owner, apiKey };
+  await setCachedMerchantContext(keyHash, { workspace, owner });
 
   return {
     ...context,
     security: extractSecurityContext(request),
   };
+}
+
+export function requireApiPermission(context: MerchantApiContext, permission: string) {
+  if (!apiKeyHasPermission(context.apiKey, permission)) {
+    return Response.json(
+      { ok: false, error: "Insufficient API key permissions", code: "FORBIDDEN" },
+      { status: 403 },
+    );
+  }
+  return null;
 }
 
 export function merchantApiUnauthorized() {

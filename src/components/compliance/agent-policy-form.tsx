@@ -52,7 +52,6 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 
 function getComplianceTokenIcon(id: string) {
-  if (id === "lcx") return "/tokens/lcx.png";
   return getPaymentTokenIcon(id);
 }
 

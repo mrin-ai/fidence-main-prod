@@ -22,7 +22,7 @@ import { cn } from "@/lib/utils";
 
 const INTRO_STEPS = [
   {
-    title: "Welcome to PayAgent",
+    title: "Welcome to Fidence",
     subtitle:
       "Create payment links and professional invoices in minutes — no code required.",
   },
@@ -197,7 +197,7 @@ export function OnboardingModal() {
                 Choose your username
               </DialogTitle>
               <DialogDescription className="text-sm leading-relaxed">
-                This becomes your PayAgent profile link for payment links and
+                This becomes your Fidence profile link for payment links and
                 invoices.
               </DialogDescription>
             </DialogHeader>
@@ -286,7 +286,7 @@ export function OnboardingModal() {
                   You&apos;re all set
                 </DialogTitle>
                 <DialogDescription className="text-sm leading-relaxed">
-                  Your PayAgent profile is ready to use.
+                  Your Fidence profile is ready to use.
                 </DialogDescription>
               </DialogHeader>
             </div>

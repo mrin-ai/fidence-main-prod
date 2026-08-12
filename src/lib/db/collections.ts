@@ -19,4 +19,7 @@ export const COLLECTIONS = {
   agentSpendDaily: "agent_spend_daily",
   agentSpendMonthly: "agent_spend_monthly",
   paymentApprovals: "payment_approvals",
+  idempotencyKeys: "idempotency_keys",
+  webhookEndpoints: "webhook_endpoints",
+  webhookDeliveries: "webhook_deliveries",
 } as const;

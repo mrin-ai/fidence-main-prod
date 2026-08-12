@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google";
+import { AppSplashLoader } from "@/components/app-splash-loader";
 import { TokenPricesProvider } from "@/components/token-prices-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 import { Web3Providers } from "@/components/providers/web3-providers";
 import "@rainbow-me/rainbowkit/styles.css";
 import "./globals.css";
-import "./landing.css";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -29,22 +29,21 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://www.payagent.co"),
   title: {
     default: "Instant Crypto Payments – Low Fees + AI Agent Payment API",
-    template: "%s · PayAgent",
+    template: "%s · Fidence",
   },
   description:
     "Accept instant crypto payments with low transaction fees. Simple for humans and merchants, with an AI agent payment API for autonomous commerce.",
-  applicationName: "PayAgent",
-  authors: [{ name: "PayAgent" }],
-  creator: "PayAgent",
-  publisher: "PayAgent",
+  applicationName: "Fidence",
+  authors: [{ name: "Fidence" }],
+  creator: "Fidence",
+  publisher: "Fidence",
   keywords: [
-    "PayAgent",
+    "Fidence",
     "crypto payments",
     "payment links",
     "AI agent payments",
     "USDC",
     "merchant payments",
-    "LCX",
   ],
   alternates: {
     canonical: "/",
@@ -64,7 +63,7 @@ export const metadata: Metadata = {
     description:
       "Accept instant crypto payments with low transaction fees. Simple for humans and merchants, with an AI agent payment API for autonomous commerce.",
     url: "https://www.payagent.co",
-    siteName: "PayAgent",
+    siteName: "Fidence",
     locale: "en_US",
     type: "website",
     images: [
@@ -72,7 +71,7 @@ export const metadata: Metadata = {
         url: "https://www.payagent.co/payagent-og.png",
         width: 1200,
         height: 630,
-        alt: "PayAgent – Instant Crypto Payments",
+        alt: "Fidence – Instant Crypto Payments",
         type: "image/png",
       },
     ],
@@ -116,24 +115,26 @@ export default async function RootLayout({
             __html: JSON.stringify({
               "@context": "https://schema.org",
               "@type": "WebSite",
-              name: "PayAgent",
+              name: "Fidence",
               url: "https://www.payagent.co",
               description:
                 "Accept instant crypto payments with low transaction fees. Simple for humans and merchants, with an AI agent payment API for autonomous commerce.",
               publisher: {
                 "@type": "Organization",
-                name: "PayAgent",
+                name: "Fidence",
                 url: "https://www.payagent.co",
-                logo: "https://www.payagent.co/favicon/favicon.svg",
+                logo: "https://www.payagent.co/logo.svg",
               },
             }),
           }}
         />
         <Web3Providers cookie={cookie}>
-          <TooltipProvider>
-            <TokenPricesProvider>{children}</TokenPricesProvider>
-          </TooltipProvider>
-          <Toaster richColors closeButton />
+          <AppSplashLoader>
+            <TooltipProvider>
+              <TokenPricesProvider>{children}</TokenPricesProvider>
+            </TooltipProvider>
+            <Toaster richColors closeButton />
+          </AppSplashLoader>
         </Web3Providers>
       </body>
     </html>

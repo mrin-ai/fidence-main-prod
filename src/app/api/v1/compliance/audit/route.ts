@@ -4,13 +4,20 @@ import { NextResponse } from "next/server";
 import { serializeDecision } from "@/lib/compliance/policy-api";
 import {
   getMerchantApiContext,
+  getWorkspaceId,
   merchantApiUnauthorized,
 } from "@/lib/db/merchant-api";
 import { queryPolicyDecisions } from "@/lib/db/policy-decisions";
+import { enforceComplianceReadRateLimit } from "@/lib/merchant-api/rate-limit";
 
 export async function GET(request: Request) {
   const context = await getMerchantApiContext(request);
   if (!context) return merchantApiUnauthorized();
+
+  const rateLimited = await enforceComplianceReadRateLimit(
+    getWorkspaceId(context),
+  );
+  if (rateLimited) return rateLimited;
 
   const url = new URL(request.url);
   const fromRaw = url.searchParams.get("from");

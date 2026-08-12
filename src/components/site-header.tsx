@@ -1,8 +1,8 @@
 "use client"
 
-import Image from "next/image"
 import { Link2Icon } from "lucide-react"
 
+import { FidenceLogoIcon } from "@/components/fidence-logo-icon"
 import { useCreatePaymentLink } from "@/components/create-payment-link-sheet"
 import { NotificationDropdown } from "@/components/notifications/notification-dropdown"
 import { Button } from "@/components/ui/button"
@@ -21,14 +21,8 @@ export function SiteHeader({ title }: { title: string }) {
           className="mx-2 h-4 data-vertical:self-auto"
         />
         <div className="flex items-center gap-2">
-          <div className="flex size-6 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border/50 bg-white">
-            <Image
-              src="/logo.png"
-              alt="PayAgent"
-              width={24}
-              height={24}
-              className="size-6 object-contain"
-            />
+          <div className="flex size-6 shrink-0 items-center justify-center overflow-visible rounded-md border border-border/50 bg-white">
+            <FidenceLogoIcon className="size-5" />
           </div>
           <h1 className="text-sm font-medium text-foreground/80">{title}</h1>
         </div>

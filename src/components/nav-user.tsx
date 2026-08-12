@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation"
 import { useDisconnect } from "wagmi"
+import { toast } from "sonner"
 import {
   Avatar,
   AvatarFallback,
@@ -28,11 +29,14 @@ import {
 } from "@/hooks/use-local-preference"
 import {
   BellIcon,
+  CircleUserIcon,
   HistoryIcon,
   LogOutIcon,
   SettingsIcon,
   UsersIcon,
 } from "lucide-react"
+import { hasUsername } from "@/lib/onboarding"
+import { buildProfilePath } from "@/lib/profile-url"
 
 export function NavUser({
   user,
@@ -41,6 +45,8 @@ export function NavUser({
     name: string
     role: string
     initials: string
+    username: string | null
+    hasVerifiedWallet: boolean
   }
 }) {
   const { isMobile } = useSidebar()
@@ -56,6 +62,28 @@ export function NavUser({
     disconnect()
     router.push("/sign-in")
     router.refresh()
+  }
+
+  const handleViewProfile = () => {
+    if (!hasUsername(user.username)) {
+      toast.error("Set up your username first to view your public profile.")
+      return
+    }
+
+    if (!user.hasVerifiedWallet) {
+      toast.error(
+        "Verify at least one wallet before viewing your public profile.",
+        {
+          action: {
+            label: "Go to Wallets",
+            onClick: () => router.push("/wallets"),
+          },
+        },
+      )
+      return
+    }
+
+    router.push(buildProfilePath(user.username))
   }
 
   return (
@@ -136,16 +164,20 @@ export function NavUser({
                   New
                 </span>
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleViewProfile}>
+                <CircleUserIcon />
+                View profile
+              </DropdownMenuItem>
               <DropdownMenuItem
-                className="justify-between gap-3"
-                onClick={() => router.push("/referrals")}
+                disabled
+                className="justify-between gap-3 text-muted-foreground"
               >
                 <span className="flex items-center gap-2">
                   <UsersIcon />
                   Referrals
                 </span>
                 <span className="rounded-md bg-secondary px-1.5 py-0.5 text-[0.625rem] font-medium text-secondary-foreground">
-                  New
+                  Soon
                 </span>
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => router.push("/settings")}>

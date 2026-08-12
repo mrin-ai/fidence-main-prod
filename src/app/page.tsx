@@ -1,25 +1,9 @@
-import type { Metadata } from "next";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 
-import { StackgridPage } from "@/components/StackgridPage";
-import { getStackgridHomeHtml } from "@/lib/stackgrid-home";
+import { AUTH_COOKIE } from "@/lib/auth-session";
 
-export const metadata: Metadata = {
-  title: "Instant Crypto Payments – Low Fees + AI Agent Payment API",
-  description:
-    "Accept instant crypto payments with low transaction fees. Simple for humans and merchants, with an AI agent payment API for autonomous commerce.",
-  alternates: {
-    canonical: "/",
-  },
-  openGraph: {
-    title: "Instant Crypto Payments – Low Fees + AI Agent Payment API",
-    description:
-      "Accept instant crypto payments with low transaction fees. Simple for humans and merchants, with an AI agent payment API for autonomous commerce.",
-    url: "https://www.payagent.co",
-    images: ["https://www.payagent.co/payagent-og.png"],
-  },
-};
-
-export default function HomePage() {
-  const html = getStackgridHomeHtml();
-  return <StackgridPage html={html} />;
+export default async function HomePage() {
+  const token = (await cookies()).get(AUTH_COOKIE)?.value;
+  redirect(token ? "/dashboard" : "/sign-in");
 }

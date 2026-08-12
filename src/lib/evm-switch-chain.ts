@@ -129,7 +129,7 @@ export async function switchWalletChain(chainId: number) {
 
     const chain = getChainConfig(chainId);
     if (!chain) {
-      throw new Error("This network is not configured in PayAgent.");
+      throw new Error("This network is not configured in Fidence.");
     }
 
     await provider.request({
@@ -200,7 +200,7 @@ export function createPaymentWalletClient(input: {
 
   const chain = getChainConfig(input.chainId);
   if (!chain) {
-    throw new Error("This network is not configured in PayAgent.");
+    throw new Error("This network is not configured in Fidence.");
   }
 
   return createWalletClient({

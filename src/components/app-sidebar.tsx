@@ -1,8 +1,8 @@
 "use client"
 
 import * as React from "react"
-import Image from "next/image"
 
+import { FidenceLogoIcon } from "@/components/fidence-logo-icon"
 import { NavMain } from "@/components/nav-main"
 import { NavUser } from "@/components/nav-user"
 import {
@@ -26,7 +26,9 @@ import {
   ReceiptIcon,
   ShieldCheckIcon,
   StoreIcon,
+  UsersIcon,
   WalletIcon,
+  WebhookIcon,
 } from "lucide-react"
 
 const data = {
@@ -81,11 +83,6 @@ const data = {
           ],
         },
         {
-          title: "Reward",
-          url: "/rewards",
-          icon: <GiftIcon />,
-        },
-        {
           title: "Merchant",
           url: "/merchant/api-credentials",
           icon: <KeyRoundIcon />,
@@ -105,6 +102,11 @@ const data = {
               url: "/merchant/compliance",
               icon: <ShieldCheckIcon />,
             },
+            {
+              title: "Webhooks",
+              url: "/merchant/webhooks",
+              icon: <WebhookIcon />,
+            },
           ],
         },
       ],
@@ -113,16 +115,27 @@ const data = {
       label: "Soon",
       items: [
         {
+          title: "Rewards",
+          url: "#",
+          icon: <GiftIcon />,
+          comingSoon: true,
+        },
+        {
+          title: "Referrals",
+          url: "#",
+          icon: <UsersIcon />,
+          comingSoon: true,
+        },
+        {
           title: "Intelligence Commerce",
           url: "#",
           icon: <StoreIcon />,
           comingSoon: true,
         },
         {
-          title: "API & Webhooks",
-          url: "#",
+          title: "API docs",
+          url: "/docs",
           icon: <Code2Icon />,
-          comingSoon: true,
         },
       ],
     },
@@ -138,6 +151,8 @@ export function AppSidebar({
     name: string
     role: string
     initials: string
+    username: string | null
+    hasVerifiedWallet: boolean
   }
   workspace: {
     name: string
@@ -151,23 +166,15 @@ export function AppSidebar({
           <SidebarMenuItem>
             <SidebarMenuButton
               size="lg"
-              tooltip="Payagent"
+              tooltip="Fidence"
               className="pointer-events-none group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:overflow-visible! group-data-[collapsible=icon]:p-0.5!"
               render={<div />}
             >
-              <div className="flex aspect-square size-8 shrink-0 items-center justify-center rounded-lg border border-border/50 bg-white group-data-[collapsible=icon]:size-full group-data-[collapsible=icon]:border-0 group-data-[collapsible=icon]:bg-transparent">
-                <Image
-                  src="/logo.png"
-                  alt="Payagent"
-                  width={32}
-                  height={32}
-                  className="size-7 object-contain group-data-[collapsible=icon]:size-7"
-                  priority
-                />
+              <div className="flex aspect-square size-8 shrink-0 items-center justify-center overflow-visible rounded-lg border border-border/50 bg-white group-data-[collapsible=icon]:size-full group-data-[collapsible=icon]:border-0 group-data-[collapsible=icon]:bg-transparent">
+                <FidenceLogoIcon className="size-8 scale-[1.35] group-data-[collapsible=icon]:size-6 group-data-[collapsible=icon]:scale-100" />
               </div>
-              <div className="flex min-w-0 flex-1 items-baseline gap-1.5 text-left font-serif text-xl tracking-tight leading-none group-data-[collapsible=icon]:hidden">
-                <span className="truncate">Payagent</span>
-                <span className="shrink-0 text-muted-foreground">by LCX</span>
+              <div className="flex min-w-0 flex-1 items-baseline text-left font-serif text-xl tracking-tight leading-none group-data-[collapsible=icon]:hidden">
+                <span className="truncate">Fidence</span>
               </div>
             </SidebarMenuButton>
           </SidebarMenuItem>

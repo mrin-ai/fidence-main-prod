@@ -19,7 +19,7 @@ export function getResendFromAddress() {
   const from = process.env.RESEND_FROM_EMAIL?.trim();
   if (!from) {
     throw new Error(
-      "RESEND_FROM_EMAIL is not configured (e.g. PayAgent <invoices@yourdomain.com>)",
+      "RESEND_FROM_EMAIL is not configured (e.g. Fidence <invoices@yourdomain.com>)",
     );
   }
   return from;

@@ -141,7 +141,7 @@ export function QuickActions() {
       title: "Referrals",
       subtitle: "Invite merchants and earn LCX",
       icon: <GiftIcon className="size-4" />,
-      href: "/referrals",
+      comingSoon: true,
     },
     {
       title: "API Documentation",

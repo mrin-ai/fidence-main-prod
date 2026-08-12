@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { PlusIcon } from "lucide-react";
 
 import { useCreatePaymentLink } from "@/components/create-payment-link-sheet";
-import { LcxLogo } from "@/components/lcx-logo";
+import { FidenceLogoIcon } from "@/components/fidence-logo-icon";
 import { Button } from "@/components/ui/button";
 
 export function PayPageNavbar() {
@@ -27,7 +27,9 @@ export function PayPageNavbar() {
     <header className="sticky top-0 z-10 border-b border-border/40 bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
       <div className="mx-auto flex h-14 w-full max-w-5xl items-center justify-between px-4 md:px-6">
         <Link href="/dashboard" className="inline-flex shrink-0 items-center">
-          <LcxLogo className="h-11 w-auto" priority />
+          <div className="flex size-8 shrink-0 items-center justify-center overflow-visible rounded-lg border border-border/50 bg-white">
+            <FidenceLogoIcon className="size-6" />
+          </div>
         </Link>
         <Button
           size="sm"

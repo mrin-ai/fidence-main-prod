@@ -51,10 +51,12 @@ next-env.d.ts
 /solidity/artifacts
 /solidity/deployments
 
-# Local landing source (integrated into src/app)
-/fidence-landing
+# Local landing assets
 /public/landing
 
 # Local Invoicely reference clone (do not push)
 /Invoicely
 /invoicely
+
+# Operator-only runbooks (deploy, DB, security) — local only, never commit
+/docs/internal/

@@ -13,7 +13,7 @@ import {
   getWorkspaceId,
   merchantApiUnauthorized,
 } from "@/lib/db/merchant-api";
-import { enforceCompliancePolicyRateLimit } from "@/lib/merchant-api/rate-limit";
+import { enforceCompliancePolicyRateLimit, enforceComplianceReadRateLimit } from "@/lib/merchant-api/rate-limit";
 
 type Params = { params: Promise<{ agentId: string }> };
 
@@ -25,6 +25,11 @@ function authMethodFromRequest(request: Request) {
 export async function GET(request: Request, { params }: Params) {
   const context = await getMerchantApiContext(request);
   if (!context) return merchantApiUnauthorized();
+
+  const rateLimited = await enforceComplianceReadRateLimit(
+    getWorkspaceId(context),
+  );
+  if (rateLimited) return rateLimited;
 
   const { agentId } = await params;
   const agent = await resolveWorkspaceAgent(context.workspace._id, agentId);

@@ -19,6 +19,8 @@ export function AppShell({
     name: string
     role: string
     initials: string
+    username: string | null
+    hasVerifiedWallet: boolean
   }
   workspace: {
     name: string

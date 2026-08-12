@@ -17,8 +17,8 @@ function emailShell(body: string) {
         <td align="center">
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;padding:28px;">
             <tr>
-              <td style="font-size:13px;font-weight:600;letter-spacing:0.04em;color:#0066ff;padding-bottom:16px;">
-                PAYAGENT
+              <td style="font-size:13px;font-weight:600;letter-spacing:0.04em;color:#d5c515;padding-bottom:16px;">
+                Fidence
               </td>
             </tr>
             <tr>
@@ -63,12 +63,12 @@ export async function sendInvoiceShareEmail(input: {
       </tr>
     </table>
     <a href="${escapeHtml(input.paymentUrl)}"
-       style="display:inline-block;background:#0066ff;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 18px;border-radius:8px;">
+       style="display:inline-block;background:#d5c515;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 18px;border-radius:8px;">
       Pay invoice
     </a>
     <p style="margin:20px 0 0;font-size:12px;line-height:1.5;color:#9ca3af;">
       Or open this link:<br />
-      <a href="${escapeHtml(input.paymentUrl)}" style="color:#0066ff;word-break:break-all;">${escapeHtml(input.paymentUrl)}</a>
+      <a href="${escapeHtml(input.paymentUrl)}" style="color:#d5c515;word-break:break-all;">${escapeHtml(input.paymentUrl)}</a>
     </p>
   `);
 

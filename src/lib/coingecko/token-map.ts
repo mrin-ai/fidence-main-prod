@@ -4,7 +4,6 @@ export const COINGECKO_COIN_IDS: Record<string, string> = {
   usdt: "tether",
   eth: "ethereum",
   sol: "solana",
-  lcx: "lcx",
 };
 
 export const STABLECOIN_TOKEN_IDS = new Set(["usdc", "usdt"]);
