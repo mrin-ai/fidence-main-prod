@@ -49,12 +49,6 @@ const data = {
           isNew: true,
         },
         {
-          title: "Pay",
-          url: "/pay/agents",
-          icon: <CreditCardIcon />,
-          featureFlag: "pay" as const,
-        },
-        {
           title: "Invoices",
           url: "/manage-invoices",
           icon: <FileTextIcon />,
@@ -122,6 +116,12 @@ const data = {
       label: "Soon",
       items: [
         {
+          title: "Fidence Pay",
+          url: "/pay/agents",
+          icon: <CreditCardIcon />,
+          comingSoon: true,
+        },
+        {
           title: "Rewards",
           url: "#",
           icon: <GiftIcon />,
@@ -152,7 +152,7 @@ const data = {
 export function AppSidebar({
   user,
   workspace: _workspace,
-  payEnabled = true,
+  payEnabled: _payEnabled = true,
   ...props
 }: React.ComponentProps<typeof Sidebar> & {
   user: {
@@ -168,16 +168,6 @@ export function AppSidebar({
   }
   payEnabled?: boolean
 }) {
-  const navGroups = React.useMemo(() => {
-    if (payEnabled) return data.navGroups
-    return data.navGroups.map((group) => ({
-      ...group,
-      items: group.items.filter(
-        (item) => !("featureFlag" in item && item.featureFlag === "pay"),
-      ),
-    }))
-  }, [payEnabled])
-
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
@@ -200,7 +190,7 @@ export function AppSidebar({
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain groups={navGroups} />
+        <NavMain groups={data.navGroups} />
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={user} />
