@@ -13,7 +13,6 @@ import {
   metricCardValueClassName,
 } from "@/lib/dashboard-styles"
 import type { DashboardOverview } from "@/lib/db/types"
-import { formatRewardCredits } from "@/lib/reward-config"
 import { cn } from "@/lib/utils"
 
 type Stat = {
@@ -24,6 +23,7 @@ type Stat = {
   chartKey: string
   chartColor: string
   chartData: { value: number }[]
+  comingSoon?: boolean
 }
 
 function buildStats(metrics: DashboardOverview["metrics"]): Stat[] {
@@ -60,12 +60,13 @@ function buildStats(metrics: DashboardOverview["metrics"]): Stat[] {
     },
     {
       label: "Rewards",
-      value: formatRewardCredits(metrics.rewardsAmount),
+      value: "Soon",
       icon: <GiftIcon className="size-3" />,
-      valueClassName: "text-primary",
+      valueClassName: "text-sm font-medium text-muted-foreground",
       chartKey: "rewards",
       chartColor: "var(--chart-3)",
-      chartData: metrics.sparklines.rewards.map((value) => ({ value })),
+      chartData: [],
+      comingSoon: true,
     },
   ]
 }
@@ -118,10 +119,11 @@ function StatCard({
   chartKey,
   chartColor,
   chartData,
+  comingSoon = false,
 }: Stat) {
   return (
     <Card size="sm" className={metricCardSurfaceClassName}>
-      <CardHeader className="gap-1.5 pb-2">
+      <CardHeader className={cn("gap-1.5 pb-2", comingSoon && "pb-4")}>
         <p
           className={cn(
             "flex items-center gap-1 text-xs",
@@ -133,7 +135,9 @@ function StatCard({
         </p>
         <CardTitle
           className={cn(
-            "text-xl font-semibold tracking-tight tabular-nums",
+            comingSoon
+              ? "text-sm font-medium"
+              : "text-xl font-semibold tracking-tight tabular-nums",
             metricCardValueClassName,
             valueClassName
           )}
@@ -141,13 +145,19 @@ function StatCard({
           {value}
         </CardTitle>
       </CardHeader>
-      <CardContent className="px-4 pb-3 pt-0">
-        <MetricSparkline
-          chartKey={chartKey}
-          chartColor={chartColor}
-          chartData={chartData}
-        />
-      </CardContent>
+      {!comingSoon ? (
+        <CardContent className="px-4 pb-3 pt-0">
+          <MetricSparkline
+            chartKey={chartKey}
+            chartColor={chartColor}
+            chartData={chartData}
+          />
+        </CardContent>
+      ) : (
+        <CardContent className="px-4 pb-3 pt-0" aria-hidden>
+          <div className="h-11" />
+        </CardContent>
+      )}
     </Card>
   )
 }

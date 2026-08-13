@@ -31,6 +31,8 @@ export type CommerceSource = "human" | "agent";
 
 export type AgentStatus = "active" | "inactive";
 
+export type AgentRegistrationSource = "api" | "linked";
+
 export type AgentWallet = {
   id: string;
   networkId: string;
@@ -55,6 +57,11 @@ export type AgentDoc = {
   amountReceived: number;
   /** In-flight link create exposure (released after insert or on failure). */
   linkExposureHoldUsd?: number;
+  registrationSource?: AgentRegistrationSource;
+  platform?: string;
+  linkedAt?: Date;
+  linkSessionId?: string;
+  defaultPayerWalletId?: string;
   registeredAt: Date;
   lastActiveAt: Date;
   createdAt: Date;
@@ -76,6 +83,9 @@ export type ApiKeyDoc = {
   permissions?: string[];
   agentId?: ObjectId;
   name?: string;
+  /** Temporary storage until first poll delivery; never returned after delivery. */
+  plaintextKey?: string;
+  revokedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
   lastUsedAt?: Date;

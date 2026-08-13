@@ -8,6 +8,7 @@ import {
   rotateWebhookSecret,
   updateWebhookEndpoint,
 } from "@/lib/db/webhooks";
+import { validateWebhookUrl } from "@/lib/webhooks/validate-url";
 
 type Params = {
   params: Promise<{ id: string }>;
@@ -65,11 +66,11 @@ export async function PATCH(request: Request, { params }: Params) {
   }
 
   if (body.url !== undefined) {
-    try {
-      new URL(body.url);
-    } catch {
-      return NextResponse.json({ error: "URL must be valid https/http" }, { status: 400 });
+    const urlCheck = validateWebhookUrl(body.url);
+    if (!urlCheck.ok) {
+      return NextResponse.json({ error: urlCheck.error }, { status: 400 });
     }
+    body.url = urlCheck.url;
   }
 
   let events: ReturnType<typeof parseEvents> | undefined;

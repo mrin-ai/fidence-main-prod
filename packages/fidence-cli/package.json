@@ -1,0 +1,46 @@
+{
+  "name": "fidence-cli",
+  "version": "0.1.4",
+  "description": "CLI for Fidence Pay — connect AI agents, poll link approval, and create payment intents.",
+  "type": "module",
+  "bin": {
+    "fidence": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json && chmod +x dist/index.js",
+    "prepublishOnly": "npm run build",
+    "dev": "tsx src/index.ts"
+  },
+  "keywords": [
+    "fidence",
+    "payments",
+    "agents",
+    "crypto",
+    "cli"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mrin-ai/fidence-main-prod.git",
+    "directory": "packages/fidence-cli"
+  },
+  "bugs": {
+    "url": "https://github.com/mrin-ai/fidence-main-prod/issues"
+  },
+  "homepage": "https://github.com/mrin-ai/fidence-skills#readme",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "tweetnacl": "^1.0.3",
+    "viem": "^2.37.1"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
+  }
+}

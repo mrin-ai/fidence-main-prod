@@ -30,10 +30,11 @@ export function generateApprovalId() {
 }
 
 type ApprovalPayloadMatch = {
-  type: "link" | "profile";
+  type: "link" | "profile" | "address";
   linkUsername?: string;
   linkPublicId?: string;
   recipientUsername?: string;
+  recipientAddress?: string;
   payerAddress?: string;
 };
 
@@ -74,6 +75,17 @@ function matchesApprovalBindings(
     return {
       ok: false as const,
       error: "Approval recipient mismatch",
+      code: "APPROVAL_MISMATCH",
+    };
+  }
+  if (
+    input.payloadMatch.type === "address" &&
+    approval.payload.recipientAddress?.toLowerCase() !==
+      input.payloadMatch.recipientAddress?.toLowerCase()
+  ) {
+    return {
+      ok: false as const,
+      error: "Approval recipient address mismatch",
       code: "APPROVAL_MISMATCH",
     };
   }
@@ -301,7 +313,12 @@ export async function resolvePaymentApproval(input: {
     ]);
     const reEval = evaluatePolicy({
       agentStatus: agent?.status === "active" ? "active" : "inactive",
-      action: existing.payload.type === "link" ? "pay.link" : "pay.profile",
+      action:
+        existing.payload.type === "link"
+          ? "pay.link"
+          : existing.payload.type === "address"
+            ? "pay.address"
+            : "pay.profile",
       amountUsd: existing.amountUsd,
       networkId: existing.networkId,
       tokenId: existing.tokenId,

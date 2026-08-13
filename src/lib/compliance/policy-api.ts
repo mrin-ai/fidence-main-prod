@@ -37,6 +37,7 @@ export function parsePolicyBody(body: Record<string, unknown>): {
       allowedTokenIds,
       allowCreatePaymentLinks: Boolean(body.allowCreatePaymentLinks),
       allowPay: Boolean(body.allowPay),
+      autoPayEnabled: body.autoPayEnabled === true,
       requireApprovalAbove,
     },
     confirmWideOpen: body.confirmWideOpen === true,

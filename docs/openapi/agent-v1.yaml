@@ -294,6 +294,85 @@ paths:
       responses:
         "200":
           description: OpenAPI JSON
+  /agent-links:
+    post:
+      tags: [Agents]
+      summary: Create agent link session (CLI)
+      security: []
+      operationId: createAgentLink
+      responses:
+        "200":
+          description: Link session created
+  /agent-links/{lid}:
+    get:
+      tags: [Agents]
+      summary: Poll agent link session
+      security: []
+      operationId: pollAgentLink
+      parameters:
+        - name: lid
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: pollSecret
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Link session status
+    delete:
+      tags: [Agents]
+      summary: Cancel pending link session
+      security: []
+      operationId: cancelAgentLink
+      parameters:
+        - name: lid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Cancelled
+  /payment-intents:
+    post:
+      tags: [Pay]
+      summary: Create payment intent (scoped agent key)
+      operationId: createPaymentIntent
+      responses:
+        "200":
+          description: Intent created
+  /payment-intents/{id}:
+    get:
+      tags: [Pay]
+      summary: Get payment intent
+      operationId: getPaymentIntent
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Intent status
+  /payment-intents/{id}/poll:
+    get:
+      tags: [Pay]
+      summary: Poll payment intent until terminal state
+      operationId: pollPaymentIntent
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Poll result
 components:
   securitySchemes:
     bearerAuth:

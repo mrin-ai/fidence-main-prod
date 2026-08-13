@@ -9,6 +9,7 @@ import { POLICY_CODES } from "@/lib/compliance/codes";
 import { toPolicyAmountUsdAsync } from "@/lib/compliance/valuation-async";
 import {
   agentHasWallet,
+  isLinkedAgent,
   requireActiveAgent,
 } from "@/lib/db/agents";
 import { getAgentPolicy } from "@/lib/db/agent-policies";
@@ -25,9 +26,16 @@ import { getWorkspaceForUser } from "@/lib/db/auth";
 import { getDb } from "@/lib/db/client";
 import { COLLECTIONS } from "@/lib/db/collections";
 import { recordProfilePayment } from "@/lib/db/profile-payments";
+import { logAgentPaymentSentActivity } from "@/lib/db/activity";
+import { findTransactionByWorkspaceTxHash } from "@/lib/db/transaction-txhash";
+import { incrementDailyStat } from "@/lib/db/workspace-stats";
+import { incrementAgentPaymentStats } from "@/lib/db/agents";
+import { getTokenById } from "@/lib/create-payment-link-data";
+import type { TransactionDoc } from "@/lib/db/types";
 import { resolveRecipientAddress } from "@/lib/db/wallets";
 import { normalizeUsername } from "@/lib/db/profile";
 import { normalizePaymentAddress, normalizeTxHash } from "@/lib/payment/normalize";
+import { validateRecipientAddress } from "@/lib/pay/recipient-address";
 import { supportsOnChainPayment } from "@/lib/payment-contracts";
 import { getSettlementVerifier } from "@/lib/payment/settlement";
 import { logSecurityEvent } from "@/lib/db/security-audit";
@@ -49,10 +57,12 @@ async function verifyAgentPayerWallet(
   const active = await requireActiveAgent(context.workspace._id, externalAgentId);
   if (!active.ok) return active;
 
-  if (!agentHasWallet(active.agent, payerAddress, networkId)) {
+  if (!agentHasWallet(active.agent, payerAddress, networkId, context.owner)) {
     return {
       ok: false as const,
-      error: "payerAddress does not match a wallet registered for this agent",
+      error: isLinkedAgent(active.agent)
+        ? "payerAddress does not match a verified wallet on /wallets for this network"
+        : "payerAddress does not match a wallet registered for this agent",
       code: "AGENT_WALLET_MISMATCH" as const,
     };
   }
@@ -94,7 +104,7 @@ export type AgentPayPolicyGate =
 export async function gateAgentPayPolicy(input: {
   context: MerchantApiContext;
   agent: AgentDoc;
-  action: "pay.link" | "pay.profile";
+  action: "pay.link" | "pay.profile" | "pay.address";
   /** Amount used for policy evaluation (observed on-chain for profile). */
   amount: number;
   tokenId: string;
@@ -106,10 +116,11 @@ export async function gateAgentPayPolicy(input: {
    */
   approvalClaimAmount?: number;
   payloadMatch: {
-    type: "link" | "profile";
+    type: "link" | "profile" | "address";
     linkUsername?: string;
     linkPublicId?: string;
     recipientUsername?: string;
+    recipientAddress?: string;
     payerAddress?: string;
   };
 }): Promise<AgentPayPolicyGate> {
@@ -237,6 +248,7 @@ export async function gateAgentPayPolicy(input: {
         linkUsername: input.payloadMatch.linkUsername,
         linkPublicId: input.payloadMatch.linkPublicId,
         recipientUsername: input.payloadMatch.recipientUsername,
+        recipientAddress: input.payloadMatch.recipientAddress,
         amount: input.amount,
         tokenId: input.tokenId,
         networkId: input.networkId,
@@ -695,5 +707,266 @@ export async function recordAgentProfilePayment(input: {
       publicId: walletCheck.agent.publicId,
       externalAgentId: walletCheck.agent.externalAgentId,
     },
+  };
+}
+
+export async function recordAgentAddressPayment(input: {
+  context: MerchantApiContext;
+  externalAgentId: string;
+  payerAddress: string;
+  txHash: string;
+  recipientAddress: string;
+  amount: number;
+  tokenId: string;
+  networkId: string;
+  approvalId?: string;
+}) {
+  const validated = validateRecipientAddress(input.recipientAddress, input.networkId);
+  if (!validated.ok) {
+    return { ok: false as const, error: validated.error, code: "INVALID_ADDRESS" as const };
+  }
+
+  if (!supportsOnChainPayment(input.networkId, input.tokenId)) {
+    return {
+      ok: false as const,
+      error: "This token/network combination is not supported",
+      code: "TOKEN_NETWORK_UNSUPPORTED" as const,
+    };
+  }
+
+  const walletCheck = await verifyAgentPayerWallet(
+    input.context,
+    input.externalAgentId,
+    input.payerAddress,
+    input.networkId,
+  );
+  if (!walletCheck.ok) return walletCheck;
+
+  const normalizedPayerAddress = normalizePaymentAddress(
+    input.payerAddress,
+    input.networkId,
+  );
+  const normalizedTxHash = normalizeTxHash(input.txHash, input.networkId);
+  const normalizedRecipientAddress = validated.address;
+
+  const verified = await getSettlementVerifier().verifySettlementDetailed(
+    {
+      recipientAddress: normalizedRecipientAddress,
+      amount: input.amount,
+      tokenId: input.tokenId,
+      networkId: input.networkId,
+      payerAddress: normalizedPayerAddress,
+    },
+    normalizedTxHash,
+  );
+
+  if (!verified.ok) {
+    return { ok: false as const, error: "Payment verification failed" };
+  }
+
+  if (!Number.isFinite(verified.observedAmount) || verified.observedAmount <= 0) {
+    return {
+      ok: false as const,
+      error: "Could not determine on-chain settlement amount",
+      code: POLICY_CODES.SETTLEMENT_AMOUNT_UNKNOWN,
+    };
+  }
+
+  const observedAmount = verified.observedAmount;
+
+  const gate = await gateAgentPayPolicy({
+    context: input.context,
+    agent: walletCheck.agent,
+    action: "pay.address",
+    amount: observedAmount,
+    approvalClaimAmount: input.amount,
+    tokenId: input.tokenId,
+    networkId: input.networkId,
+    approvalId: input.approvalId,
+    payloadMatch: {
+      type: "address",
+      recipientAddress: normalizedRecipientAddress,
+      payerAddress: input.payerAddress,
+    },
+  });
+
+  if (!gate.ok) {
+    return { ok: false as const, policyResponse: gate.response };
+  }
+
+  const spend = await reserveSpend({
+    workspaceId: input.context.workspace._id,
+    agentId: walletCheck.agent._id,
+    amountUsd: gate.amountUsd,
+  });
+
+  if (!spend.ok) {
+    if (gate.approvalClaimed && input.approvalId) {
+      await releasePaymentApprovalClaim({
+        workspaceId: input.context.workspace._id,
+        approvalId: input.approvalId,
+      });
+    }
+    return {
+      ok: false as const,
+      error: "Agent spend cap exceeded",
+      code: spend.code,
+    };
+  }
+
+  const existing = await findTransactionByWorkspaceTxHash(
+    input.context.workspace._id,
+    normalizedTxHash,
+    input.networkId,
+  );
+  if (existing) {
+    await decrementAgentSpend({
+      workspaceId: input.context.workspace._id,
+      agentId: walletCheck.agent._id,
+      amountUsd: gate.amountUsd,
+    });
+    if (input.approvalId && gate.approvalClaimed) {
+      await consumePaymentApproval({
+        workspaceId: input.context.workspace._id,
+        approvalId: input.approvalId,
+      });
+    }
+    return {
+      ok: true as const,
+      transactionId: existing._id.toString(),
+      duplicate: true,
+      agent: {
+        publicId: walletCheck.agent.publicId,
+        externalAgentId: walletCheck.agent.externalAgentId,
+      },
+    };
+  }
+
+  const sent = await recordAgentAddressPaymentSent({
+    workspaceId: input.context.workspace._id,
+    agent: walletCheck.agent,
+    recipientAddress: normalizedRecipientAddress,
+    amount: observedAmount,
+    tokenId: input.tokenId,
+    networkId: input.networkId,
+    txHash: normalizedTxHash,
+  });
+
+  if (!sent.ok) {
+    await decrementAgentSpend({
+      workspaceId: input.context.workspace._id,
+      agentId: walletCheck.agent._id,
+      amountUsd: gate.amountUsd,
+    });
+    if (gate.approvalClaimed && input.approvalId) {
+      await releasePaymentApprovalClaim({
+        workspaceId: input.context.workspace._id,
+        approvalId: input.approvalId,
+      });
+    }
+    return {
+      ok: false as const,
+      error: "Could not record payment",
+      code: "RECORD_FAILED" as const,
+    };
+  }
+
+  if (input.approvalId && gate.approvalClaimed) {
+    const consumed = await consumePaymentApproval({
+      workspaceId: input.context.workspace._id,
+      approvalId: input.approvalId,
+    });
+    if (!consumed.ok) {
+      await decrementAgentSpend({
+        workspaceId: input.context.workspace._id,
+        agentId: walletCheck.agent._id,
+        amountUsd: gate.amountUsd,
+      });
+      return {
+        ok: false as const,
+        error: consumed.error,
+        code: consumed.code,
+      };
+    }
+  }
+
+  await logSecurityEvent({
+    workspaceId: input.context.workspace._id,
+    actorType: "agent",
+    actorId: walletCheck.agent.publicId,
+    agentId: walletCheck.agent._id,
+    action: "agent_address_payment",
+    resourceType: "wallet",
+    resourceId: normalizedRecipientAddress,
+    security: input.context.security,
+  });
+
+  return {
+    ok: true as const,
+    transactionId: sent.transactionId,
+    duplicate: sent.duplicate,
+    agent: {
+      publicId: walletCheck.agent.publicId,
+      externalAgentId: walletCheck.agent.externalAgentId,
+    },
+  };
+}
+
+async function recordAgentAddressPaymentSent(input: {
+  workspaceId: ObjectId;
+  agent: AgentDoc;
+  recipientAddress: string;
+  amount: number;
+  tokenId: string;
+  networkId: string;
+  txHash: string;
+}) {
+  const existing = await findTransactionByWorkspaceTxHash(
+    input.workspaceId,
+    input.txHash,
+    input.networkId,
+  );
+  if (existing) {
+    return {
+      ok: true as const,
+      transactionId: existing._id.toString(),
+      duplicate: true,
+    };
+  }
+
+  const db = await getDb();
+  const now = new Date();
+  const token = getTokenById(input.tokenId);
+
+  const result = await db.collection(COLLECTIONS.transactions).insertOne({
+    workspaceId: input.workspaceId,
+    type: "payment_sent",
+    label: `Agent payment sent · ${input.agent.publicId}`,
+    amount: input.amount,
+    symbol: token?.symbol?.toLowerCase() ?? input.tokenId,
+    networkId: input.networkId,
+    txHash: input.txHash,
+    recipientAddress: input.recipientAddress,
+    source: "agent",
+    agentId: input.agent._id,
+    status: "confirmed",
+    occurredAt: now,
+    createdAt: now,
+  } satisfies Omit<TransactionDoc, "_id">);
+
+  await logAgentPaymentSentActivity({
+    workspaceId: input.workspaceId,
+    agentPublicId: input.agent.publicId,
+    amount: input.amount,
+    tokenSymbol: token?.symbol ?? input.tokenId.toUpperCase(),
+  });
+
+  await incrementDailyStat(input.workspaceId, "sentAmount", input.amount, now);
+  await incrementAgentPaymentStats(input.agent._id, { paid: input.amount });
+
+  return {
+    ok: true as const,
+    transactionId: result.insertedId.toString(),
+    duplicate: false,
   };
 }

@@ -33,6 +33,7 @@ export function policyDocToApi(doc: AgentPolicyDoc): AgentPolicy & {
     allowedTokenIds: doc.allowedTokenIds,
     allowCreatePaymentLinks: doc.allowCreatePaymentLinks,
     allowPay: doc.allowPay,
+    autoPayEnabled: doc.autoPayEnabled === true,
     requireApprovalAbove: doc.requireApprovalAbove,
     updatedAt: doc.updatedAt.toISOString(),
     policyVersion: doc.policyVersion,
@@ -53,6 +54,7 @@ export function toEvaluablePolicy(doc: AgentPolicyDoc) {
     allowedTokenIds: doc.allowedTokenIds,
     allowCreatePaymentLinks: doc.allowCreatePaymentLinks,
     allowPay: doc.allowPay,
+    autoPayEnabled: doc.autoPayEnabled === true,
     requireApprovalAbove: doc.requireApprovalAbove,
   };
 }
@@ -207,6 +209,7 @@ export async function upsertAgentPolicy(input: {
     allowedTokenIds: input.body.allowedTokenIds,
     allowCreatePaymentLinks: input.body.allowCreatePaymentLinks,
     allowPay: input.body.allowPay,
+    autoPayEnabled: input.body.autoPayEnabled,
     requireApprovalAbove: input.body.requireApprovalAbove,
     updatedAt: now,
     lastUpdatedByUserId: input.actor.userId,

@@ -6,7 +6,8 @@ export type EvaluatePolicyAction =
   | "payment_links.create"
   | "payment_links.batch_item"
   | "pay.link"
-  | "pay.profile";
+  | "pay.profile"
+  | "pay.address";
 
 export type EvaluablePolicy = {
   id: string;
@@ -80,7 +81,10 @@ export function evaluatePolicy(input: EvaluatePolicyInput): EvaluatePolicyResult
     const isCreate =
       input.action === "payment_links.create" ||
       input.action === "payment_links.batch_item";
-    const isPay = input.action === "pay.link" || input.action === "pay.profile";
+    const isPay =
+      input.action === "pay.link" ||
+      input.action === "pay.profile" ||
+      input.action === "pay.address";
 
     if (isCreate && !policy.allowCreatePaymentLinks) {
       return deny([POLICY_CODES.ACTION_NOT_ALLOWED], policy);

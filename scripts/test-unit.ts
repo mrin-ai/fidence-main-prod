@@ -21,6 +21,7 @@ import {
   PAYAGENT_TOKEN_DECIMALS,
   PAYAGENT_TOKEN_SYMBOL,
 } from "../src/lib/payagent-token";
+import { validateRecipientAddress } from "../src/lib/pay/recipient-address";
 import { isReservedPaymentPathSegment } from "../src/lib/payment-link-url";
 import { evaluatePolicy } from "../src/lib/compliance/evaluate-policy";
 import { toPolicyAmountUsd } from "../src/lib/compliance/valuation";
@@ -32,6 +33,10 @@ import {
   isFormatOnlySettlementVerification,
 } from "../src/lib/payment/settlement/mode";
 import { validateWebhookUrl } from "../src/lib/webhooks/validate-url";
+import { savedAddressInputSchema } from "../src/lib/pay/saved-address-schema";
+import { isPayAgentConnectEnabled, AGENT_SCOPED_KEY_PERMISSIONS } from "../src/lib/pay/config";
+import { hashPollSecret } from "../src/lib/db/agent-links";
+import { apiKeyHasPermission } from "../src/lib/db/api-keys";
 
 type TestCase = {
   name: string;
@@ -256,6 +261,44 @@ const tests: TestCase[] = [
     },
   },
   {
+    name: "evaluatePolicy allows pay.address within caps",
+    run: () => {
+      const result = evaluatePolicy({
+        agentStatus: "active",
+        action: "pay.address",
+        amountUsd: 10,
+        networkId: "base",
+        tokenId: "usdc",
+        policy: {
+          id: "pol_1",
+          status: "active",
+          policyVersion: 1,
+          maxAmountPerPayment: 50,
+          dailySpendCap: 200,
+          monthlySpendCap: null,
+          allowedNetworkIds: ["base"],
+          allowedTokenIds: ["usdc"],
+          allowCreatePaymentLinks: true,
+          allowPay: true,
+          requireApprovalAbove: null,
+        },
+        spentDailyUsd: 0,
+        spentMonthlyUsd: 0,
+      });
+      assertEqual(result.verdict, "allow");
+    },
+  },
+  {
+    name: "validateRecipientAddress accepts checksummed EVM address",
+    run: () => {
+      const result = validateRecipientAddress(
+        "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
+        "sepolia",
+      );
+      assertTrue(result.ok);
+    },
+  },
+  {
     name: "redactSecretsForLogs keeps IP and strips bearer tokens",
     run: () => {
       const redacted = redactSecretsForLogs({
@@ -329,6 +372,59 @@ const tests: TestCase[] = [
     run: () => {
       const result = validateWebhookUrl("http://169.254.169.254/latest/meta-data");
       assertEqual(result.ok, false);
+    },
+  },
+  {
+    name: "saved address schema requires country ISO-2",
+    run: () => {
+      const parsed = savedAddressInputSchema.safeParse({
+        name: "Test",
+        line1: "1 Main",
+        city: "NYC",
+        country: "US",
+      });
+      assertTrue(parsed.success);
+    },
+  },
+  {
+    name: "saved address schema rejects invalid email",
+    run: () => {
+      const parsed = savedAddressInputSchema.safeParse({
+        name: "Test",
+        email: "not-an-email",
+        line1: "1 Main",
+        city: "NYC",
+        country: "US",
+      });
+      assertTrue(!parsed.success);
+    },
+  },
+  {
+    name: "isPayAgentConnectEnabled defaults true",
+    run: () => {
+      const prev = process.env.PAY_AGENT_CONNECT_ENABLED;
+      delete process.env.PAY_AGENT_CONNECT_ENABLED;
+      assertTrue(isPayAgentConnectEnabled());
+      if (prev) process.env.PAY_AGENT_CONNECT_ENABLED = prev;
+    },
+  },
+  {
+    name: "agent scoped permissions include payment_intents.create",
+    run: () => {
+      assertTrue(AGENT_SCOPED_KEY_PERMISSIONS.includes("payment_intents.create"));
+      assertTrue(
+        apiKeyHasPermission(
+          { permissions: [...AGENT_SCOPED_KEY_PERMISSIONS] } as import("../src/lib/db/merchant-types").ApiKeyDoc,
+          "payment_intents.create",
+        ),
+      );
+    },
+  },
+  {
+    name: "hashPollSecret is deterministic",
+    run: () => {
+      assertEqual(hashPollSecret("abc"), hashPollSecret("abc"));
+      assertTrue(hashPollSecret("abc") !== hashPollSecret("def"));
     },
   },
 ];

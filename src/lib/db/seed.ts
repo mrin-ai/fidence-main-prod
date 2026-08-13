@@ -264,5 +264,7 @@ export async function ensureDbIndexes(dbInput?: Db) {
 export async function bootstrapDatabase() {
   const migrationResult = await runDbMigrations();
   await ensureDbIndexes();
+  const { ensurePayIndexes } = await import("@/lib/db/pay-indexes");
+  await ensurePayIndexes();
   return migrationResult;
 }

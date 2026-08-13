@@ -4,6 +4,7 @@ export const COMPLIANCE_DECISION_ACTIONS = {
   PAYMENT_LINKS_BATCH_ITEM: "payment_links.batch_item",
   PAY_LINK: "pay.link",
   PAY_PROFILE: "pay.profile",
+  PAY_ADDRESS: "pay.address",
   PAY_PREFLIGHT: "pay.preflight",
   POLICY_DRAFT_SAVED: "policy.draft_saved",
   POLICY_ACTIVATED: "policy.activated",

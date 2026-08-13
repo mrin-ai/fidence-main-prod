@@ -2,6 +2,7 @@
 
 # dependencies
 /node_modules
+/packages/*/node_modules
 /.pnp
 .pnp.*
 .yarn/*
@@ -53,6 +54,9 @@ next-env.d.ts
 
 # Local landing assets
 /public/landing
+
+# Separate skills repo (published at github.com/mrin-ai/fidence-skills)
+/fidence-skills/
 
 # Local Invoicely reference clone (do not push)
 /Invoicely

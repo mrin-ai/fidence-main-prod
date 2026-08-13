@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 
 import {
+  preflightAgentAddressPayment,
   preflightAgentLinkPayment,
   preflightAgentProfilePayment,
+  withAutoPayEligible,
 } from "@/lib/db/agent-pay-preflight";
 import {
   getMerchantApiContext,
@@ -84,11 +86,43 @@ export async function GET(request: Request) {
       dryRun,
     });
 
-    return NextResponse.json(result);
+    return NextResponse.json(await withAutoPayEligible(context, agentId, result));
+  }
+
+  if (type === "address") {
+    const recipientAddress = searchParams.get("recipientAddress")?.trim();
+    const tokenId = searchParams.get("tokenId")?.trim();
+    const networkId = searchParams.get("networkId")?.trim();
+
+    if (!recipientAddress || !tokenId || !networkId) {
+      return NextResponse.json(
+        {
+          error:
+            "recipientAddress, tokenId, and networkId are required for type=address",
+        },
+        { status: 400 },
+      );
+    }
+
+    const amountRaw = searchParams.get("amount");
+    const amount = amountRaw != null ? Number(amountRaw) : undefined;
+
+    const result = await preflightAgentAddressPayment({
+      context,
+      externalAgentId: agentId,
+      recipientAddress,
+      tokenId,
+      networkId,
+      payerAddress,
+      amount,
+      dryRun,
+    });
+
+    return NextResponse.json(await withAutoPayEligible(context, agentId, result));
   }
 
   return NextResponse.json(
-    { error: "type must be 'link' or 'profile'" },
+    { error: "type must be 'link', 'profile', or 'address'" },
     { status: 400 },
   );
 }

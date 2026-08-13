@@ -20,6 +20,7 @@ export type AgentPolicyDoc = {
   allowedTokenIds: string[];
   allowCreatePaymentLinks: boolean;
   allowPay: boolean;
+  autoPayEnabled?: boolean;
   requireApprovalAbove: number | null;
   createdAt: Date;
   updatedAt: Date;
@@ -77,10 +78,11 @@ export type PaymentApprovalStatus =
   | "consumed";
 
 export type PaymentApprovalPayload = {
-  type: "link" | "profile";
+  type: "link" | "profile" | "address";
   linkUsername?: string;
   linkPublicId?: string;
   recipientUsername?: string;
+  recipientAddress?: string;
   amount: number;
   tokenId: string;
   networkId: string;

@@ -6,7 +6,8 @@ import { toPolicyAmountUsdAsync } from "@/lib/compliance/valuation-async";
 import {
   agentHasWallet,
   getAgentByExternalId,
-  getAgentWallets,
+  getAgentPayerWallets,
+  isLinkedAgent,
 } from "@/lib/db/agents";
 import { getAgentPolicy, toEvaluablePolicy } from "@/lib/db/agent-policies";
 import { getAgentSpendTotals } from "@/lib/db/agent-spend";
@@ -18,6 +19,7 @@ import { COLLECTIONS } from "@/lib/db/collections";
 import { normalizeUsername } from "@/lib/db/profile";
 import { resolveRecipientAddress } from "@/lib/db/wallets";
 import { supportsOnChainPayment } from "@/lib/payment-contracts";
+import { validateRecipientAddress } from "@/lib/pay/recipient-address";
 import type { UserDoc } from "@/lib/db/types";
 import type { AgentDoc } from "@/lib/db/merchant-types";
 
@@ -29,7 +31,7 @@ export type PreflightCheck = {
 
 export type AgentPayPreflightResult = {
   ready: boolean;
-  type: "link" | "profile";
+  type: "link" | "profile" | "address";
   checks: Record<string, PreflightCheck>;
 };
 
@@ -41,11 +43,43 @@ function allReady(checks: Record<string, PreflightCheck>) {
   return Object.values(checks).every((item) => item.ok);
 }
 
-function agentWalletVerified(agent: AgentDoc, payerAddress?: string, networkId?: string) {
+export function isAutoPayEligibleFromChecks(checks: Record<string, PreflightCheck>) {
+  if (Object.values(checks).some((item) => !item.ok)) return false;
+  return !Object.values(checks).some(
+    (item) => item.code === POLICY_CODES.APPROVAL_REQUIRED,
+  );
+}
+
+export async function withAutoPayEligible(
+  context: MerchantApiContext,
+  externalAgentId: string,
+  result: AgentPayPreflightResult,
+): Promise<AgentPayPreflightResult & { autoPayEligible: boolean }> {
+  const agent = await getAgentByExternalId(context.workspace._id, externalAgentId);
+  if (!agent) {
+    return { ...result, autoPayEligible: false };
+  }
+
+  const policy = await getAgentPolicy(context.workspace._id, agent._id);
+  const autoPayEligible = Boolean(
+    policy?.autoPayEnabled === true &&
+      policy.status === "active" &&
+      isAutoPayEligibleFromChecks(result.checks),
+  );
+
+  return { ...result, autoPayEligible };
+}
+
+function agentWalletVerified(
+  agent: AgentDoc,
+  owner: UserDoc | null,
+  payerAddress?: string,
+  networkId?: string,
+) {
   if (process.env.AGENT_REQUIRE_VERIFIED_WALLET !== "true") {
     return true;
   }
-  const wallets = getAgentWallets(agent);
+  const wallets = getAgentPayerWallets(agent, owner);
   if (!payerAddress || !networkId) {
     return wallets.some((w) => w.verifiedAt);
   }
@@ -93,15 +127,17 @@ async function checkAgent(
     checks.agent_active = check(true, "Agent is active");
   }
 
-  const wallets = getAgentWallets(agent);
+  const wallets = getAgentPayerWallets(agent, context.owner);
   if (wallets.length === 0) {
     checks.agent_wallet = check(
       false,
-      "No wallet added for this agent",
+      isLinkedAgent(agent)
+        ? "No verified wallet on /wallets for this network"
+        : "No wallet added for this agent",
       "AGENT_WALLET_MISSING",
     );
   } else if (payerAddress && networkId) {
-    checks.agent_wallet = agentHasWallet(agent, payerAddress, networkId)
+    checks.agent_wallet = agentHasWallet(agent, payerAddress, networkId, context.owner)
       ? check(true, "Payer address matches agent wallet on this network")
       : check(
           false,
@@ -114,15 +150,22 @@ async function checkAgent(
       ? check(true, `Agent has a wallet on ${networkId}`)
       : check(
           false,
-          `Agent has no wallet on ${networkId}`,
+          isLinkedAgent(agent)
+            ? `No verified wallet on /wallets for ${networkId}`
+            : `Agent has no wallet on ${networkId}`,
           "AGENT_WALLET_MISSING",
         );
   } else {
     checks.agent_wallet = check(true, `${wallets.length} wallet(s) configured`);
   }
 
-  if (payerAddress && networkId && agentHasWallet(agent, payerAddress, networkId)) {
-    checks.agent_wallet_verified = agentWalletVerified(agent, payerAddress, networkId)
+  if (payerAddress && networkId && agentHasWallet(agent, payerAddress, networkId, context.owner)) {
+    checks.agent_wallet_verified = agentWalletVerified(
+      agent,
+      context.owner,
+      payerAddress,
+      networkId,
+    )
       ? check(true, "Agent wallet is verified")
       : check(
           false,
@@ -137,7 +180,7 @@ async function checkAgent(
 async function appendPolicyChecks(input: {
   context: MerchantApiContext;
   agent: AgentDoc;
-  action: "pay.link" | "pay.profile";
+  action: "pay.link" | "pay.profile" | "pay.address";
   amount?: number;
   tokenId: string;
   networkId: string;
@@ -443,4 +486,63 @@ export async function preflightAgentProfilePayment(input: {
   });
 
   return { ready: allReady(checks), type: "profile", checks };
+}
+
+export async function preflightAgentAddressPayment(input: {
+  context: MerchantApiContext;
+  externalAgentId: string;
+  recipientAddress: string;
+  tokenId: string;
+  networkId: string;
+  payerAddress?: string;
+  amount?: number;
+  dryRun?: boolean;
+}): Promise<AgentPayPreflightResult> {
+  const { checks, agent } = await checkAgent(
+    input.context,
+    input.externalAgentId,
+    input.payerAddress,
+    input.networkId,
+  );
+
+  if (supportsOnChainPayment(input.networkId, input.tokenId)) {
+    checks.token_network = check(
+      true,
+      `${input.tokenId.toUpperCase()} on ${input.networkId} is supported`,
+    );
+  } else {
+    checks.token_network = check(
+      false,
+      `${input.tokenId}/${input.networkId} is not supported`,
+      "TOKEN_NETWORK_UNSUPPORTED",
+    );
+  }
+
+  const validated = validateRecipientAddress(input.recipientAddress, input.networkId);
+  if (validated.ok) {
+    checks.recipient_address = check(true, "Recipient address is valid");
+  } else {
+    checks.recipient_address = check(
+      false,
+      validated.error,
+      "INVALID_RECIPIENT_ADDRESS",
+    );
+  }
+
+  if (!agent) {
+    return { ready: allReady(checks), type: "address", checks };
+  }
+
+  await appendPolicyChecks({
+    context: input.context,
+    agent,
+    action: "pay.address",
+    amount: input.amount,
+    tokenId: input.tokenId,
+    networkId: input.networkId,
+    checks,
+    dryRun: input.dryRun,
+  });
+
+  return { ready: allReady(checks), type: "address", checks };
 }

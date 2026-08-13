@@ -29,12 +29,15 @@ export function proxy(request: NextRequest) {
     pathname.startsWith("/referrals") ||
     pathname.startsWith("/rewards") ||
     pathname.startsWith("/transactions") ||
-    pathname.startsWith("/merchant");
+    pathname.startsWith("/merchant") ||
+    pathname.startsWith("/pay");
 
   if (isProtected && !token) {
+    const redirectTarget = `${pathname}${request.nextUrl.search}`;
     const url = request.nextUrl.clone();
     url.pathname = "/sign-in";
-    url.searchParams.set("redirect", pathname);
+    url.search = "";
+    url.searchParams.set("redirect", redirectTarget);
     return NextResponse.redirect(url);
   }
 
@@ -76,6 +79,8 @@ export const config = {
     "/transactions/:path*",
     "/merchant",
     "/merchant/:path*",
+    "/pay",
+    "/pay/:path*",
     "/wallets",
     "/wallets/:path*",
     "/sign-in",

@@ -24,6 +24,15 @@ export const ACTIVITY_EVENT_TYPES = {
   agentPaymentSent: "agent_payment_sent",
   agentPaymentReceived: "agent_payment_received",
   apiKeyRotated: "api_key_rotated",
+  agentConnected: "agent_connected",
+  agentDisconnected: "agent_disconnected",
+  agentLinkExpired: "agent_link_expired",
+  savedAddressCreated: "saved_address_created",
+  savedAddressUpdated: "saved_address_updated",
+  savedAddressDeleted: "saved_address_deleted",
+  paymentIntentCreated: "payment_intent_created",
+  paymentIntentApproved: "payment_intent_approved",
+  paymentIntentRejected: "payment_intent_rejected",
 } as const;
 
 export type ActivityEventType =
@@ -32,7 +41,16 @@ export type ActivityEventType =
   | "blocked"
   | "approval"
   | "wallet_funded"
-  | "payment_sent";
+  | "payment_sent"
+  | "agent_connected"
+  | "agent_disconnected"
+  | "agent_link_expired"
+  | "saved_address_created"
+  | "saved_address_updated"
+  | "saved_address_deleted"
+  | "payment_intent_created"
+  | "payment_intent_approved"
+  | "payment_intent_rejected";
 
 export type ActivityLogInput = {
   workspaceId: import("mongodb").ObjectId;

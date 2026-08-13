@@ -24,6 +24,8 @@ export type AgentPolicy = {
   allowedTokenIds: string[];
   allowCreatePaymentLinks: boolean;
   allowPay: boolean;
+  /** When true, in-mandate payments skip portal approval (wallet sign only). */
+  autoPayEnabled: boolean;
   requireApprovalAbove: number | null;
   updatedAt: string;
   policyVersion?: number;

@@ -19,6 +19,14 @@
     {
       "path": "/api/internal/jobs/drain-approvals",
       "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/internal/jobs/drain-link-sessions",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/internal/jobs/drain-payment-intents",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

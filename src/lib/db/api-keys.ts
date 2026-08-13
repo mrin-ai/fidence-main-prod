@@ -222,6 +222,106 @@ export async function createOrRotateAdminApiKey(input: {
   };
 }
 
+export async function issueAgentScopedKey(input: {
+  workspaceId: ObjectId;
+  userId: ObjectId;
+  agentId: ObjectId;
+  agentName: string;
+  security: SecurityContext;
+  plaintextKeyStorage?: boolean;
+}) {
+  const db = await getDb();
+  const now = new Date();
+  const rawKey = `${API_KEY_PREFIXES.agent}${randomBytes(24).toString("hex")}`;
+  const keyHash = hashApiKey(rawKey);
+  const keyLast4 = rawKey.slice(-4);
+  const apiKeyId = new ObjectId();
+
+  const { AGENT_SCOPED_KEY_PERMISSIONS } = await import("@/lib/pay/config");
+
+  const doc: ApiKeyDoc & { plaintextKey?: string } = {
+    _id: apiKeyId,
+    workspaceId: input.workspaceId,
+    createdBy: input.userId,
+    keyHash,
+    keyPrefix: API_KEY_PREFIXES.agent,
+    keyLast4,
+    keyType: "agent",
+    environment: "live",
+    permissions: [...AGENT_SCOPED_KEY_PERMISSIONS],
+    agentId: input.agentId,
+    name: `${input.agentName} (linked agent)`,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  if (input.plaintextKeyStorage) {
+    doc.plaintextKey = rawKey;
+  }
+
+  await db.collection(COLLECTIONS.apiKeys).insertOne(doc);
+
+  await logSecurityEvent({
+    workspaceId: input.workspaceId,
+    actorType: "user",
+    actorId: input.userId.toString(),
+    agentId: input.agentId,
+    action: "agent_scoped_key_issued",
+    resourceType: "api_key",
+    resourceId: apiKeyId.toString(),
+    security: input.security,
+  });
+
+  return {
+    apiKeyId,
+    apiKey: rawKey,
+    maskedKey: `${API_KEY_PREFIXES.agent}••••••••${keyLast4}`,
+    keyLast4,
+    createdAt: now.toISOString(),
+  };
+}
+
+export async function revokeAgentScopedKeysForAgent(input: {
+  workspaceId: ObjectId;
+  agentId: ObjectId;
+  security: SecurityContext;
+  actorUserId: string;
+}) {
+  const db = await getDb();
+  const now = new Date();
+
+  const result = await db.collection<ApiKeyDoc>(COLLECTIONS.apiKeys).updateMany(
+    {
+      workspaceId: input.workspaceId,
+      agentId: input.agentId,
+      keyType: "agent",
+      revokedAt: { $exists: false },
+    },
+    {
+      $set: {
+        revokedAt: now,
+        updatedAt: now,
+      },
+      $unset: { plaintextKey: "" },
+    },
+  );
+
+  if (result.modifiedCount > 0) {
+    await logSecurityEvent({
+      workspaceId: input.workspaceId,
+      actorType: "user",
+      actorId: input.actorUserId,
+      agentId: input.agentId,
+      action: "agent_scoped_keys_revoked",
+      resourceType: "agent",
+      resourceId: input.agentId.toString(),
+      security: input.security,
+    });
+  }
+
+  return result.modifiedCount;
+}
+
 export async function resolveApiKey(rawKey: string) {
   const meta = detectKeyMeta(rawKey);
   if (!meta) return null;
@@ -230,6 +330,7 @@ export async function resolveApiKey(rawKey: string) {
   const keyHash = hashApiKey(rawKey);
   const doc = await db.collection<ApiKeyDoc>(COLLECTIONS.apiKeys).findOne({
     keyHash,
+    revokedAt: { $exists: false },
   });
 
   if (!doc) return null;

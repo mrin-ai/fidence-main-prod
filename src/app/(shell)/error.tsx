@@ -27,7 +27,7 @@ export default function ShellError({
         <Button type="button" onClick={() => reset()}>
           Try again
         </Button>
-        <Button variant="outline" render={<Link href="/dashboard" />}>
+        <Button nativeButton={false} variant="outline" render={<Link href="/dashboard" />}>
           Go to Overview
         </Button>
       </div>

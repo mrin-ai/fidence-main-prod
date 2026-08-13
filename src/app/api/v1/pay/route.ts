@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import {
+  recordAgentAddressPayment,
   recordAgentPaymentLink,
   recordAgentProfilePayment,
 } from "@/lib/db/agent-payments";
@@ -49,10 +50,11 @@ async function handlePay(
     agentId?: string;
     payerAddress?: string;
     txHash?: string;
-    type?: "link" | "profile";
+    type?: "link" | "profile" | "address";
     linkUsername?: string;
     linkId?: string;
     recipientUsername?: string;
+    recipientAddress?: string;
     amount?: number;
     tokenId?: string;
     networkId?: string;
@@ -175,8 +177,69 @@ async function handlePay(
     });
   }
 
+  if (type === "address") {
+    const recipientAddress = body.recipientAddress?.trim();
+    const amount = Number(body.amount);
+    const tokenId = body.tokenId?.trim();
+    const networkId = body.networkId?.trim();
+
+    if (!recipientAddress || !amount || !tokenId || !networkId) {
+      return NextResponse.json(
+        {
+          error:
+            "recipientAddress, amount, tokenId, and networkId are required for address payments",
+        },
+        { status: 400 },
+      );
+    }
+
+    if (amount <= 0) {
+      return NextResponse.json({ error: "Amount must be greater than zero" }, { status: 400 });
+    }
+
+    if (!supportsOnChainPayment(networkId, tokenId)) {
+      return NextResponse.json(
+        { error: "This token/network combination is not supported" },
+        { status: 400 },
+      );
+    }
+
+    const result = await recordAgentAddressPayment({
+      context,
+      externalAgentId,
+      payerAddress,
+      txHash,
+      recipientAddress,
+      amount,
+      tokenId,
+      networkId,
+      approvalId,
+    });
+
+    if (!result.ok) {
+      if ("policyResponse" in result && result.policyResponse) {
+        return result.policyResponse;
+      }
+      const code = "code" in result ? result.code : undefined;
+      const status = mapAgentPayErrorStatus(code);
+
+      return NextResponse.json(
+        { error: result.error, ...(code ? { code } : {}) },
+        { status },
+      );
+    }
+
+    return NextResponse.json({
+      ok: true,
+      type: "address",
+      transactionId: result.transactionId,
+      duplicate: result.duplicate,
+      agent: result.agent,
+    });
+  }
+
   return NextResponse.json(
-    { error: "type must be 'link' or 'profile'" },
+    { error: "type must be 'link', 'profile', or 'address'" },
     { status: 400 },
   );
 }

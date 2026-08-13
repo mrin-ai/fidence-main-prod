@@ -109,6 +109,61 @@ export async function merchantFetch(
   return { response, data };
 }
 
+export async function sessionFetch(
+  path: string,
+  init: RequestInit = {},
+) {
+  const config = getAgentE2eConfig();
+  const sessionToken = process.env.AGENT_E2E_SESSION_TOKEN ?? "";
+  if (!sessionToken) {
+    throw new Error("Missing AGENT_E2E_SESSION_TOKEN for portal API tests");
+  }
+
+  const headers = new Headers(init.headers);
+  headers.set("Cookie", `lcx-auth=${sessionToken}`);
+  if (init.body && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+
+  const response = await fetch(`${config.baseUrl}${path}`, {
+    ...init,
+    headers,
+  });
+
+  const text = await response.text();
+  let data: unknown = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = text;
+  }
+
+  return { response, data };
+}
+
+export async function publicFetch(path: string, init: RequestInit = {}) {
+  const config = getAgentE2eConfig();
+  const headers = new Headers(init.headers);
+  if (init.body && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+
+  const response = await fetch(`${config.baseUrl}${path}`, {
+    ...init,
+    headers,
+  });
+
+  const text = await response.text();
+  let data: unknown = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = text;
+  }
+
+  return { response, data };
+}
+
 export function skip(message: string) {
   console.log(`SKIP: ${message}`);
 }

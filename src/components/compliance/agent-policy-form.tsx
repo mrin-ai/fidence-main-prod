@@ -375,6 +375,7 @@ export function AgentPolicyForm({ agent }: { agent: AgentListItem }) {
         allowedTokenIds: form.allowedTokenIds,
         allowCreatePaymentLinks: form.allowCreatePaymentLinks,
         allowPay: form.allowPay,
+        autoPayEnabled: policy?.autoPayEnabled === true,
         requireApprovalAbove,
       },
     };

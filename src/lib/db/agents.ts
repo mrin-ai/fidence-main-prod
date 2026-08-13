@@ -12,6 +12,8 @@ import { truncateAddress } from "@/lib/profile-url";
 import { normalizePaymentAddress } from "@/lib/payment/normalize";
 import { getWalletNetworkLabel } from "@/lib/wallet-networks";
 import { walletNetworks } from "@/lib/wallet-networks";
+import { listVerifiedWallets } from "@/lib/db/wallets";
+import type { UserDoc } from "@/lib/db/types";
 
 export const MAX_AGENTS_PER_WORKSPACE = 10;
 
@@ -44,13 +46,50 @@ export function getAgentWallets(agent: AgentDoc): AgentWallet[] {
   return [];
 }
 
+export function isLinkedAgent(agent: AgentDoc) {
+  return agent.registrationSource === "linked";
+}
+
+function ownerVerifiedWalletsAsAgentWallets(owner: UserDoc): AgentWallet[] {
+  return listVerifiedWallets(owner).map((wallet) => ({
+    id: wallet.id,
+    networkId: wallet.networkId,
+    address: wallet.address,
+    addedAt: wallet.verifiedAt,
+    verifiedAt: wallet.verifiedAt,
+    verificationMethod:
+      wallet.verificationMethod === "solana" ? ("solana" as const) : ("eip191" as const),
+  }));
+}
+
+/** Payer wallets for pay preflight/settlement — linked agents fall back to workspace owner /wallets. */
+export function getAgentPayerWallets(agent: AgentDoc, owner?: UserDoc | null): AgentWallet[] {
+  const onAgent = getAgentWallets(agent);
+  if (onAgent.length > 0) return onAgent;
+  if (isLinkedAgent(agent) && owner) {
+    return ownerVerifiedWalletsAsAgentWallets(owner);
+  }
+  return [];
+}
+
 export async function listWorkspaceAgents(
   workspaceId: ObjectId,
+  options?: { registrationSource?: "api" | "linked" },
 ): Promise<AgentListItem[]> {
   const db = await getDb();
+  const filter: Record<string, unknown> = { workspaceId };
+  if (options?.registrationSource) {
+    filter.registrationSource = options.registrationSource;
+  } else {
+    filter.$or = [
+      { registrationSource: { $exists: false } },
+      { registrationSource: "api" },
+    ];
+  }
+
   const agents = await db
     .collection<AgentDoc>(COLLECTIONS.agents)
-    .find({ workspaceId })
+    .find(filter)
     .sort({ lastActiveAt: -1 })
     .toArray();
 
@@ -158,6 +197,7 @@ export async function registerAgent(input: {
     name,
     wallets: [],
     status: "active",
+    registrationSource: "api",
     linksCreated: 0,
     amountPaid: 0,
     amountReceived: 0,
@@ -188,6 +228,171 @@ export async function registerAgent(input: {
   });
 
   return { ok: true as const, agent, created: true as const };
+}
+
+export async function registerLinkedAgent(input: {
+  workspaceId: ObjectId;
+  externalAgentId: string;
+  name: string;
+  platform: string;
+  linkSessionId: string;
+  security: SecurityContext;
+}) {
+  const db = await getDb();
+  const now = new Date();
+  const normalizedExternalId = input.externalAgentId.trim();
+  const name = input.name.trim();
+
+  if (!normalizedExternalId || !name) {
+    return { ok: false as const, error: "Invalid linked agent payload" };
+  }
+
+  const existing = await getAgentByExternalId(
+    input.workspaceId,
+    normalizedExternalId,
+  );
+
+  if (existing) {
+    return {
+      ok: false as const,
+      error: "Agent already registered",
+      code: "AGENT_EXISTS" as const,
+      agent: existing,
+    };
+  }
+
+  const linkedCount = await db.collection(COLLECTIONS.agents).countDocuments({
+    workspaceId: input.workspaceId,
+    registrationSource: "linked",
+    status: "active",
+  });
+
+  const { MAX_LINKED_AGENTS_PER_WORKSPACE } = await import("@/lib/pay/config");
+  if (linkedCount >= MAX_LINKED_AGENTS_PER_WORKSPACE) {
+    return {
+      ok: false as const,
+      error: `Maximum ${MAX_LINKED_AGENTS_PER_WORKSPACE} linked agents allowed`,
+      code: "LINKED_AGENT_LIMIT" as const,
+    };
+  }
+
+  let publicId = generateAgentPublicId();
+  while (
+    await db.collection<AgentDoc>(COLLECTIONS.agents).findOne({ publicId })
+  ) {
+    publicId = generateAgentPublicId();
+  }
+
+  const doc: Omit<AgentDoc, "_id"> = {
+    workspaceId: input.workspaceId,
+    externalAgentId: normalizedExternalId,
+    publicId,
+    name,
+    wallets: [],
+    status: "active",
+    registrationSource: "linked",
+    platform: input.platform.trim(),
+    linkSessionId: input.linkSessionId,
+    linkedAt: now,
+    linksCreated: 0,
+    amountPaid: 0,
+    amountReceived: 0,
+    registeredAt: now,
+    lastActiveAt: now,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  const result = await db.collection(COLLECTIONS.agents).insertOne(doc);
+  const agent = { ...doc, _id: result.insertedId };
+
+  await logSecurityEvent({
+    workspaceId: input.workspaceId,
+    actorType: "user",
+    actorId: input.security.ip,
+    agentId: result.insertedId,
+    action: "agent_linked",
+    resourceType: "agent",
+    resourceId: result.insertedId.toString(),
+    security: input.security,
+  });
+
+  return { ok: true as const, agent, created: true as const };
+}
+
+export async function listLinkedAgents(workspaceId: ObjectId) {
+  const db = await getDb();
+  const workspace = await db.collection(COLLECTIONS.workspaces).findOne({ _id: workspaceId });
+  const owner = workspace
+    ? await db.collection<UserDoc>(COLLECTIONS.users).findOne({ _id: workspace.ownerId })
+    : null;
+
+  const agents = await db
+    .collection<AgentDoc>(COLLECTIONS.agents)
+    .find({
+      workspaceId,
+      registrationSource: "linked",
+    })
+    .sort({ linkedAt: -1, lastActiveAt: -1 })
+    .toArray();
+
+  return agents.map((agent) => {
+    const wallets = getAgentPayerWallets(agent, owner);
+    return {
+      id: agent._id.toString(),
+      publicId: agent.publicId,
+      externalAgentId: agent.externalAgentId,
+      name: agent.name ?? agent.externalAgentId,
+      platform: agent.platform,
+      status: agent.status,
+      defaultPayerWalletId: agent.defaultPayerWalletId,
+      wallets: wallets.map((wallet) => ({
+        id: wallet.id,
+        networkId: wallet.networkId,
+        address: wallet.address,
+        verifiedAt: wallet.verifiedAt?.toISOString(),
+      })),
+      linkedAt: agent.linkedAt?.toISOString(),
+      lastActiveAt: agent.lastActiveAt.toISOString(),
+    };
+  });
+}
+
+export async function getLinkedAgentById(
+  workspaceId: ObjectId,
+  agentObjectId: ObjectId,
+) {
+  const db = await getDb();
+  return db.collection<AgentDoc>(COLLECTIONS.agents).findOne({
+    _id: agentObjectId,
+    workspaceId,
+    registrationSource: "linked",
+  });
+}
+
+export async function setLinkedAgentDefaultWallet(input: {
+  workspaceId: ObjectId;
+  agentObjectId: ObjectId;
+  walletId: string;
+}) {
+  const agent = await getLinkedAgentById(input.workspaceId, input.agentObjectId);
+  if (!agent) {
+    return { ok: false as const, error: "Linked agent not found" };
+  }
+
+  const wallets = getAgentWallets(agent);
+  if (!wallets.some((wallet) => wallet.id === input.walletId)) {
+    return { ok: false as const, error: "Wallet not found on agent" };
+  }
+
+  const db = await getDb();
+  const now = new Date();
+  await db.collection<AgentDoc>(COLLECTIONS.agents).updateOne(
+    { _id: agent._id },
+    { $set: { defaultPayerWalletId: input.walletId, updatedAt: now } },
+  );
+
+  return { ok: true as const };
 }
 
 export async function addAgentWallet(input: {
@@ -307,9 +512,10 @@ export function agentHasWallet(
   agent: AgentDoc,
   walletAddress: string,
   networkId: string,
+  owner?: UserDoc | null,
 ) {
   const normalized = normalizePaymentAddress(walletAddress, networkId);
-  return getAgentWallets(agent).some(
+  return getAgentPayerWallets(agent, owner).some(
     (wallet) =>
       wallet.networkId === networkId &&
       normalizePaymentAddress(wallet.address, networkId) === normalized,

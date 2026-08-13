@@ -7,6 +7,7 @@ import {
   listWebhookEndpoints,
   listWebhookEventTypes,
 } from "@/lib/db/webhooks";
+import { validateWebhookUrl } from "@/lib/webhooks/validate-url";
 
 function parseEvents(value: unknown) {
   if (!Array.isArray(value) || value.length === 0) {
@@ -50,10 +51,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "URL is required" }, { status: 400 });
   }
 
-  try {
-    new URL(url);
-  } catch {
-    return NextResponse.json({ error: "URL must be valid https/http" }, { status: 400 });
+  const urlCheck = validateWebhookUrl(url);
+  if (!urlCheck.ok) {
+    return NextResponse.json({ error: urlCheck.error }, { status: 400 });
   }
 
   const parsedEvents = parseEvents(body.events);
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
 
   const created = await createWebhookEndpoint({
     workspaceId: session.workspace._id,
-    url,
+    url: urlCheck.url,
     events: parsedEvents.events,
     enabled: body.enabled,
   });

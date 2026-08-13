@@ -13,6 +13,10 @@ const SHELL_TITLES: Record<string, string> = {
   "/merchant/agents": "Registered Agents",
   "/merchant/compliance": "Compliance Engine",
   "/merchant/webhooks": "Webhooks",
+  "/pay/agents": "Pay",
+  "/pay/addresses": "Pay",
+  "/pay/mandates": "Pay",
+  "/pay/connect": "Authorize agent",
 };
 
 const HIDDEN_HEADER_PATHS = new Set(["/settings"]);
@@ -20,6 +24,10 @@ const HIDDEN_HEADER_PATHS = new Set(["/settings"]);
 export function getShellTitle(pathname: string) {
   if (SHELL_TITLES[pathname]) {
     return SHELL_TITLES[pathname];
+  }
+
+  if (pathname.startsWith("/pay/")) {
+    return "Pay";
   }
 
   if (pathname.startsWith("/merchant/compliance/")) {

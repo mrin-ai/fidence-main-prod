@@ -56,6 +56,7 @@ export function createEmptyPolicyInput(): Omit<
     allowedTokenIds: ["usdc", "usdt"],
     allowCreatePaymentLinks: true,
     allowPay: true,
+    autoPayEnabled: true,
     requireApprovalAbove: null,
   };
 }

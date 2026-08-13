@@ -22,4 +22,7 @@ export const COLLECTIONS = {
   idempotencyKeys: "idempotency_keys",
   webhookEndpoints: "webhook_endpoints",
   webhookDeliveries: "webhook_deliveries",
+  agentLinkSessions: "agent_link_sessions",
+  savedAddresses: "saved_addresses",
+  paymentIntents: "payment_intents",
 } as const;

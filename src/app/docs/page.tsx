@@ -2,6 +2,7 @@ import Link from "next/link";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
+import { FidenceLogoIcon } from "@/components/fidence-logo-icon";
 import { MerchantApiDocs } from "@/components/merchant/merchant-api-docs";
 import { buttonVariants } from "@/components/ui/button";
 import { getPaymentBaseUrl } from "@/lib/payment-link-url";
@@ -27,11 +28,18 @@ export default function DocsPage() {
     <div className="min-h-screen bg-background">
       <header className="border-b border-border/60">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-4 lg:px-8">
-          <div>
-            <p className="text-sm font-medium">Fidence Docs</p>
-            <p className="text-sm text-muted-foreground">
-              Product overview and merchant API reference
-            </p>
+          <div className="flex min-w-0 items-center gap-3">
+            <Link href="/dashboard" className="inline-flex shrink-0 items-center">
+              <div className="flex size-8 shrink-0 items-center justify-center overflow-visible rounded-lg border border-border/50 bg-white">
+                <FidenceLogoIcon className="size-6" />
+              </div>
+            </Link>
+            <div className="min-w-0">
+              <p className="text-sm font-medium">Fidence Docs</p>
+              <p className="text-sm text-muted-foreground">
+                Product overview and merchant API reference
+              </p>
+            </div>
           </div>
           <Link
             href="/merchant/api-credentials"

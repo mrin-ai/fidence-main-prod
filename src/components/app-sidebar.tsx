@@ -18,6 +18,7 @@ import {
 import {
   BotIcon,
   Code2Icon,
+  CreditCardIcon,
   FileTextIcon,
   GiftIcon,
   KeyRoundIcon,
@@ -46,6 +47,12 @@ const data = {
           url: "/wallets",
           icon: <WalletIcon />,
           isNew: true,
+        },
+        {
+          title: "Pay",
+          url: "/pay/agents",
+          icon: <CreditCardIcon />,
+          featureFlag: "pay" as const,
         },
         {
           title: "Invoices",
@@ -145,6 +152,7 @@ const data = {
 export function AppSidebar({
   user,
   workspace: _workspace,
+  payEnabled = true,
   ...props
 }: React.ComponentProps<typeof Sidebar> & {
   user: {
@@ -158,7 +166,18 @@ export function AppSidebar({
     name: string
     slug: string
   }
+  payEnabled?: boolean
 }) {
+  const navGroups = React.useMemo(() => {
+    if (payEnabled) return data.navGroups
+    return data.navGroups.map((group) => ({
+      ...group,
+      items: group.items.filter(
+        (item) => !("featureFlag" in item && item.featureFlag === "pay"),
+      ),
+    }))
+  }, [payEnabled])
+
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
@@ -181,7 +200,7 @@ export function AppSidebar({
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain groups={data.navGroups} />
+        <NavMain groups={navGroups} />
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={user} />
