@@ -12,7 +12,7 @@ import { truncateAddress } from "@/lib/profile-url";
 import { normalizePaymentAddress } from "@/lib/payment/normalize";
 import { getWalletNetworkLabel } from "@/lib/wallet-networks";
 import { walletNetworks } from "@/lib/wallet-networks";
-import { listVerifiedWallets } from "@/lib/db/wallets";
+import type { AgentWalletVerificationMethod, AgentWalletSource } from "@/lib/db/merchant-types";
 import type { UserDoc } from "@/lib/db/types";
 
 export const MAX_AGENTS_PER_WORKSPACE = 10;
@@ -50,26 +50,9 @@ export function isLinkedAgent(agent: AgentDoc) {
   return agent.registrationSource === "linked";
 }
 
-function ownerVerifiedWalletsAsAgentWallets(owner: UserDoc): AgentWallet[] {
-  return listVerifiedWallets(owner).map((wallet) => ({
-    id: wallet.id,
-    networkId: wallet.networkId,
-    address: wallet.address,
-    addedAt: wallet.verifiedAt,
-    verifiedAt: wallet.verifiedAt,
-    verificationMethod:
-      wallet.verificationMethod === "solana" ? ("solana" as const) : ("eip191" as const),
-  }));
-}
-
-/** Payer wallets for pay preflight/settlement — linked agents fall back to workspace owner /wallets. */
-export function getAgentPayerWallets(agent: AgentDoc, owner?: UserDoc | null): AgentWallet[] {
-  const onAgent = getAgentWallets(agent);
-  if (onAgent.length > 0) return onAgent;
-  if (isLinkedAgent(agent) && owner) {
-    return ownerVerifiedWalletsAsAgentWallets(owner);
-  }
-  return [];
+/** Payer wallets for pay preflight/settlement — agent-attached wallets only. */
+export function getAgentPayerWallets(agent: AgentDoc, _owner?: UserDoc | null): AgentWallet[] {
+  return getAgentWallets(agent);
 }
 
 export async function listWorkspaceAgents(
@@ -236,6 +219,7 @@ export async function registerLinkedAgent(input: {
   name: string;
   platform: string;
   linkSessionId: string;
+  signingMode?: AgentDoc["signingMode"];
   security: SecurityContext;
 }) {
   const db = await getDb();
@@ -291,6 +275,7 @@ export async function registerLinkedAgent(input: {
     wallets: [],
     status: "active",
     registrationSource: "linked",
+    signingMode: input.signingMode ?? "agent_wallet",
     platform: input.platform.trim(),
     linkSessionId: input.linkSessionId,
     linkedAt: now,
@@ -322,10 +307,6 @@ export async function registerLinkedAgent(input: {
 
 export async function listLinkedAgents(workspaceId: ObjectId) {
   const db = await getDb();
-  const workspace = await db.collection(COLLECTIONS.workspaces).findOne({ _id: workspaceId });
-  const owner = workspace
-    ? await db.collection<UserDoc>(COLLECTIONS.users).findOne({ _id: workspace.ownerId })
-    : null;
 
   const agents = await db
     .collection<AgentDoc>(COLLECTIONS.agents)
@@ -337,7 +318,7 @@ export async function listLinkedAgents(workspaceId: ObjectId) {
     .toArray();
 
   return agents.map((agent) => {
-    const wallets = getAgentPayerWallets(agent, owner);
+    const wallets = getAgentWallets(agent);
     return {
       id: agent._id.toString(),
       publicId: agent.publicId,
@@ -400,6 +381,9 @@ export async function addAgentWallet(input: {
   externalAgentId: string;
   walletAddress: string;
   networkId: string;
+  verifiedAt?: Date;
+  verificationMethod?: AgentWalletVerificationMethod;
+  source?: AgentWalletSource;
   security: SecurityContext;
 }) {
   const active = await requireActiveAgent(input.workspaceId, input.externalAgentId);
@@ -432,6 +416,9 @@ export async function addAgentWallet(input: {
     networkId: input.networkId,
     address: normalizedAddress,
     addedAt: now,
+    ...(input.verifiedAt ? { verifiedAt: input.verifiedAt } : {}),
+    ...(input.verificationMethod ? { verificationMethod: input.verificationMethod } : {}),
+    ...(input.source ? { source: input.source } : {}),
   };
 
   const nextWallets = [...wallets.filter((wallet) => wallet.id !== "legacy"), nextWallet];

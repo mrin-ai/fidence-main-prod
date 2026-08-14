@@ -11,7 +11,7 @@ import { privateKeyToAccount } from "viem/accounts";
 import { base, mainnet, sepolia } from "viem/chains";
 
 import { erc20TransferAbi, getTokenContract } from "./contracts.js";
-import type { LocalWallet } from "./wallet.js";
+import type { LoadedAgentWallet } from "./agent-wallets.js";
 
 const chains: Record<string, Chain> = {
   sepolia,
@@ -47,7 +47,7 @@ function applyGasBuffer(estimated: bigint, cap: bigint) {
 }
 
 export async function sendLocalEvmPayment(input: {
-  wallet: LocalWallet;
+  wallet: Extract<LoadedAgentWallet, { keyType: "evm" }>;
   networkId: string;
   tokenId: string;
   recipientAddress: string;

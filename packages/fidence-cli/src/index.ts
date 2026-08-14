@@ -1,17 +1,26 @@
 #!/usr/bin/env node
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, chmodSync } from "node:fs";
 import { dirname } from "node:path";
 
+import {
+  hasAgentWallets,
+  listAgentWalletAddresses,
+  loadAgentWallet,
+  removeAgentWallets,
+  saveAgentWalletsFromPoll,
+} from "./agent-wallets.js";
 import { sendLocalEvmPayment } from "./evm-pay.js";
 import { supportsOnChainPayment } from "./contracts.js";
+import { sendLocalSolanaPayment } from "./solana-pay.js";
 import { apiFetch, generateKeyPair, getBaseUrl, getConfigPath, sleep } from "./lib.js";
-import { hasLocalWallet, loadLocalWallet, saveLocalWallet } from "./wallet.js";
 
 type Config = {
   apiKey?: string;
   agentId?: string;
   linkId?: string;
   pollSecret?: string;
+  linkPublicKey?: string;
+  linkSecretKey?: string;
 };
 
 function loadConfig(): Config {
@@ -25,7 +34,12 @@ function loadConfig(): Config {
 function saveConfig(config: Config) {
   const path = getConfigPath();
   mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, JSON.stringify(config, null, 2));
+  writeFileSync(path, JSON.stringify(config, null, 2), { mode: 0o600 });
+  try {
+    chmodSync(path, 0o600);
+  } catch {
+    // Best effort.
+  }
 }
 
 function usage() {
@@ -36,19 +50,21 @@ Usage:
   fidence setup poll [--link-id LID]
   fidence status
   fidence preflight [--type link|profile|address] [--username USER] [--to ADDRESS] [--amount N] [--network ID] [--token ID]
-  fidence pay [--to ADDRESS | --username USER] [--amount N] [--network ID] [--token ID] [--auto] [--intent-id ID]
-  fidence wallet import --private-key 0x...
+  fidence pay --to ADDRESS --amount N --network ID --token ID --auto
+  fidence wallet status
+  fidence agent disconnect
   fidence clear-intents
 
-Headless auto-pay (no browser, no MetaMask popup):
-  1. Import the same wallet you verified on Fidence: fidence wallet import --private-key 0x...
-  2. Enable "Automatic payments" on /pay/mandates
-  3. fidence pay --auto --to 0x… --amount 10 --network sepolia --token usdt
+Headless auto-pay (agent spending wallet — no MetaMask export):
+  1. fidence setup && approve in browser (creates spending wallets)
+  2. fidence setup poll
+  3. Enable "Automatic payments" on /pay/mandates
+  4. fidence pay --auto --to 0x… --amount 10 --network sepolia --token usdt
 
 Environment:
   FIDENCE_BASE_URL  API base (default http://localhost:3000)
-  FIDENCE_WALLET_PRIVATE_KEY  Optional alternative to wallet import
-  FIDENCE_SEPOLIA_RPC_URL  RPC for local signing (recommended)
+  FIDENCE_SEPOLIA_RPC_URL  RPC for EVM signing
+  FIDENCE_SOLANA_RPC_URL  RPC for Solana signing
   FIDENCE_RPC_URL  Fallback RPC for all networks
 `);
 }
@@ -59,11 +75,11 @@ async function cmdSetup(args: string[]) {
   const platform = platformIdx >= 0 ? args[platformIdx + 1] : "cursor";
   const agentName = nameIdx >= 0 ? args[nameIdx + 1] : "My Agent";
 
-  const { publicKey } = generateKeyPair();
+  const keyPair = generateKeyPair();
 
   const result = await apiFetch("/api/v1/agent-links", {
     method: "POST",
-    body: JSON.stringify({ publicKey, platform, agentName }),
+    body: JSON.stringify({ publicKey: keyPair.publicKey, platform, agentName }),
   });
 
   if (!result.response.ok) {
@@ -77,7 +93,12 @@ async function cmdSetup(args: string[]) {
     connectUrl: string;
   };
 
-  saveConfig({ linkId: body.linkId, pollSecret: body.pollSecret });
+  saveConfig({
+    linkId: body.linkId,
+    pollSecret: body.pollSecret,
+    linkPublicKey: keyPair.publicKey,
+    linkSecretKey: keyPair.secretKey,
+  });
 
   const connect = body.connectUrl.startsWith("http")
     ? body.connectUrl
@@ -98,37 +119,68 @@ async function cmdSetupPoll(args: string[]) {
     process.exit(1);
   }
 
+  if (!config.linkSecretKey) {
+    console.error("Missing link secret key. Run `fidence setup` again to generate a new link.");
+    process.exit(1);
+  }
+
   for (let attempt = 0; attempt < 120; attempt += 1) {
-    const result = await apiFetch(
-      `/api/v1/agent-links/${encodeURIComponent(linkId)}?pollSecret=${encodeURIComponent(pollSecret)}`,
-    );
+    const result = await apiFetch(`/api/v1/agent-links/${encodeURIComponent(linkId)}`, {
+      method: "POST",
+      body: JSON.stringify({ pollSecret }),
+    });
 
     const body = result.data as {
       status?: string;
       apiKey?: string;
       agent?: { externalAgentId?: string };
+      spendingWallets?: Array<{
+        networkId: string;
+        address: string;
+        sealedSecret: string;
+        nonce: string;
+        ephemeralPublicKey: string;
+      }> | null;
     };
 
     if (body.status === "approved") {
-      if (body.apiKey) {
+      const agentId = body.agent?.externalAgentId ?? config.agentId;
+      if (body.apiKey && body.spendingWallets?.length && agentId && config.linkSecretKey) {
+        saveAgentWalletsFromPoll({
+          agentId,
+          linkSecretKeyB64: config.linkSecretKey,
+          spendingWallets: body.spendingWallets,
+        });
         saveConfig({
           ...config,
           apiKey: body.apiKey,
-          agentId: body.agent?.externalAgentId,
+          agentId,
           linkId,
           pollSecret,
         });
-        console.log("Agent connected. Scoped API key saved to ~/.fidence/config.json");
+        console.log("Agent connected. API key and spending wallets saved locally.");
         return;
       }
 
-      if (config.apiKey) {
-        console.log("Agent already connected. Scoped API key is in ~/.fidence/config.json");
+      if (config.apiKey && agentId && hasAgentWallets(agentId)) {
+        console.log("Agent already connected. Credentials are in ~/.fidence/");
+        return;
+      }
+
+      if (body.apiKey && !body.spendingWallets?.length) {
+        console.error(
+          "Link approved but spending wallets were already delivered. Run `fidence setup` again.",
+        );
+        process.exit(1);
+      }
+
+      if (!body.apiKey && config.apiKey) {
+        console.log("Agent already connected. Credentials are in ~/.fidence/");
         return;
       }
 
       console.error(
-        "Link is approved but the scoped key was already delivered. Run `fidence setup` again for a new link.",
+        "Link is approved but secrets were already delivered. Run `fidence setup` again for a new link.",
       );
       process.exit(1);
     }
@@ -166,17 +218,29 @@ async function cmdPreflight(args: string[]) {
   const tokenId = args.includes("--token") ? args[args.indexOf("--token") + 1] : "usdc";
   const agentId = encodeURIComponent(config.agentId ?? "");
 
+  const loadedWallet =
+    config.agentId && config.linkSecretKey
+      ? loadAgentWallet({
+          agentId: config.agentId,
+          networkId,
+          linkSecretKeyB64: config.linkSecretKey,
+        })
+      : null;
+  const payerParam = loadedWallet
+    ? `&payerAddress=${encodeURIComponent(loadedWallet.address)}`
+    : "";
+
   let query: string;
   if (type === "link") {
-    query = `type=link&agentId=${agentId}&linkUsername=${encodeURIComponent(username)}&linkId=example&dryRun=1`;
+    query = `type=link&agentId=${agentId}&linkUsername=${encodeURIComponent(username)}&linkId=example&dryRun=1${payerParam}`;
   } else if (type === "address") {
     if (!to) {
       console.error("--to ADDRESS is required for type=address");
       process.exit(1);
     }
-    query = `type=address&agentId=${agentId}&recipientAddress=${encodeURIComponent(to)}&amount=${amount}&tokenId=${encodeURIComponent(tokenId)}&networkId=${encodeURIComponent(networkId)}&dryRun=1`;
+    query = `type=address&agentId=${agentId}&recipientAddress=${encodeURIComponent(to)}&amount=${amount}&tokenId=${encodeURIComponent(tokenId)}&networkId=${encodeURIComponent(networkId)}&dryRun=1${payerParam}`;
   } else {
-    query = `type=profile&agentId=${agentId}&recipientUsername=${encodeURIComponent(username)}&amount=${amount}&tokenId=${encodeURIComponent(tokenId)}&networkId=${encodeURIComponent(networkId)}&dryRun=1`;
+    query = `type=profile&agentId=${agentId}&recipientUsername=${encodeURIComponent(username)}&amount=${amount}&tokenId=${encodeURIComponent(tokenId)}&networkId=${encodeURIComponent(networkId)}&dryRun=1${payerParam}`;
   }
 
   const result = await apiFetch(`/api/v1/pay/preflight?${query}`, {
@@ -189,18 +253,13 @@ async function cmdPreflight(args: string[]) {
 
 async function cmdPayHeadless(args: string[]) {
   const config = loadConfig();
-  if (!config.apiKey) {
-    console.error("No scoped API key.");
+  if (!config.apiKey || !config.agentId || !config.linkSecretKey) {
+    console.error("No scoped API key or spending wallet. Run setup + poll first.");
     process.exit(1);
   }
 
-  const wallet = loadLocalWallet();
-  if (!wallet) {
-    console.error(
-      "Headless pay requires a local wallet.\n" +
-        "  fidence wallet import --private-key 0x...\n" +
-        "  or set FIDENCE_WALLET_PRIVATE_KEY",
-    );
+  if (!args.includes("--auto")) {
+    console.error("Linked agents require explicit --auto for headless pay.");
     process.exit(1);
   }
 
@@ -213,14 +272,24 @@ async function cmdPayHeadless(args: string[]) {
   const amount = args.includes("--amount") ? Number(args[args.indexOf("--amount") + 1]) : 1;
   const networkId = args.includes("--network") ? args[args.indexOf("--network") + 1] : "base";
   const tokenId = args.includes("--token") ? args[args.indexOf("--token") + 1] : "usdc";
-  const agentId = encodeURIComponent(config.agentId ?? "");
+  const agentId = encodeURIComponent(config.agentId);
 
   if (!supportsOnChainPayment(networkId, tokenId)) {
     console.error(`Unsupported token/network: ${tokenId}/${networkId}`);
     process.exit(1);
   }
 
-  const preflightQuery = `type=address&agentId=${agentId}&recipientAddress=${encodeURIComponent(to)}&amount=${amount}&tokenId=${encodeURIComponent(tokenId)}&networkId=${encodeURIComponent(networkId)}&dryRun=1`;
+  const wallet = loadAgentWallet({
+    agentId: config.agentId,
+    networkId,
+    linkSecretKeyB64: config.linkSecretKey,
+  });
+  if (!wallet) {
+    console.error(`No agent spending wallet for network ${networkId}. Re-run setup poll.`);
+    process.exit(1);
+  }
+
+  const preflightQuery = `type=address&agentId=${agentId}&recipientAddress=${encodeURIComponent(to)}&amount=${amount}&tokenId=${encodeURIComponent(tokenId)}&networkId=${encodeURIComponent(networkId)}&payerAddress=${encodeURIComponent(wallet.address)}&dryRun=1`;
   const preflight = await apiFetch(`/api/v1/pay/preflight?${preflightQuery}`, {
     headers: { Authorization: `Bearer ${config.apiKey}` },
   });
@@ -230,23 +299,35 @@ async function cmdPayHeadless(args: string[]) {
     process.exit(1);
   }
 
-  const pf = preflight.data as { ready?: boolean; autoPayEligible?: boolean; checks?: Record<string, { ok: boolean; message: string }> };
+  const pf = preflight.data as {
+    ready?: boolean;
+    autoPayEligible?: boolean;
+    checks?: Record<string, { ok: boolean; message: string }>;
+  };
   if (!pf.autoPayEligible) {
     console.error(
-      "Not eligible for headless auto-pay. Enable Automatic payments on /pay/mandates or amount may exceed limits.",
+      "Not eligible for headless auto-pay. Enable Automatic payments on /pay/mandates or fund your spending wallet.",
     );
     console.error(JSON.stringify(pf, null, 2));
     process.exit(1);
   }
 
   console.log(`Sending ${amount} ${tokenId.toUpperCase()} to ${to} on ${networkId}…`);
-  const txHash = await sendLocalEvmPayment({
-    wallet,
-    networkId,
-    tokenId,
-    recipientAddress: to,
-    amount,
-  });
+  const txHash =
+    wallet.keyType === "solana"
+      ? await sendLocalSolanaPayment({
+          secretKey: wallet.secretKey,
+          tokenId,
+          recipientAddress: to,
+          amount,
+        })
+      : await sendLocalEvmPayment({
+          wallet,
+          networkId,
+          tokenId,
+          recipientAddress: to,
+          amount,
+        });
   console.log("Transaction confirmed:", txHash);
 
   const record = await apiFetch("/api/v1/pay", {
@@ -276,20 +357,46 @@ async function cmdPayHeadless(args: string[]) {
   console.log(JSON.stringify(record.data, null, 2));
 }
 
-async function cmdWalletImport(args: string[]) {
-  const keyIdx = args.indexOf("--private-key");
-  const privateKey =
-    keyIdx >= 0 ? args[keyIdx + 1] : process.env.FIDENCE_WALLET_PRIVATE_KEY;
-
-  if (!privateKey) {
-    console.error("Usage: fidence wallet import --private-key 0x...");
+async function cmdWalletStatus() {
+  const config = loadConfig();
+  if (!config.agentId) {
+    console.error("No agent connected.");
     process.exit(1);
   }
+  const wallets = listAgentWalletAddresses(config.agentId) ?? [];
+  console.log(
+    JSON.stringify(
+      {
+        agentId: config.agentId,
+        wallets,
+        hint: "Fund these addresses before auto-pay. Enable Automatic payments on /pay/mandates.",
+      },
+      null,
+      2,
+    ),
+  );
+}
 
-  const address = saveLocalWallet(privateKey);
-  console.log("Wallet saved to ~/.fidence/wallet.json");
-  console.log("Address:", address);
-  console.log("Use the same wallet you verified on Fidence /wallets.");
+async function cmdAgentDisconnect() {
+  const config = loadConfig();
+  if (config.agentId) {
+    removeAgentWallets(config.agentId);
+  }
+  saveConfig({
+    linkId: config.linkId,
+    pollSecret: config.pollSecret,
+    linkPublicKey: config.linkPublicKey,
+    linkSecretKey: config.linkSecretKey,
+  });
+  console.log("Local agent credentials cleared. Disconnect the agent in the Fidence portal if needed.");
+}
+
+async function cmdWalletImport() {
+  console.error(
+    "wallet import is deprecated.\n" +
+      "Reconnect your agent: fidence setup → approve in browser → fidence setup poll",
+  );
+  process.exit(1);
 }
 
 async function cmdPay(args: string[]) {
@@ -316,13 +423,18 @@ async function cmdPay(args: string[]) {
     process.exit(1);
   }
 
-  const useHeadless =
-    args.includes("--auto") ||
-    (args.includes("--to") && hasLocalWallet() && !args.includes("--username"));
+  const useHeadless = args.includes("--auto") && args.includes("--to");
 
-  if (useHeadless && args.includes("--to")) {
+  if (useHeadless) {
     await cmdPayHeadless(args);
     return;
+  }
+
+  if (args.includes("--to") && !args.includes("--auto")) {
+    console.error(
+      "Linked agents pay via the spending wallet. Use: fidence pay --auto --to ADDRESS ...",
+    );
+    process.exit(1);
   }
 
   const amount = args.includes("--amount") ? Number(args[args.indexOf("--amount") + 1]) : 1;
@@ -429,7 +541,17 @@ async function main() {
   }
 
   if (command === "wallet" && commandArgs[0] === "import") {
-    await cmdWalletImport(commandArgs.slice(1));
+    await cmdWalletImport();
+    return;
+  }
+
+  if (command === "wallet" && commandArgs[0] === "status") {
+    await cmdWalletStatus();
+    return;
+  }
+
+  if (command === "agent" && commandArgs[0] === "disconnect") {
+    await cmdAgentDisconnect();
     return;
   }
 

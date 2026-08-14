@@ -49,6 +49,11 @@ const data = {
           isNew: true,
         },
         {
+          title: "Fidence Pay",
+          url: "/pay/agents",
+          icon: <CreditCardIcon />,
+        },
+        {
           title: "Invoices",
           url: "/manage-invoices",
           icon: <FileTextIcon />,
@@ -115,12 +120,6 @@ const data = {
     {
       label: "Soon",
       items: [
-        {
-          title: "Fidence Pay",
-          url: "/pay/agents",
-          icon: <CreditCardIcon />,
-          comingSoon: true,
-        },
         {
           title: "Rewards",
           url: "#",

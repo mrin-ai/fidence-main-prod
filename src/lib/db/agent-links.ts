@@ -15,7 +15,15 @@ import {
   MAX_PENDING_LINK_SESSIONS_PER_WORKSPACE,
 } from "@/lib/pay/config";
 import type { AgentLinkSessionDoc, AgentLinkSessionStatus } from "@/lib/pay/types";
-import { registerLinkedAgent } from "@/lib/db/agents";
+import { registerLinkedAgent, addAgentWallet } from "@/lib/db/agents";
+import { upsertAgentPolicy } from "@/lib/db/agent-policies";
+import { actorFromSecurity } from "@/lib/compliance/actor";
+import { createEmptyPolicyInput } from "@/lib/compliance/policy-helpers";
+import {
+  pickDefaultPayerWalletId,
+  validateSpendingWalletsPayload,
+} from "@/lib/pay/validate-spending-wallets";
+import type { PendingSpendingWallet } from "@/lib/pay/spending-wallet-types";
 import {
   issueAgentScopedKey,
   revokeAgentScopedKeysForAgent,
@@ -157,6 +165,12 @@ export async function pollAgentLinkSession(input: {
       scopedKey = keyResult.plaintextKey;
     }
 
+    let spendingWallets: PendingSpendingWallet[] | null = null;
+    if (!session.spendingWalletDeliveredAt && session.pendingSpendingWallets?.length) {
+      const walletResult = await deliverSpendingWalletsOnce(session);
+      spendingWallets = walletResult.wallets;
+    }
+
     const db = await getDb();
     const agent = await db.collection<AgentDoc>(COLLECTIONS.agents).findOne({
       _id: session.agentObjectId,
@@ -175,6 +189,7 @@ export async function pollAgentLinkSession(input: {
           }
         : null,
       apiKey: scopedKey,
+      spendingWallets,
     };
   }
 
@@ -209,11 +224,38 @@ async function deliverScopedKeyOnce(session: AgentLinkSessionDoc) {
   return { plaintextKey };
 }
 
+async function deliverSpendingWalletsOnce(session: AgentLinkSessionDoc) {
+  const db = await getDb();
+  if (!session.pendingSpendingWallets?.length) {
+    return { wallets: null as PendingSpendingWallet[] | null };
+  }
+
+  const fresh = await db.collection<AgentLinkSessionDoc>(COLLECTIONS.agentLinkSessions).findOne({
+    _id: session._id,
+  });
+
+  if (!fresh?.pendingSpendingWallets?.length || fresh.spendingWalletDeliveredAt) {
+    return { wallets: null as PendingSpendingWallet[] | null };
+  }
+
+  const wallets = fresh.pendingSpendingWallets;
+  await db.collection<AgentLinkSessionDoc>(COLLECTIONS.agentLinkSessions).updateOne(
+    { _id: session._id, spendingWalletDeliveredAt: { $exists: false } },
+    {
+      $set: { spendingWalletDeliveredAt: new Date(), updatedAt: new Date() },
+      $unset: { pendingSpendingWallets: "" },
+    },
+  );
+
+  return { wallets };
+}
+
 export async function approveAgentLinkSession(input: {
   linkId: string;
   workspaceId: ObjectId;
   userId: ObjectId;
   security: SecurityContext;
+  spendingWallets: PendingSpendingWallet[];
 }) {
   const session = await getAgentLinkSession(input.linkId);
   if (!session) {
@@ -222,6 +264,11 @@ export async function approveAgentLinkSession(input: {
 
   if (session.status !== "pending") {
     return { ok: false as const, error: `Link session is ${session.status}` };
+  }
+
+  const validatedWallets = validateSpendingWalletsPayload(input.spendingWallets);
+  if (!validatedWallets.ok) {
+    return { ok: false as const, error: validatedWallets.error };
   }
 
   const db = await getDb();
@@ -259,12 +306,58 @@ export async function approveAgentLinkSession(input: {
     name: session.agentName,
     platform: session.platform,
     linkSessionId: session.linkId,
+    signingMode: "agent_wallet",
     security: input.security,
   });
 
   if (!registered.ok) {
     return registered;
   }
+
+  const verifiedAt = new Date();
+  let latestAgent = registered.agent;
+
+  for (const wallet of validatedWallets.wallets) {
+    const added = await addAgentWallet({
+      workspaceId: input.workspaceId,
+      externalAgentId: registered.agent.externalAgentId,
+      walletAddress: wallet.address,
+      networkId: wallet.networkId,
+      verifiedAt,
+      verificationMethod: "connect_attested",
+      source: "connect",
+      security: input.security,
+    });
+    if (!added.ok) {
+      return added;
+    }
+    latestAgent = added.agent;
+  }
+
+  const agentWallets = latestAgent.wallets ?? [];
+  const defaultPayerWalletId = pickDefaultPayerWalletId(agentWallets);
+  if (defaultPayerWalletId) {
+    await db.collection<AgentDoc>(COLLECTIONS.agents).updateOne(
+      { _id: latestAgent._id },
+      { $set: { defaultPayerWalletId, updatedAt: verifiedAt } },
+    );
+  }
+
+  const policyInput = createEmptyPolicyInput();
+  policyInput.status = "draft";
+  policyInput.autoPayEnabled = false;
+
+  await upsertAgentPolicy({
+    workspaceId: input.workspaceId,
+    agent: latestAgent,
+    body: policyInput,
+    actor: actorFromSecurity(input.security, {
+      actorType: "user",
+      authMethod: "session",
+      userId: input.userId.toString(),
+    }),
+    security: input.security,
+  });
 
   const keyIssued = await issueAgentScopedKey({
     workspaceId: input.workspaceId,
@@ -284,11 +377,24 @@ export async function approveAgentLinkSession(input: {
         workspaceId: input.workspaceId,
         agentObjectId: registered.agent._id,
         apiKeyId: keyIssued.apiKeyId,
+        signingMode: "agent_wallet",
+        pendingSpendingWallets: validatedWallets.wallets,
         approvedAt: now,
         updatedAt: now,
       },
     },
   );
+
+  await logSecurityEvent({
+    workspaceId: input.workspaceId,
+    actorType: "user",
+    actorId: input.userId.toString(),
+    agentId: registered.agent._id,
+    action: "agent_spending_wallets_created",
+    resourceType: "agent_link_session",
+    resourceId: session.linkId,
+    security: input.security,
+  });
 
   await logSecurityEvent({
     workspaceId: input.workspaceId,
@@ -309,7 +415,7 @@ export async function approveAgentLinkSession(input: {
 
   return {
     ok: true as const,
-    agent: registered.agent,
+    agent: latestAgent,
     linkId: session.linkId,
   };
 }

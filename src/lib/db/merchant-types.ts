@@ -33,14 +33,21 @@ export type AgentStatus = "active" | "inactive";
 
 export type AgentRegistrationSource = "api" | "linked";
 
+export type AgentWalletVerificationMethod = "eip191" | "solana" | "connect_attested";
+
+export type AgentWalletSource = "connect" | "api";
+
 export type AgentWallet = {
   id: string;
   networkId: string;
   address: string;
   addedAt: Date;
   verifiedAt?: Date;
-  verificationMethod?: "eip191" | "solana";
+  verificationMethod?: AgentWalletVerificationMethod;
+  source?: AgentWalletSource;
 };
+
+export type AgentSigningMode = "agent_wallet" | "browser_only";
 
 export type AgentDoc = {
   _id: ObjectId;
@@ -58,6 +65,7 @@ export type AgentDoc = {
   /** In-flight link create exposure (released after insert or on failure). */
   linkExposureHoldUsd?: number;
   registrationSource?: AgentRegistrationSource;
+  signingMode?: AgentSigningMode;
   platform?: string;
   linkedAt?: Date;
   linkSessionId?: string;

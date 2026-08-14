@@ -1,8 +1,12 @@
 import type { ObjectId } from "mongodb";
 
+import type { PendingSpendingWallet } from "@/lib/pay/spending-wallet-types";
+
 export type AgentRegistrationSource = "api" | "linked";
 
 export type AgentLinkSessionStatus = "pending" | "approved" | "expired" | "rejected" | "cancelled";
+
+export type AgentSigningMode = "agent_wallet" | "browser_only";
 
 export type AgentLinkSessionDoc = {
   _id: ObjectId;
@@ -17,6 +21,9 @@ export type AgentLinkSessionDoc = {
   agentObjectId?: ObjectId;
   apiKeyId?: ObjectId;
   scopedKeyDeliveredAt?: Date;
+  spendingWalletDeliveredAt?: Date;
+  signingMode?: "agent_wallet";
+  pendingSpendingWallets?: PendingSpendingWallet[];
   expiresAt: Date;
   approvedAt?: Date;
   createdAt: Date;

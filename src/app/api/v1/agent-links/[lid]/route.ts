@@ -20,6 +20,25 @@ export async function GET(request: Request, { params }: Params) {
     return NextResponse.json({ error: "pollSecret query param is required" }, { status: 400 });
   }
 
+  return handlePoll(lid, pollSecret);
+}
+
+export async function POST(request: Request, { params }: Params) {
+  if (!isPayAgentConnectEnabled()) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  const { lid } = await params;
+  const body = (await request.json()) as { pollSecret?: string };
+  const pollSecret = body.pollSecret?.trim();
+  if (!pollSecret) {
+    return NextResponse.json({ error: "pollSecret is required" }, { status: 400 });
+  }
+
+  return handlePoll(lid, pollSecret);
+}
+
+async function handlePoll(lid: string, pollSecret: string) {
   const limited = await checkRateLimit(`agent-links:poll:${lid}`, {
     max: 120,
     windowMs: 60 * 1000,

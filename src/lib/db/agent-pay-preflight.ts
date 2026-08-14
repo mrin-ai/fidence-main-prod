@@ -3,13 +3,13 @@ import { evaluateAndRecordPolicy } from "@/lib/compliance/evaluate-and-record";
 import { evaluatePolicy } from "@/lib/compliance/evaluate-policy";
 import { POLICY_CODES } from "@/lib/compliance/codes";
 import { toPolicyAmountUsdAsync } from "@/lib/compliance/valuation-async";
+import { getAgentPolicy, toEvaluablePolicy } from "@/lib/db/agent-policies";
 import {
   agentHasWallet,
   getAgentByExternalId,
   getAgentPayerWallets,
   isLinkedAgent,
 } from "@/lib/db/agents";
-import { getAgentPolicy, toEvaluablePolicy } from "@/lib/db/agent-policies";
 import { getAgentSpendTotals } from "@/lib/db/agent-spend";
 import type { MerchantApiContext } from "@/lib/db/merchant-api";
 import { getPaymentLinkByUsernameAndPublicId } from "@/lib/db/payment-links";
@@ -72,14 +72,30 @@ export async function withAutoPayEligible(
 
 function agentWalletVerified(
   agent: AgentDoc,
-  owner: UserDoc | null,
+  _owner: UserDoc | null,
   payerAddress?: string,
   networkId?: string,
 ) {
+  const wallets = getAgentPayerWallets(agent);
+  const isConnectWallet = (wallet: (typeof wallets)[number]) =>
+    wallet.verificationMethod === "connect_attested" && Boolean(wallet.verifiedAt);
+
+  if (isLinkedAgent(agent) && agent.signingMode === "agent_wallet") {
+    if (!payerAddress || !networkId) {
+      return wallets.some(isConnectWallet);
+    }
+    const normalized = payerAddress.trim().toLowerCase();
+    return wallets.some(
+      (wallet) =>
+        wallet.networkId === networkId &&
+        wallet.address.toLowerCase() === normalized &&
+        isConnectWallet(wallet),
+    );
+  }
+
   if (process.env.AGENT_REQUIRE_VERIFIED_WALLET !== "true") {
     return true;
   }
-  const wallets = getAgentPayerWallets(agent, owner);
   if (!payerAddress || !networkId) {
     return wallets.some((w) => w.verifiedAt);
   }
@@ -132,7 +148,7 @@ async function checkAgent(
     checks.agent_wallet = check(
       false,
       isLinkedAgent(agent)
-        ? "No verified wallet on /wallets for this network"
+        ? "No agent spending wallet configured — reconnect via fidence setup"
         : "No wallet added for this agent",
       "AGENT_WALLET_MISSING",
     );
@@ -151,7 +167,7 @@ async function checkAgent(
       : check(
           false,
           isLinkedAgent(agent)
-            ? `No verified wallet on /wallets for ${networkId}`
+            ? `No agent spending wallet on ${networkId}`
             : `Agent has no wallet on ${networkId}`,
           "AGENT_WALLET_MISSING",
         );

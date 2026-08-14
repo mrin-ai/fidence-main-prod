@@ -28,6 +28,7 @@ export async function GET(_request: Request, { params }: Params) {
       description: session.description,
       status: session.status,
       expiresAt: session.expiresAt.toISOString(),
+      publicKey: session.status === "pending" ? session.publicKey : undefined,
     },
   });
 }
@@ -37,7 +38,16 @@ export async function POST(request: Request, { params }: Params) {
   if (!ctx.ok) return ctx.response;
 
   const { lid } = await params;
-  const body = (await request.json()) as { action?: "approve" | "reject" };
+  const body = (await request.json()) as {
+    action?: "approve" | "reject";
+    spendingWallets?: Array<{
+      networkId: string;
+      address: string;
+      sealedSecret: string;
+      nonce: string;
+      ephemeralPublicKey: string;
+    }>;
+  };
 
   if (body.action === "reject") {
     const result = await rejectAgentLinkSession({
@@ -57,11 +67,16 @@ export async function POST(request: Request, { params }: Params) {
     workspaceId: ctx.workspaceId,
     userId: ctx.userId,
     security: ctx.security,
+    spendingWallets: body.spendingWallets ?? [],
   });
 
   if (!result.ok) {
-    const status = result.code === "LINKED_AGENT_LIMIT" ? 409 : 400;
-    return NextResponse.json({ error: result.error, code: result.code }, { status });
+    const status =
+      "code" in result && result.code === "LINKED_AGENT_LIMIT" ? 409 : 400;
+    return NextResponse.json(
+      { error: result.error, ...("code" in result && result.code ? { code: result.code } : {}) },
+      { status },
+    );
   }
 
   return NextResponse.json({

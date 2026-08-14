@@ -40,8 +40,11 @@ export function getTokenContract(networkId: string, tokenId: string) {
 }
 
 export function supportsOnChainPayment(networkId: string, tokenId: string) {
-  if (networkId === "solana") return false;
-  if (tokenId.toLowerCase() === "eth") return networkId !== "solana";
+  if (networkId === "solana") {
+    const normalized = tokenId.toLowerCase();
+    return normalized === "sol" || normalized === "usdc" || normalized === "usdt";
+  }
+  if (tokenId.toLowerCase() === "eth") return true;
   return Boolean(getTokenContract(networkId, tokenId));
 }
 

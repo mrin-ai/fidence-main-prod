@@ -31,7 +31,7 @@ export async function apiFetch(path: string, init: RequestInit = {}) {
 }
 
 export function generateKeyPair() {
-  const pair = nacl.sign.keyPair();
+  const pair = nacl.box.keyPair();
   return {
     publicKey: Buffer.from(pair.publicKey).toString("base64"),
     secretKey: Buffer.from(pair.secretKey).toString("base64"),

@@ -32,10 +32,12 @@ export function getTokenContract(networkId, tokenId) {
     return { ...contract, address: getAddress(contract.address) };
 }
 export function supportsOnChainPayment(networkId, tokenId) {
-    if (networkId === "solana")
-        return false;
+    if (networkId === "solana") {
+        const normalized = tokenId.toLowerCase();
+        return normalized === "sol" || normalized === "usdc" || normalized === "usdt";
+    }
     if (tokenId.toLowerCase() === "eth")
-        return networkId !== "solana";
+        return true;
     return Boolean(getTokenContract(networkId, tokenId));
 }
 export { erc20TransferAbi };

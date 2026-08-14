@@ -1,6 +1,6 @@
 {
   "name": "fidence-cli",
-  "version": "0.1.4",
+  "version": "0.2.0",
   "description": "CLI for Fidence Pay — connect AI agents, poll link approval, and create payment intents.",
   "type": "module",
   "bin": {
@@ -36,10 +36,13 @@
     "node": ">=18"
   },
   "dependencies": {
+    "@solana/spl-token": "^0.4.15",
+    "@solana/web3.js": "^1.98.4",
     "tweetnacl": "^1.0.3",
     "viem": "^2.37.1"
   },
   "devDependencies": {
+    "@types/node": "^22.17.2",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2"
   }

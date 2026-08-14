@@ -1,6 +1,8 @@
-import type { LocalWallet } from "./wallet.js";
+import type { LoadedAgentWallet } from "./agent-wallets.js";
 export declare function sendLocalEvmPayment(input: {
-    wallet: LocalWallet;
+    wallet: Extract<LoadedAgentWallet, {
+        keyType: "evm";
+    }>;
     networkId: string;
     tokenId: string;
     recipientAddress: string;

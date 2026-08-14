@@ -38,10 +38,10 @@ const STEPS = [
     footer: null,
   },
   {
-    title: "Set up wallet & mandate",
+    title: "Set up mandate & fund wallets",
     description:
-      "Add a payer wallet and activate spending rules so your agent can pay within limits.",
-    footer: "You can finish wallet setup on the Mandates tab after closing this guide.",
+      "After approval, fund your agent spending wallets and enable automatic payments within your mandate limits.",
+    footer: "Open Mandates to activate spending rules and enable auto-pay for the CLI.",
   },
 ] as const;
 

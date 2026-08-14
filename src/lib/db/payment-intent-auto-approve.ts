@@ -1,5 +1,6 @@
 import type { MerchantApiContext } from "@/lib/db/merchant-api";
 import { getAgentPolicy } from "@/lib/db/agent-policies";
+import { isLinkedAgent } from "@/lib/db/agents";
 import {
   isAutoPayEligibleFromChecks,
   preflightAgentAddressPayment,
@@ -22,6 +23,13 @@ export async function evaluateAutoPayEligibility(input: {
   networkId?: string;
 }): Promise<boolean> {
   if (!input.context.agent) return false;
+
+  if (
+    isLinkedAgent(input.context.agent) &&
+    input.context.agent.signingMode === "agent_wallet"
+  ) {
+    return false;
+  }
 
   const policy = await getAgentPolicy(
     input.context.workspace._id,
