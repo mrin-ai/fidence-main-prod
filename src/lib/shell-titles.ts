@@ -14,8 +14,10 @@ const SHELL_TITLES: Record<string, string> = {
   "/merchant/compliance": "Compliance Engine",
   "/merchant/webhooks": "Webhooks",
   "/pay/agents": "Pay",
+  "/pay/wallets": "Pay",
   "/pay/addresses": "Pay",
   "/pay/mandates": "Pay",
+  "/pay/card": "Pay",
   "/pay/connect": "Authorize agent",
 };
 

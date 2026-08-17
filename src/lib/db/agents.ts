@@ -313,6 +313,7 @@ export async function listLinkedAgents(workspaceId: ObjectId) {
     .find({
       workspaceId,
       registrationSource: "linked",
+      status: "active",
     })
     .sort({ linkedAt: -1, lastActiveAt: -1 })
     .toArray();

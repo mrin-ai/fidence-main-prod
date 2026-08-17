@@ -7,8 +7,10 @@ import { cn } from "@/lib/utils";
 
 const tabs = [
   { href: "/pay/agents", label: "Agents" },
+  { href: "/pay/wallets", label: "Wallets" },
   { href: "/pay/addresses", label: "Addresses" },
   { href: "/pay/mandates", label: "Mandates" },
+  { href: "/pay/card", label: "Card" },
 ];
 
 export function PayTabsNav() {

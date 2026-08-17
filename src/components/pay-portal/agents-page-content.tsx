@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 
 import { ConnectAgentDialog } from "@/components/pay-portal/connect-agent-dialog";
+import { RemoveLinkedAgentButton } from "@/components/pay-portal/remove-linked-agent-button";
 import type { LinkedAgentSummary } from "@/lib/pay/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -288,6 +289,7 @@ export function PayAgentsPageContent() {
                   <TableHead>Platform</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Wallets</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -301,6 +303,13 @@ export function PayAgentsPageContent() {
                       </Badge>
                     </TableCell>
                     <TableCell>{agent.wallets.length}</TableCell>
+                    <TableCell className="text-right">
+                      <RemoveLinkedAgentButton
+                        agentId={agent.id}
+                        agentName={agent.name}
+                        onRemoved={() => void load()}
+                      />
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

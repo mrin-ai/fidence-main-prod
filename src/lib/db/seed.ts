@@ -207,10 +207,10 @@ export async function ensureDbIndexes(dbInput?: Db) {
         // Legacy unique index may already be removed.
       }
     })(),
-    db.collection(COLLECTIONS.apiKeys).createIndex(
-      { workspaceId: 1, keyType: 1, environment: 1 },
-      { unique: true, sparse: true },
-    ),
+    (async () => {
+      const { ensureApiKeyIndexes } = await import("@/lib/db/api-key-indexes");
+      await ensureApiKeyIndexes();
+    })(),
     db.collection(COLLECTIONS.apiKeys).createIndex({ keyHash: 1 }, { unique: true }),
     db.collection(COLLECTIONS.agents).createIndex(
       { workspaceId: 1, externalAgentId: 1 },

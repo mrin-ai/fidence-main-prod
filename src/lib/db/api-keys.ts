@@ -230,6 +230,9 @@ export async function issueAgentScopedKey(input: {
   security: SecurityContext;
   plaintextKeyStorage?: boolean;
 }) {
+  const { ensureApiKeyIndexes } = await import("@/lib/db/api-key-indexes");
+  await ensureApiKeyIndexes();
+
   const db = await getDb();
   const now = new Date();
   const rawKey = `${API_KEY_PREFIXES.agent}${randomBytes(24).toString("hex")}`;

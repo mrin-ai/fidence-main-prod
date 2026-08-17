@@ -12,6 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { RemoveLinkedAgentButton } from "@/components/pay-portal/remove-linked-agent-button";
 import { dashboardCardClassName } from "@/lib/dashboard-styles";
 
 export function PayMandatesPageContent() {
@@ -25,8 +26,11 @@ export function PayMandatesPageContent() {
     const data = (await res.json()) as { agents?: LinkedAgentSummary[] };
     const list = data.agents ?? [];
     setAgents(list);
-    if (!selectedId && list[0]) setSelectedId(list[0].id);
-  }, [selectedId]);
+    setSelectedId((current) => {
+      if (current && list.some((agent) => agent.id === current)) return current;
+      return list[0]?.id ?? null;
+    });
+  }, []);
 
   const loadPolicy = useCallback(async (agentId: string) => {
     const res = await fetch(`/api/pay/mandates/${agentId}`);
@@ -120,9 +124,14 @@ export function PayMandatesPageContent() {
           </Card>
 
           <Card className={dashboardCardClassName}>
-            <CardHeader>
-              <CardTitle className="text-base">{selected?.name ?? "Mandate"}</CardTitle>
-              <CardDescription>Caps, allowed assets, and approval thresholds.</CardDescription>
+            <CardHeader className="flex-row items-start justify-between gap-4 space-y-0">
+              <div>
+                <CardTitle className="text-base">{selected?.name ?? "Mandate"}</CardTitle>
+                <CardDescription>Caps, allowed assets, and approval thresholds.</CardDescription>
+              </div>
+              {selected ? (
+                <RemoveLinkedAgentButton agentId={selected.id} agentName={selected.name} onRemoved={() => void loadAgents()} />
+              ) : null}
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between rounded-md border p-3">
